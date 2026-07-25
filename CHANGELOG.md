@@ -67,6 +67,16 @@ All notable changes follow Keep a Changelog conventions.
 - Command-driven merges, dimensions, sheet move/rename/duplicate/visibility/tab
   color, and a 50-operation mixed undo regression.
 - XLSX and OGrid persistence for autofilter and data-validation state.
+- Immutable range-bound chart specifications and headless category/series
+  extraction from current formula caches.
+- Movable/resizable matplotlib chart panels for column, bar, line, pie,
+  scatter, area, and combo charts.
+- Chart wizard configuration for range, type, titles, axes, headers, and
+  legend placement, plus 160-DPI PNG export.
+- Live chart refresh after edits, command changes, recalculation, sheet
+  switches, and workbook loads.
+- Undoable chart add/remove, structural range translation, sheet-rename
+  translation, and native OGrid chart persistence.
 
 ### Fixed
 

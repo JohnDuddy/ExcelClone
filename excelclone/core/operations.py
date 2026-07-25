@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from excelclone.core.conditional import ConditionalRule
+from excelclone.core.chart import ChartSpec
 from excelclone.core.data_tools import AutoFilter, DataValidation
 from excelclone.core.refs import RangeReference
 from excelclone.core.refs import MAX_COLUMNS, MAX_ROWS
@@ -56,6 +57,25 @@ def edit_structure(
                     error=None,
                 ),
             )
+        translated_charts: list[object] = []
+        for chart in formula_sheet.charts:
+            if not isinstance(chart, ChartSpec) or (
+                chart.sheet_name.casefold() != target.name.casefold()
+            ):
+                translated_charts.append(chart)
+                continue
+            translated_range = translate_reference_structure(
+                chart.source_range,
+                axis=axis,
+                index=index,
+                count=count,
+                delete=delete,
+            )
+            if isinstance(translated_range, RangeReference):
+                translated_charts.append(
+                    replace(chart, source_range=translated_range)
+                )
+        formula_sheet.charts = translated_charts
 
     _move_cells(target, axis=axis, index=index, count=count, delete=delete)
     if axis == "row":

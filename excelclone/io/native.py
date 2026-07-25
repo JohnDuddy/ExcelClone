@@ -10,6 +10,7 @@ from typing import Any, Callable
 from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 from excelclone.core.cell import BorderStyle, Cell, CellFormat
+from excelclone.core.chart import ChartSpec
 from excelclone.core.conditional import ConditionalRule, FormatPatch
 from excelclone.core.data_tools import AutoFilter, DataValidation
 from excelclone.core.refs import parse_a1
@@ -134,6 +135,11 @@ def _sheet_to_data(sheet: Any) -> dict[str, Any]:
             else None
         ),
         "filtered_rows": sorted(sheet.filtered_rows),
+        "charts": [
+            _chart_to_data(item)
+            for item in sheet.charts
+            if isinstance(item, ChartSpec)
+        ],
         "freeze_panes": list(sheet.freeze_panes) if sheet.freeze_panes else None,
         "tab_color": sheet.tab_color,
         "visible": sheet.visible,
@@ -182,6 +188,9 @@ def _restore_sheet(sheet: Any, data: dict[str, Any]) -> None:
         _filter_from_data(filter_data) if isinstance(filter_data, dict) else None
     )
     sheet.filtered_rows = {int(value) for value in data.get("filtered_rows", ())}
+    sheet.charts = [
+        _chart_from_data(item) for item in data.get("charts", ())
+    ]
     panes = data.get("freeze_panes")
     sheet.freeze_panes = tuple(panes) if panes is not None else None
     sheet.tab_color = data.get("tab_color")
@@ -326,6 +335,43 @@ def _filter_from_data(data: dict[str, Any]) -> AutoFilter:
             _decode_value(value) for value in data.get("allowed_values", ())
         ),
         has_header=bool(data.get("has_header", True)),
+    )
+
+
+def _chart_to_data(chart: ChartSpec) -> dict[str, Any]:
+    return {
+        "chart_id": chart.chart_id,
+        "sheet_name": chart.sheet_name,
+        "source_range": chart.source_range.to_a1(),
+        "chart_type": chart.chart_type,
+        "title": chart.title,
+        "x_axis_title": chart.x_axis_title,
+        "y_axis_title": chart.y_axis_title,
+        "legend_position": chart.legend_position,
+        "has_headers": chart.has_headers,
+        "category_column": chart.category_column,
+        "series_columns": (
+            list(chart.series_columns)
+            if chart.series_columns is not None
+            else None
+        ),
+    }
+
+
+def _chart_from_data(data: dict[str, Any]) -> ChartSpec:
+    columns = data.get("series_columns")
+    return ChartSpec(
+        data["chart_id"],
+        data["sheet_name"],
+        parse_a1(data["source_range"]),
+        data["chart_type"],
+        data.get("title", ""),
+        data.get("x_axis_title", ""),
+        data.get("y_axis_title", ""),
+        data.get("legend_position", "right"),
+        bool(data.get("has_headers", True)),
+        data.get("category_column"),
+        tuple(columns) if columns is not None else None,
     )
 
 

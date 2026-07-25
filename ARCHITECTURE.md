@@ -49,6 +49,14 @@ and restore that graph on undo. Formula AST translation runs before sparse
 coordinates move; a dependency-index rebuild then recalculates the resulting
 workbook without stale graph edges.
 
+## Charts
+
+`ChartSpec` is immutable workbook metadata; `chart_data` reads current cached
+values and emits renderer-neutral categories and numeric series. The Qt chart
+panel owns matplotlib figures and refreshes from those values after commands or
+recalculation. This keeps matplotlib and Qt out of core and makes live binding
+observable without pixel tests.
+
 ## Performance Shape
 
 Sheets allocate cells only when content or non-default formatting exists. The Qt

@@ -25,6 +25,7 @@ class Sheet:
         "filtered_rows",
         "auto_filter",
         "data_validations",
+        "charts",
         "merged_ranges",
         "conditional_formats",
         "freeze_panes",
@@ -44,6 +45,7 @@ class Sheet:
         self.filtered_rows: set[int] = set()
         self.auto_filter: Any = None
         self.data_validations: list[Any] = []
+        self.charts: list[Any] = []
         self.merged_ranges: list[RangeReference] = []
         self.conditional_formats: list[Any] = []
         self.freeze_panes: tuple[int, int] | None = None
@@ -145,6 +147,7 @@ class Sheet:
         duplicate.filtered_rows = self.filtered_rows.copy()
         duplicate.auto_filter = self.auto_filter
         duplicate.data_validations = list(self.data_validations)
+        duplicate.charts = list(self.charts)
         duplicate.merged_ranges = list(self.merged_ranges)
         duplicate.conditional_formats = list(self.conditional_formats)
         duplicate.freeze_panes = self.freeze_panes
@@ -163,6 +166,7 @@ class Sheet:
         self.filtered_rows = restored.filtered_rows
         self.auto_filter = restored.auto_filter
         self.data_validations = restored.data_validations
+        self.charts = restored.charts
         self.merged_ranges = restored.merged_ranges
         self.conditional_formats = restored.conditional_formats
         self.freeze_panes = restored.freeze_panes

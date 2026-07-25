@@ -8,6 +8,7 @@ from typing import Any
 
 from excelclone.commands.base import Command
 from excelclone.core.cell import Cell, CellFormat
+from excelclone.core.chart import ChartSpec
 from excelclone.core.conditional import FormatPatch
 from excelclone.core.data_tools import (
     DataValidation,
@@ -374,6 +375,52 @@ class AddValidationCommand(_WorkbookSnapshotCommand):
         self.engine.workbook.get_sheet(self.sheet_name).data_validations.append(
             self.validation
         )
+
+
+@dataclass
+class AddChartCommand(_WorkbookSnapshotCommand):
+    """Attach a chart specification to a sheet."""
+
+    sheet_name: str
+    chart: ChartSpec
+
+    @property
+    def description(self) -> str:
+        return "Add chart"
+
+    def do(self) -> None:
+        self._capture()
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        if any(
+            isinstance(item, ChartSpec) and item.chart_id == self.chart.chart_id
+            for item in sheet.charts
+        ):
+            raise ValueError(f"Chart ID already exists: {self.chart.chart_id}")
+        sheet.charts.append(self.chart)
+
+
+@dataclass
+class RemoveChartCommand(_WorkbookSnapshotCommand):
+    """Remove a sheet chart by ID."""
+
+    sheet_name: str
+    chart_id: str
+
+    @property
+    def description(self) -> str:
+        return "Remove chart"
+
+    def do(self) -> None:
+        self._capture()
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        retained = [
+            item
+            for item in sheet.charts
+            if not isinstance(item, ChartSpec) or item.chart_id != self.chart_id
+        ]
+        if len(retained) == len(sheet.charts):
+            raise KeyError(f"Unknown chart ID: {self.chart_id}")
+        sheet.charts = retained
 
 
 @dataclass
@@ -852,3 +899,31 @@ def _rename_formula_sheet_references(
                         error=None,
                     ),
                 )
+        renamed_charts: list[Any] = []
+        for chart in sheet.charts:
+            if not isinstance(chart, ChartSpec):
+                renamed_charts.append(chart)
+                continue
+            source_range = chart.source_range
+            if (
+                source_range.sheet is not None
+                and source_range.sheet.casefold() == old_name.casefold()
+            ):
+                source_range = RangeReference(
+                    replace(source_range.start, sheet=new_name),
+                    replace(source_range.end, sheet=new_name),
+                    whole_row=source_range.whole_row,
+                    whole_column=source_range.whole_column,
+                )
+            renamed_charts.append(
+                replace(
+                    chart,
+                    sheet_name=(
+                        new_name
+                        if chart.sheet_name.casefold() == old_name.casefold()
+                        else chart.sheet_name
+                    ),
+                    source_range=source_range,
+                )
+            )
+        sheet.charts = renamed_charts

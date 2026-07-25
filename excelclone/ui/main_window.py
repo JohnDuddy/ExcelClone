@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from excelclone.commands.base import CommandHistory
 from excelclone.commands.edits import (
     AddSheetCommand,
+    AddChartCommand,
     AddValidationCommand,
     ApplyFilterCommand,
     ClearFilterCommand,
@@ -35,6 +36,7 @@ from excelclone.commands.edits import (
     MoveSheetCommand,
     PasteCellsCommand,
     RemoveDuplicatesCommand,
+    RemoveChartCommand,
     RenameSheetCommand,
     ReplaceAllCommand,
     SetColumnWidthCommand,
@@ -57,6 +59,8 @@ from excelclone.io.native import load_ogrid, save_ogrid
 from excelclone.io.xlsx_reader import read_xlsx
 from excelclone.io.xlsx_writer import write_xlsx
 from excelclone.ui.delegates import CellDelegate
+from excelclone.ui.charting import ChartPanel
+from excelclone.ui.dialogs.chart_wizard import ChartWizard
 from excelclone.ui.dialogs.format_cells import FormatCellsDialog
 from excelclone.ui.dialogs.data_tools import (
     FilterDialog,
@@ -90,6 +94,7 @@ class MainWindow(QMainWindow):
         self.current_path: Path | None = None
         self.dirty = False
         self._suppress_dirty = False
+        self._chart_panels: dict[str, ChartPanel] = {}
 
         self.engine = FormulaEngine(workbook if workbook is not None else Workbook())
         self.history = CommandHistory(limit=200)
@@ -212,6 +217,7 @@ class MainWindow(QMainWindow):
         )
         self.ribbon.actionRequested.connect(self._ribbon_action)
         self.grid.sync_sheet_metadata()
+        self._sync_charts()
 
     def new_workbook(self) -> None:
         """Replace the current document with a blank workbook."""
@@ -315,6 +321,7 @@ class MainWindow(QMainWindow):
         *,
         path: Path | None,
     ) -> None:
+        self._dispose_chart_panels()
         self.engine = FormulaEngine(workbook)
         self.grid_model.replace_engine(self.engine)
         self._suppress_dirty = True
@@ -326,6 +333,7 @@ class MainWindow(QMainWindow):
         self.grid.setCurrentIndex(index)
         self.on_current_cell_changed(index)
         self.grid.sync_sheet_metadata()
+        self._sync_charts()
         self.current_path = path
         self.dirty = False
         if path is not None:
@@ -523,11 +531,13 @@ class MainWindow(QMainWindow):
             self.grid_model.set_active_sheet(self.engine.workbook.get_sheet(index).name)
             self.on_current_cell_changed(self.grid.currentIndex())
             self.grid.sync_sheet_metadata()
+            self._sync_charts()
 
     def recalculate(self) -> None:
         """Run full workbook recalculation."""
         result = self.engine.recalculate()
         self.grid_model.refresh()
+        self._refresh_charts()
         if result.first_circular is not None:
             self.statusBar().showMessage(
                 f"Circular reference: {result.first_circular.to_a1()}",
@@ -556,6 +566,7 @@ class MainWindow(QMainWindow):
             self.grid_model.set_active_sheet(active_name)
         self.sheet_tabs.sync(self.engine.workbook)
         self.grid.sync_sheet_metadata()
+        self._sync_charts()
 
     def _ribbon_action(self, name: str) -> None:
         actions = {
@@ -592,6 +603,7 @@ class MainWindow(QMainWindow):
             "Validate": self.validate_selection,
             "Remove Duplicates": self.remove_duplicates,
             "Text to Columns": self.text_to_columns,
+            "Chart": self.insert_chart,
         }
         action = actions.get(name)
         if action is not None:
@@ -631,6 +643,77 @@ class MainWindow(QMainWindow):
                 dialog.transpose.isChecked(),
             )
         )
+
+    def insert_chart(self) -> None:
+        """Create a range-bound chart through the chart wizard."""
+        target = self._selected_range()
+        wizard = ChartWizard(
+            self.grid_model.active_sheet_name,
+            target.to_a1(),
+            self,
+        )
+        if wizard.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            spec = wizard.chart_spec()
+            self.history.execute(
+                AddChartCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    spec,
+                )
+            )
+        except ValueError as error:
+            self.statusBar().showMessage(str(error), 3000)
+
+    def _sync_charts(self) -> None:
+        active_specs = {
+            chart.chart_id: chart
+            for chart in self.engine.workbook.active_sheet.charts
+            if hasattr(chart, "chart_id")
+        }
+        for chart_id, panel in tuple(self._chart_panels.items()):
+            if chart_id not in active_specs or panel.workbook is not self.engine.workbook:
+                self.removeDockWidget(panel)
+                panel.setParent(None)
+                panel.deleteLater()
+                del self._chart_panels[chart_id]
+        for chart_id, spec in active_specs.items():
+            panel = self._chart_panels.get(chart_id)
+            if panel is None:
+                panel = ChartPanel(self.engine.workbook, spec, self)
+                panel.closeRequested.connect(self._remove_chart)
+                self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, panel)
+                panel.setFloating(True)
+                panel.show()
+                self._chart_panels[chart_id] = panel
+            else:
+                panel.spec = spec
+                panel.refresh()
+
+    def _refresh_charts(self) -> None:
+        for panel in self._chart_panels.values():
+            panel.refresh()
+
+    def _remove_chart(self, chart_id: str) -> None:
+        if any(
+            getattr(chart, "chart_id", None) == chart_id
+            for chart in self.engine.workbook.active_sheet.charts
+        ):
+            self.history.execute(
+                RemoveChartCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    chart_id,
+                )
+            )
+
+    def _dispose_chart_panels(self) -> None:
+        for panel in self._chart_panels.values():
+            self.removeDockWidget(panel)
+            panel.setParent(None)
+            panel.deleteLater()
+        self._chart_panels.clear()
 
     def insert_rows(self) -> None:
         """Insert rows above the selected range."""

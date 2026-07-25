@@ -42,13 +42,14 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M8 is complete: structural formula translation, rich clipboard/Paste Special,
-fill, sort/filter, find/replace, validation, cleanup tools, merges, dimensions,
-and extended sheet commands are covered by the regression suite. The current
-milestone is M9: range-bound matplotlib charts, wizard configuration, overlay
-panels, live recalculation updates, and PNG export.
+M9 is complete: range-bound chart data, all seven matplotlib chart types,
+wizard configuration, movable panels, live refresh, PNG export, commands, and
+native persistence are covered by the regression suite. The current milestone
+is M10: performance verification, autosave/recovery, logging, remaining view
+polish, installer assets, offline dependency bundle, and final ZIP acceptance.
 
 ## Known Issues
 
-Visible frozen-pane overlays, split views, a mouse fill handle, and charts
-remain scheduled. No shipped M1 through M8 behavior is known to be broken.
+Visible frozen-pane overlays, split views, and a mouse fill handle remain
+scheduled for the M10 polish pass. No shipped M1 through M9 behavior is known
+to be broken.

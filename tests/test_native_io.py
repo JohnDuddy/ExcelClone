@@ -6,6 +6,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import pytest
 
 from excelclone.core.cell import BorderStyle, CellFormat
+from excelclone.core.chart import ChartSpec
 from excelclone.core.conditional import ConditionalRule, FormatPatch
 from excelclone.core.data_tools import DataValidation, apply_filter
 from excelclone.core.refs import parse_a1
@@ -61,6 +62,15 @@ def rich_workbook() -> Workbook:
             (0,),
         )
     )
+    sheet.charts.append(
+        ChartSpec(
+            "sales",
+            "Sheet1",
+            parse_a1("A1:B2"),
+            "line",
+            title="Sales",
+        )
+    )
     apply_filter(
         sheet,
         parse_a1("A1:A10"),
@@ -99,6 +109,7 @@ def test_ogrid_round_trip_is_lossless(tmp_path) -> None:
     assert restored.data_validations == source.data_validations
     assert restored.auto_filter == source.auto_filter
     assert restored.filtered_rows == source.filtered_rows
+    assert restored.charts == source.charts
     assert not loaded.get_sheet("Data").visible
 
 

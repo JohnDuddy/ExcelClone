@@ -123,3 +123,11 @@ metadata across many coordinates. These commands retain a sparse workbook
 snapshot, then restore it through `Workbook.restore_from` on undo. Immutable
 cells make the snapshot proportional to populated state and avoid fragile
 operation-specific inverse algorithms.
+
+## 2026-07-25 — Chart binding seam
+
+Charts persist immutable range and presentation specifications, not matplotlib
+objects or duplicated data. A headless extractor converts current workbook
+caches to categories and series each time a panel refreshes. Rendering and PNG
+export share one Qt/matplotlib path, while core chart behavior remains usable
+in file and structural tests without a `QApplication`.

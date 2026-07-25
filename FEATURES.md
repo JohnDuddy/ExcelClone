@@ -59,7 +59,10 @@ complete.
 - [x] Remove duplicates and text-to-columns (`test_data_tools.py`, `test_commands.py`)
 - [x] Sheet rename/move/duplicate/hide/tab-color commands (`test_commands.py`)
 - [x] Undo restores exact state across 50 mixed operations (`test_commands.py`)
-- [ ] Live range-bound charts
+- [x] Column, bar, line, pie, scatter, area, and combo charts (`test_chart_ui.py`)
+- [x] Range-bound chart data live-updates after recalculation/edit (`test_charts.py`, `test_chart_ui.py`)
+- [x] Chart wizard, movable panels, and PNG export (`test_chart_ui.py`)
+- [x] Undoable chart add/remove and OGrid persistence (`test_charts.py`, `test_native_io.py`)
 
 ## M10 Distribution
 

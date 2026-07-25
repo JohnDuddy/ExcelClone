@@ -45,3 +45,10 @@ formula spelling. Structural command tests cover cross-sheet recalculation,
 range growth/shrinkage, deleted-reference errors, and metadata movement. A
 mixed-operation regression executes and undoes 50 edits including inserts,
 deletes, ranges, and rich pastes.
+
+## Charts
+
+Headless tests prove category/series extraction and live value changes. Qt
+tests render every supported chart type offscreen, export PNGs, validate wizard
+output, and inspect a bar height before and after a grid edit to prove panel
+refresh behavior.
