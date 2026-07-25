@@ -172,7 +172,14 @@ def tokenize(formula: str) -> list[Token]:
         cell_match = _CELL_RE.match(source, position)
         if cell_match and _is_lexeme_boundary(source, cell_match.end()):
             value = cell_match.group(0)
-            raw_tokens.append(Token(TokenKind.CELL, value, absolute_position))
+            kind = (
+                TokenKind.IDENTIFIER
+                if cell_match.end() < len(source)
+                and source[cell_match.end()] == "("
+                and "$" not in value
+                else TokenKind.CELL
+            )
+            raw_tokens.append(Token(kind, value, absolute_position))
             position = cell_match.end()
             continue
 

@@ -130,6 +130,29 @@ def collect_references(node: Node) -> tuple[Reference | str, ...]:
     return tuple(dict.fromkeys(collected))
 
 
+def collect_function_names(node: Node) -> tuple[str, ...]:
+    """Collect called function names in source order."""
+    collected: list[str] = []
+
+    def visit(current: Node) -> None:
+        if isinstance(current, (UnaryNode, PercentNode)):
+            visit(current.operand)
+        elif isinstance(current, (BinaryNode, ReferenceOperatorNode)):
+            visit(current.left)
+            visit(current.right)
+        elif isinstance(current, FunctionNode):
+            collected.append(current.name.upper())
+            for argument in current.arguments:
+                visit(argument)
+        elif isinstance(current, ArrayNode):
+            for row in current.rows:
+                for item in row:
+                    visit(item)
+
+    visit(node)
+    return tuple(dict.fromkeys(collected))
+
+
 class _Parser:
     def __init__(self, tokens: list[Token]) -> None:
         self.tokens = tokens
@@ -271,6 +294,12 @@ class _Parser:
             return LiteralNode(token.value)
         if token.kind is TokenKind.BOOLEAN:
             self._advance()
+            if self._match(TokenKind.LEFT_PAREN):
+                self._expect(
+                    TokenKind.RIGHT_PAREN,
+                    "Logical constant takes no arguments",
+                )
+                return FunctionNode("TRUE" if token.value else "FALSE", ())
             return LiteralNode(token.value)
         if token.kind is TokenKind.ERROR:
             self._advance()
@@ -424,4 +453,3 @@ def _shared_sheet(
 
 def _is_reference_expression(node: Node) -> bool:
     return isinstance(node, (ReferenceNode, NameNode, ReferenceOperatorNode))
-

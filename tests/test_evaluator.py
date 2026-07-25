@@ -73,7 +73,7 @@ def test_operator_evaluation(
     [
         ("=1/0", DIV_ZERO_ERROR),
         ('="abc"+1', VALUE_ERROR),
-        ("=SQRT(-1)", NAME_ERROR),
+        ("=SQRT(-1)", NUM_ERROR),
         ("=#REF!", REF_ERROR),
         ("=#NUM!", NUM_ERROR),
         ("=#CIRC!", CIRC_ERROR),

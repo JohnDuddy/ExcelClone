@@ -21,8 +21,19 @@ All notable changes follow Keep a Changelog conventions.
   cross-sheet edges, range watchers, and deterministic cycle detection.
 - Formula function registry with help metadata, arity, volatility, and lazy-call
   support.
+- 162 math, statistical, logical, text, lookup, date/time, financial, and
+  information functions.
+- Lazy error-handling functions and volatile random, date/time, offset, and
+  indirect functions.
+- Dynamic-array spilling with read-only child ownership, blocker detection,
+  `#SPILL!`, automatic recovery, and cleanup.
+- A 200-formula golden workbook recalculated and cached by Microsoft Excel.
 
 ### Fixed
 
 - Whole-row and whole-column references now ignore shifts along their fully
   spanned axis, preventing out-of-grid translation.
+- Function-like identifiers such as `LOG10(` are no longer mistaken for A1 cell
+  references.
+- `NPER` now accepts valid same-sign logarithm terms while rejecting cash-flow
+  sets that have no financial solution.

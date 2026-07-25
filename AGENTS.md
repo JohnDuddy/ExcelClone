@@ -42,12 +42,12 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M3 is complete: tokenization, recursive-descent parsing, AST evaluation,
-Excel-style errors/coercion, and incremental recalculation are covered by the
-regression suite. The current milestone is M4: the registered 120+ function
-library, volatile functions, dynamic-array spills, and golden cross-checks.
+M4 is complete: 162 registered functions, volatility, dynamic-array spills, and
+200 Excel-cached golden cases are covered by the regression suite. The current
+milestone is M5: the virtualized grid, editing, selection, formula bar, sheet
+tabs, clipboard, and command-based undo/redo.
 
 ## Known Issues
 
-The function library and grid are intentionally absent until their scheduled
-milestones. No shipped M1 through M3 behavior is known to be broken.
+The grid is intentionally absent until M5. No shipped M1 through M4 behavior is
+known to be broken.

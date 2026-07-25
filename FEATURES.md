@@ -24,8 +24,10 @@ complete.
 - [x] AST evaluator with coercion, references, arrays, and Excel date serials (`test_evaluator.py`)
 - [x] Incremental bidirectional dependency graph (`test_depgraph.py`, `test_formula_engine.py`)
 - [x] Circular-reference and formula-error behavior (`test_formula_engine.py`, `test_evaluator.py`)
-- [ ] Registered 120-function library
-- [ ] Dynamic-array spill behavior
+- [x] Registered 162-function library with help metadata and per-function tests (`test_functions_all.py`, `test_function_edges.py`)
+- [x] Dynamic-array spill ownership, blocking, and recovery (`test_spills.py`)
+- [x] Volatile function recalculation (`test_spills.py`)
+- [x] 200-case Microsoft Excel cached-value cross-check (`test_golden_workbook.py`)
 
 ## M5-M6 Grid And Formatting
 

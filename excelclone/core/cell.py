@@ -48,6 +48,7 @@ class Cell:
     cached_value: Any = None
     format: CellFormat = field(default_factory=CellFormat)
     error: str | None = None
+    spill_parent: tuple[int, int] | None = None
 
     @property
     def is_formula(self) -> bool:
@@ -61,8 +62,14 @@ class Cell:
             self.raw_input is None
             and self.cached_value is None
             and self.error is None
+            and self.spill_parent is None
             and self.format.is_default
         )
+
+    @property
+    def is_spill(self) -> bool:
+        """Return whether this cell is owned by a dynamic-array anchor."""
+        return self.spill_parent is not None
 
     @property
     def display_value(self) -> Any:
@@ -76,4 +83,3 @@ class Cell:
 
 DEFAULT_CELL_FORMAT = CellFormat()
 EMPTY_CELL = Cell()
-

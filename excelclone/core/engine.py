@@ -5,15 +5,25 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any
 
-from excelclone.core.cell import CellFormat
+from excelclone.core.cell import EMPTY_CELL, Cell, CellFormat
 from excelclone.core.depgraph import CellAddress, DependencyGraph
-from excelclone.core.errors import CIRC_ERROR, SpreadsheetError
+from excelclone.core.errors import CIRC_ERROR, SPILL_ERROR, VALUE_ERROR, SpreadsheetError
 from excelclone.core.evaluator import FormulaEvaluator
-from excelclone.core.parser import Node, collect_references, parse_formula
-from excelclone.core.refs import CellReference, RangeReference, Reference
+from excelclone.core.functions import FUNCTION_REGISTRY
+from excelclone.core.parser import (
+    Node,
+    collect_function_names,
+    collect_references,
+    parse_formula,
+)
+from excelclone.core.refs import MAX_COLUMNS, MAX_ROWS, CellReference, RangeReference, Reference
 from excelclone.core.workbook import Workbook
 
 _RANGE_EDGE_LIMIT = 100_000
+
+
+class SpillCellReadOnlyError(ValueError):
+    """Raised when editing a cell owned by a dynamic-array formula."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +48,10 @@ class FormulaEngine:
         self.evaluator = FormulaEvaluator(workbook)
         self._asts: dict[CellAddress, Node] = {}
         self._range_precedents: dict[CellAddress, tuple[RangeReference, ...]] = {}
+        self._volatile: set[CellAddress] = set()
+        self._spill_cells: dict[CellAddress, set[CellAddress]] = {}
+        self._spill_owners: dict[CellAddress, CellAddress] = {}
+        self._spill_blockers: dict[CellAddress, set[CellAddress]] = {}
         self._index_existing_formulas()
 
     def set_cell(
@@ -52,12 +66,19 @@ class FormulaEngine:
         """Set a cell atomically and recalculate only affected formulas."""
         sheet = self.workbook.get_sheet(sheet_name)
         address = CellAddress(sheet.name, row, column)
+        if address in self._spill_owners:
+            owner = self._spill_owners[address]
+            raise SpillCellReadOnlyError(
+                f"{address.to_a1()} is owned by spill formula {owner.to_a1()}"
+            )
         ast = (
             parse_formula(raw_input)
             if isinstance(raw_input, str) and raw_input.startswith("=")
             else None
         )
 
+        changed = {address}
+        changed.update(self._clear_spill(address))
         previous = sheet.get_cell(row, column)
         selected_format = previous.format if cell_format is None else cell_format
         sheet.set_cell(
@@ -70,12 +91,13 @@ class FormulaEngine:
         if ast is None:
             self._asts.pop(address, None)
             self._range_precedents.pop(address, None)
+            self._volatile.discard(address)
             self.graph.set_precedents(address, set())
         else:
             self._asts[address] = ast
             self._install_dependencies(address, ast)
 
-        affected = self._affected_formulas({address})
+        affected = self._affected_formulas(changed | self._volatile)
         return self._calculate_nodes(affected)
 
     def recalculate(self, *, sheet_name: str | None = None) -> RecalculationResult:
@@ -129,6 +151,14 @@ class FormulaEngine:
                 precedents.add(address)
 
         self.graph.set_precedents(address, precedents)
+        function_names = collect_function_names(ast)
+        if any(
+            name in FUNCTION_REGISTRY and FUNCTION_REGISTRY[name].volatile
+            for name in function_names
+        ):
+            self._volatile.add(address)
+        else:
+            self._volatile.discard(address)
         if ranges:
             self._range_precedents[address] = tuple(ranges)
         else:
@@ -187,6 +217,11 @@ class FormulaEngine:
             current = queue.pop(0)
             candidates = set(self.graph.dependents_of(current))
             candidates.update(self._range_dependents(current))
+            candidates.update(
+                parent
+                for parent, blockers in self._spill_blockers.items()
+                if current in blockers
+            )
             for dependent in sorted(candidates):
                 if dependent not in affected:
                     affected.add(dependent)
@@ -238,6 +273,11 @@ class FormulaEngine:
 
     def _cache_result(self, address: CellAddress, value: Any) -> None:
         sheet = self.workbook.get_sheet(address.sheet)
+        if isinstance(value, tuple):
+            self._cache_spill(address, value)
+            return
+        self._clear_spill(address)
+        self._spill_blockers.pop(address, None)
         if isinstance(value, SpreadsheetError):
             sheet.update_cache(
                 address.row,
@@ -247,3 +287,103 @@ class FormulaEngine:
             )
         else:
             sheet.update_cache(address.row, address.column, value, error=None)
+
+    def _cache_spill(self, address: CellAddress, value: tuple[Any, ...]) -> None:
+        sheet = self.workbook.get_sheet(address.sheet)
+        rows = (
+            [list(row) for row in value]
+            if value and all(isinstance(row, tuple) for row in value)
+            else [list(value)]
+        )
+        if not rows or not rows[0] or any(len(row) != len(rows[0]) for row in rows):
+            self._clear_spill(address)
+            sheet.update_cache(
+                address.row,
+                address.column,
+                None,
+                error=VALUE_ERROR.literal,
+            )
+            return
+
+        desired: dict[CellAddress, Any] = {}
+        out_of_bounds = False
+        for row_offset, row_values in enumerate(rows):
+            for column_offset, item in enumerate(row_values):
+                row = address.row + row_offset
+                column = address.column + column_offset
+                if row >= MAX_ROWS or column >= MAX_COLUMNS:
+                    out_of_bounds = True
+                    continue
+                desired[CellAddress(address.sheet, row, column)] = item
+
+        old_children = self._spill_cells.get(address, set())
+        blockers: set[CellAddress] = set()
+        if out_of_bounds:
+            blockers.add(address)
+        for target in desired:
+            if target == address or target in old_children:
+                continue
+            cell = sheet.get_cell(target.row, target.column)
+            if not cell.is_empty:
+                blockers.add(target)
+
+        if blockers:
+            self._clear_spill(address)
+            self._spill_blockers[address] = blockers
+            sheet.update_cache(
+                address.row,
+                address.column,
+                None,
+                error=SPILL_ERROR.literal,
+            )
+            return
+
+        self._clear_spill(address)
+        self._spill_blockers.pop(address, None)
+        anchor_value = desired[address]
+        if isinstance(anchor_value, SpreadsheetError):
+            sheet.update_cache(
+                address.row,
+                address.column,
+                None,
+                error=anchor_value.literal,
+            )
+        else:
+            sheet.update_cache(address.row, address.column, anchor_value, error=None)
+
+        parent_cell = sheet.get_cell(address.row, address.column)
+        children: set[CellAddress] = set()
+        for target, item in desired.items():
+            if target == address:
+                continue
+            child = (
+                Cell(
+                    cached_value=None,
+                    format=parent_cell.format,
+                    error=item.literal,
+                    spill_parent=(address.row, address.column),
+                )
+                if isinstance(item, SpreadsheetError)
+                else Cell(
+                    cached_value=item,
+                    format=parent_cell.format,
+                    spill_parent=(address.row, address.column),
+                )
+            )
+            sheet.put_cell(target.row, target.column, child)
+            children.add(target)
+            self._spill_owners[target] = address
+        if children:
+            self._spill_cells[address] = children
+
+    def _clear_spill(self, address: CellAddress) -> set[CellAddress]:
+        children = self._spill_cells.pop(address, set())
+        if not children:
+            return set()
+        sheet = self.workbook.get_sheet(address.sheet)
+        for child_address in children:
+            cell = sheet.get_cell(child_address.row, child_address.column)
+            if cell.spill_parent == (address.row, address.column):
+                sheet.put_cell(child_address.row, child_address.column, EMPTY_CELL)
+            self._spill_owners.pop(child_address, None)
+        return children

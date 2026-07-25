@@ -60,3 +60,16 @@ def register(
 
     return decorator
 
+
+# Import each family after registry construction so decorators populate one
+# authoritative function table.
+from excelclone.core.functions import (  # noqa: E402,F401
+    datetime_fn,
+    finance_fn,
+    info_fn,
+    logical_fn,
+    lookup_fn,
+    math_fn,
+    stats_fn,
+    text_fn,
+)

@@ -49,3 +49,17 @@ Ranges up to 100,000 cells receive explicit graph edges. Larger whole-axis
 ranges remain lazy and are checked by range watchers when a coordinate changes.
 This keeps `A:A` dependencies correct without allocating one million graph
 nodes per formula.
+
+## 2026-07-25 — Spill ownership
+
+Dynamic-array anchors retain their formula while child cells store cached values
+and an immutable parent coordinate. Editing a child is rejected at the engine
+interface. Blocked target cells are tracked so clearing a blocker automatically
+recalculates the anchor.
+
+## 2026-07-25 — Golden fixture provenance
+
+`tests/fixtures/golden.xlsx` is generated from 200 formulas with independently
+derived literal expectations, then opened, fully recalculated, and saved by the
+locally installed Microsoft Excel. Tests require both the Excel cache and the
+OpenGrid evaluator to match those literals.
