@@ -44,7 +44,11 @@ complete.
 
 ## M7-M9 Data And Visualization
 
-- [ ] XLSX, CSV, TSV, and OGrid round trips
+- [x] Lossless versioned OGrid ZIP/JSON round trips (`test_native_io.py`)
+- [x] XLSX values, formulas, styles, merges, dimensions, sheets, names, and frozen-pane round trips (`test_io_roundtrip.py`)
+- [x] Explicit XLSX dropped-feature warnings (`test_io_roundtrip.py`)
+- [x] CSV/TSV encoding, delimiter, scalar/date detection, and export (`test_csv_io.py`)
+- [x] File menu workflow and persisted ten-item recent-files list (`test_ui_workflow.py`, `test_settings.py`)
 - [ ] Sort, filter, validation, find/replace, and paste special
 - [ ] Live range-bound charts
 

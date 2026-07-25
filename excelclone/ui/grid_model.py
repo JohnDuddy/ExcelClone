@@ -175,6 +175,15 @@ class GridModel(QAbstractTableModel):
         self.active_sheet_name = selected.name
         self.endResetModel()
 
+    def replace_engine(self, engine: FormulaEngine) -> None:
+        """Install a newly loaded workbook under one model reset."""
+        self.beginResetModel()
+        self.engine = engine
+        self.active_sheet_name = engine.workbook.active_sheet.name
+        self.conditional_formats = ConditionalFormatEngine(engine.workbook)
+        self.last_error = ""
+        self.endResetModel()
+
     def refresh(self) -> None:
         """Notify views that sparse workbook content may have changed."""
         self.layoutChanged.emit()
@@ -251,4 +260,3 @@ def _parse_user_input(value: Any) -> Any:
         except ValueError:
             return value
     return value
-

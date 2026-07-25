@@ -22,9 +22,14 @@ Disk dialogs -> I/O adapter <---------------------+
 Qt types stop at the UI seam. File-format types stop at the I/O seam. Core
 objects never import either.
 
+I/O adapters translate at the boundary: OpenPyXL types are converted to domain
+cells and formats, delimited text produces one sparse sheet, and native OGrid
+stores versioned JSON inside a ZIP. Loaders return domain workbooks; XLSX also
+returns an immutable warning list for content that cannot be represented.
+
 ## Recalculation
 
-The formula parser will expose cell and range precedents while building an AST.
+The formula parser exposes cell and range precedents while building an AST.
 On edit, the dependency graph replaces the edited cell's incoming edges, marks
 its transitive dependents dirty, detects cycles, and evaluates the affected
 subgraph in topological order. Cached values make display reads constant-time.
@@ -43,4 +48,3 @@ editing, paste, sorting, and tests.
 Sheets allocate cells only when content or non-default formatting exists. The Qt
 model advertises Excel-sized dimensions without materializing them. Dependency
 edges and cached formula values scale with populated and referenced cells.
-

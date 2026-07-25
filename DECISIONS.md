@@ -92,3 +92,19 @@ Formatting a range replaces immutable cell formats without invoking formula
 recalculation. Undo restores only the prior formats, not captured formula
 caches, so an intervening manual recalculation cannot be accidentally rolled
 back by a presentation edit.
+
+## 2026-07-25 — Native file schema
+
+The native `.ogrid` format is a ZIP with a small `workbook.json` manifest and
+one JSON payload per sheet. Schema version 1 preserves core cells, typed
+date/time values, formats, conditional rules, sheet metadata, names, and cached
+results. Loading advances through an explicit migration registry and rejects
+newer schemas rather than guessing.
+
+## 2026-07-25 — XLSX loss boundary
+
+XLSX adapters support the documented cell, style, sheet, name, merge,
+dimension, and frozen-pane subset. The reader detects representable content
+that will be dropped and returns deduplicated warnings for the UI to display.
+This is preferable to leaking OpenPyXL objects into the core or silently
+pretending unsupported workbook features survived.

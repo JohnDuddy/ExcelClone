@@ -45,6 +45,16 @@ All notable changes follow Keep a Changelog conventions.
   gridline, zoom, and freeze-pane metadata controls.
 - AST-level mixed-reference translation used by range-relative conditional
   formulas.
+- Versioned `.ogrid` ZIP/JSON persistence with per-sheet payloads, typed scalar
+  encoding, conditional formats, and an explicit migration registry.
+- XLSX read/write for formulas, values, formats, merges, dimensions, sheet
+  metadata, defined names, active sheet, and frozen panes.
+- User-visible XLSX warnings for charts, images, pivots, tables, validations,
+  comments, links, macros, and unsupported defined names that cannot round-trip.
+- CSV and TSV import/export with delimiter, UTF-8/CP1252, scalar, formula, and
+  optional date detection.
+- File menu open/save workflows, dirty document titles, model-safe workbook
+  replacement, and ten persisted recent files.
 
 ### Fixed
 

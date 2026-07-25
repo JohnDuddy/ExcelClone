@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QModelIndex, Qt
@@ -10,8 +11,10 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QColorDialog,
     QDialog,
+    QFileDialog,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QVBoxLayout,
     QWidget,
 )
@@ -27,6 +30,10 @@ from excelclone.core.conditional import FormatPatch
 from excelclone.core.engine import FormulaEngine
 from excelclone.core.refs import CellReference, parse_a1
 from excelclone.core.workbook import Workbook
+from excelclone.io.csv_io import read_delimited, write_delimited
+from excelclone.io.native import load_ogrid, save_ogrid
+from excelclone.io.xlsx_reader import read_xlsx
+from excelclone.io.xlsx_writer import write_xlsx
 from excelclone.ui.delegates import CellDelegate
 from excelclone.ui.dialogs.format_cells import FormatCellsDialog
 from excelclone.ui.formula_bar import FormulaBar
@@ -34,6 +41,7 @@ from excelclone.ui.grid_model import GridModel
 from excelclone.ui.grid_view import GridView
 from excelclone.ui.ribbon import Ribbon
 from excelclone.ui.sheet_tabs import SheetTabs
+from excelclone.util.settings import SettingsStore
 
 
 class MainWindow(QMainWindow):
@@ -43,11 +51,16 @@ class MainWindow(QMainWindow):
         self,
         workbook: Workbook | None = None,
         parent: Any = None,
+        settings_store: SettingsStore | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("OpenGrid — Personal Spreadsheet")
         self.setMinimumSize(800, 600)
         self.resize(1280, 800)
+        self.settings = settings_store or SettingsStore()
+        self.current_path: Path | None = None
+        self.dirty = False
+        self._suppress_dirty = False
 
         self.engine = FormulaEngine(workbook if workbook is not None else Workbook())
         self.history = CommandHistory(limit=200)
@@ -77,8 +90,21 @@ class MainWindow(QMainWindow):
         self._create_actions()
         self._connect_signals()
         self.on_current_cell_changed(self.grid_model.index(0, 0))
+        self._update_title()
 
     def _create_actions(self) -> None:
+        self.new_action = QAction("New", self)
+        self.new_action.setShortcut(QKeySequence.StandardKey.New)
+        self.new_action.triggered.connect(self.new_workbook)
+        self.open_action = QAction("Open...", self)
+        self.open_action.setShortcut(QKeySequence.StandardKey.Open)
+        self.open_action.triggered.connect(self.open_file)
+        self.save_action = QAction("Save", self)
+        self.save_action.setShortcut(QKeySequence.StandardKey.Save)
+        self.save_action.triggered.connect(self.save)
+        self.save_as_action = QAction("Save As...", self)
+        self.save_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        self.save_as_action.triggered.connect(self.save_as)
         self.undo_action = QAction("Undo", self)
         self.undo_action.setShortcut(QKeySequence.StandardKey.Undo)
         self.undo_action.triggered.connect(self.history.undo)
@@ -91,6 +117,13 @@ class MainWindow(QMainWindow):
         self.add_sheet_action = QAction("New Sheet", self)
         self.add_sheet_action.triggered.connect(self.add_sheet)
 
+        file_menu = self.menuBar().addMenu("&File")
+        file_menu.addAction(self.new_action)
+        file_menu.addAction(self.open_action)
+        file_menu.addAction(self.save_action)
+        file_menu.addAction(self.save_as_action)
+        self._recent_menu = file_menu.addMenu("Recent Files")
+        self._refresh_recent_menu()
         edit_menu = self.menuBar().addMenu("&Edit")
         edit_menu.addAction(self.undo_action)
         edit_menu.addAction(self.redo_action)
@@ -104,6 +137,10 @@ class MainWindow(QMainWindow):
                 self.redo_action,
                 self.recalculate_action,
                 self.add_sheet_action,
+                self.new_action,
+                self.open_action,
+                self.save_action,
+                self.save_as_action,
             ]
         )
         self._update_history_actions(self.history)
@@ -117,10 +154,170 @@ class MainWindow(QMainWindow):
         self.sheet_tabs.activeChanged.connect(self.switch_sheet)
         self.sheet_tabs.closeRequested.connect(self.delete_sheet)
         self.history.add_listener(self._update_history_actions)
+        self.history.add_listener(self._mark_dirty)
         self.grid_model.editRejected.connect(
             lambda message: self.statusBar().showMessage(message, 5000)
         )
         self.ribbon.actionRequested.connect(self._ribbon_action)
+
+    def new_workbook(self) -> None:
+        """Replace the current document with a blank workbook."""
+        self._install_workbook(Workbook(), path=None)
+
+    def open_file(self) -> None:
+        """Prompt for and open a supported workbook or delimited file."""
+        selected, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Spreadsheet",
+            str(self.current_path.parent if self.current_path else Path.home()),
+            (
+                "Spreadsheets (*.ogrid *.xlsx *.xlsm *.csv *.tsv);;"
+                "OpenGrid (*.ogrid);;Excel Workbook (*.xlsx *.xlsm);;"
+                "Delimited Text (*.csv *.tsv)"
+            ),
+        )
+        if not selected:
+            return
+        try:
+            warnings = self.open_path(selected)
+        except (OSError, ValueError, KeyError) as error:
+            QMessageBox.critical(self, "Open Failed", str(error))
+            return
+        self._show_import_warnings(warnings)
+
+    def open_path(self, path: str | Path) -> tuple[str, ...]:
+        """Open a known path and return any dropped-feature warnings."""
+        source = Path(path)
+        suffix = source.suffix.lower()
+        warnings: tuple[str, ...] = ()
+        if suffix == ".ogrid":
+            workbook = load_ogrid(source)
+        elif suffix in (".xlsx", ".xlsm"):
+            result = read_xlsx(source)
+            workbook = result.workbook
+            warnings = result.warnings
+        elif suffix in (".csv", ".tsv"):
+            workbook = read_delimited(source, parse_dates=True).workbook
+        else:
+            raise ValueError(
+                f"Unsupported spreadsheet file type: {suffix or '(none)'}"
+            )
+        self._install_workbook(workbook, path=source)
+        self.statusBar().showMessage(f"Opened {source.name}", 3000)
+        return warnings
+
+    def save(self) -> None:
+        """Save to the current path or prompt for one."""
+        if self.current_path is None:
+            self.save_as()
+            return
+        try:
+            self.save_path(self.current_path)
+        except (OSError, ValueError) as error:
+            QMessageBox.critical(self, "Save Failed", str(error))
+
+    def save_as(self) -> None:
+        """Prompt for a destination and save in the selected format."""
+        selected, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Spreadsheet",
+            str(self.current_path or Path.home() / "Workbook.ogrid"),
+            (
+                "OpenGrid (*.ogrid);;Excel Workbook (*.xlsx);;"
+                "CSV (*.csv);;TSV (*.tsv)"
+            ),
+        )
+        if not selected:
+            return
+        try:
+            self.save_path(selected)
+        except (OSError, ValueError) as error:
+            QMessageBox.critical(self, "Save Failed", str(error))
+
+    def save_path(self, path: str | Path) -> Path:
+        """Save the current workbook using extension-based dispatch."""
+        destination = Path(path)
+        suffix = destination.suffix.lower()
+        if suffix == ".ogrid":
+            save_ogrid(self.engine.workbook, destination)
+        elif suffix == ".xlsx":
+            write_xlsx(self.engine.workbook, destination)
+        elif suffix in (".csv", ".tsv"):
+            write_delimited(self.engine.workbook, destination)
+        else:
+            raise ValueError(
+                f"Unsupported spreadsheet file type: {suffix or '(none)'}"
+            )
+        self.current_path = destination
+        self.dirty = False
+        self.settings.add_recent_file(destination)
+        self._refresh_recent_menu()
+        self._update_title()
+        self.statusBar().showMessage(f"Saved {destination.name}", 3000)
+        return destination
+
+    def _install_workbook(
+        self,
+        workbook: Workbook,
+        *,
+        path: Path | None,
+    ) -> None:
+        self.engine = FormulaEngine(workbook)
+        self.grid_model.replace_engine(self.engine)
+        self._suppress_dirty = True
+        self.history.clear()
+        self._suppress_dirty = False
+        self.sheet_tabs.sync(workbook)
+        self.sheet_tabs.tab_bar.setCurrentIndex(workbook.active_sheet_index)
+        index = self.grid_model.index(0, 0)
+        self.grid.setCurrentIndex(index)
+        self.on_current_cell_changed(index)
+        self.current_path = path
+        self.dirty = False
+        if path is not None:
+            self.settings.add_recent_file(path)
+        self._refresh_recent_menu()
+        self._update_title()
+
+    def _mark_dirty(self, history: CommandHistory) -> None:
+        if not self._suppress_dirty:
+            self.dirty = True
+            self._update_title()
+
+    def _update_title(self) -> None:
+        base = "OpenGrid — Personal Spreadsheet"
+        marker = "*" if self.dirty else ""
+        if self.current_path is not None:
+            self.setWindowTitle(f"{self.current_path.name}{marker} - {base}")
+        elif self.dirty:
+            self.setWindowTitle(f"Untitled{marker} - {base}")
+        else:
+            self.setWindowTitle(base)
+
+    def _refresh_recent_menu(self) -> None:
+        self._recent_menu.clear()
+        for path in self.settings.recent_files:
+            action = self._recent_menu.addAction(path)
+            action.triggered.connect(
+                lambda checked=False, selected=path: self._open_recent(selected)
+            )
+        self._recent_menu.setEnabled(bool(self.settings.recent_files))
+
+    def _open_recent(self, path: str) -> None:
+        try:
+            warnings = self.open_path(path)
+        except (OSError, ValueError, KeyError) as error:
+            QMessageBox.critical(self, "Open Failed", str(error))
+            return
+        self._show_import_warnings(warnings)
+
+    def _show_import_warnings(self, warnings: tuple[str, ...]) -> None:
+        if warnings:
+            QMessageBox.warning(
+                self,
+                "Workbook Imported With Warnings",
+                "\n".join(f"- {warning}" for warning in warnings),
+            )
 
     def on_current_cell_changed(self, index: QModelIndex) -> None:
         """Synchronize the formula bar with a current grid index."""

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 from excelclone.ui.delegates import CellDelegate
 from excelclone.ui.formula_bar import cycle_absolute_reference
 from excelclone.ui.main_window import MainWindow
+from excelclone.util.settings import SettingsStore
 
 
 def application() -> QApplication:
@@ -125,4 +126,39 @@ def test_view_actions_toggle_gridlines_formulas_zoom_and_freeze_panes() -> None:
     assert model.sheet.freeze_panes == (2, 3)
     window._ribbon_action("Freeze Panes")
     assert model.sheet.freeze_panes is None
+    window.close()
+
+
+def test_main_window_saves_and_opens_native_workbook_path(tmp_path) -> None:
+    application()
+    settings = SettingsStore(tmp_path / "settings.json")
+    path = tmp_path / "workbook.ogrid"
+    window = MainWindow(settings_store=settings)
+    window.grid_model.setData(window.grid_model.index(0, 0), "42")
+
+    window.save_path(path)
+    window.grid_model.setData(window.grid_model.index(0, 0), "99")
+    warnings = window.open_path(path)
+
+    assert warnings == ()
+    assert window.grid_model.data(window.grid_model.index(0, 0)) == "42"
+    assert window.current_path == path
+    assert str(path) == settings.recent_files[0]
+    assert not window.dirty
+    assert path.name in window.windowTitle()
+    window.close()
+
+
+def test_main_window_path_dispatch_supports_xlsx_csv_and_tsv(tmp_path) -> None:
+    application()
+    window = MainWindow(settings_store=SettingsStore(tmp_path / "settings.json"))
+    window.grid_model.setData(window.grid_model.index(0, 0), "7")
+
+    for suffix in (".xlsx", ".csv", ".tsv"):
+        path = tmp_path / f"book{suffix}"
+        window.save_path(path)
+        assert path.exists()
+        window.open_path(path)
+        assert window.grid_model.data(window.grid_model.index(0, 0)) == "7"
+
     window.close()
