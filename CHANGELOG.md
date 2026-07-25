@@ -28,6 +28,13 @@ All notable changes follow Keep a Changelog conventions.
 - Dynamic-array spilling with read-only child ownership, blocker detection,
   `#SPILL!`, automatic recovery, and cleanup.
 - A 200-formula golden workbook recalculated and cached by Microsoft Excel.
+- Excel-sized `QAbstractTableModel` and `QTableView` backed by sparse sheets.
+- Formula bar with name-box navigation and F4 absolute-reference cycling.
+- Grid editing, selection statistics, keyboard undo/redo, and TSV clipboard
+  interoperability.
+- Tabbed ribbon shell and movable workbook sheet tabs.
+- Reversible command history with a 200-entry limit, adjacent edit merging,
+  atomic range edits, and sheet add/delete/rename restoration.
 
 ### Fixed
 

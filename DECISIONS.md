@@ -63,3 +63,17 @@ recalculates the anchor.
 derived literal expectations, then opened, fully recalculated, and saved by the
 locally installed Microsoft Excel. Tests require both the Excel cache and the
 OpenGrid evaluator to match those literals.
+
+## 2026-07-25 — Virtual grid reads
+
+The Qt model advertises the full Excel row and column counts at all times.
+Display and edit roles call sparse `Sheet.get_cell`, which returns an immutable
+blank singleton without allocation. Model resets occur only when switching
+sheets; ordinary edits emit targeted cell changes.
+
+## 2026-07-25 — UI mutation seam
+
+Grid edits, pasted ranges, and sheet changes execute commands through one
+`CommandHistory`. UI widgets never write directly to sheet storage. This keeps
+toolbar, keyboard, formula-bar, and future data-tool mutations equally
+undoable.

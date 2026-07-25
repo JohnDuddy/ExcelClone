@@ -31,8 +31,11 @@ complete.
 
 ## M5-M6 Grid And Formatting
 
-- [ ] Virtualized editable grid and formula bar
-- [ ] Command-based undo and redo
+- [x] Excel-sized virtualized editable grid and formula bar (`test_grid_model.py`, `test_ui_workflow.py`)
+- [x] Selection summaries and TSV clipboard (`test_ui_workflow.py`)
+- [x] Movable sheet-tab model with command-driven add/delete (`test_ui_workflow.py`, `test_commands.py`)
+- [x] Command-based 200-level undo and redo (`test_commands.py`)
+- [x] F4 absolute-reference cycling (`test_ui_workflow.py`)
 - [ ] Fill, clipboard, sheet tabs, formatting, freeze panes, and views
 - [ ] Number and conditional-format engines
 

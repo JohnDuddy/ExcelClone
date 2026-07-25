@@ -96,6 +96,10 @@ class Workbook:
                 return sheet
         raise KeyError(f"Unknown sheet: {identifier!r}")
 
+    def index_of(self, identifier: str | int) -> int:
+        """Return the zero-based tab index of a sheet."""
+        return self._sheets.index(self.get_sheet(identifier))
+
     def add_sheet(self, name: str | None = None, *, index: int | None = None) -> Sheet:
         """Add and return a new sheet."""
         selected_name = self._next_sheet_name() if name is None else name
@@ -126,6 +130,16 @@ class Workbook:
             if value.scope is None or value.scope.casefold() != sheet.name.casefold()
         }
         return sheet
+
+    def restore_sheet(self, sheet: Sheet, *, index: int | None = None) -> None:
+        """Restore a previously removed sheet object at a tab position."""
+        self._validate_new_sheet_name(sheet.name)
+        destination = len(self._sheets) if index is None else index
+        if not 0 <= destination <= len(self._sheets):
+            raise IndexError(f"Sheet insertion index out of range: {destination}")
+        self._sheets.insert(destination, sheet)
+        if self._active_sheet is None:
+            self._active_sheet = sheet
 
     def rename_sheet(self, identifier: str | int, new_name: str) -> Sheet:
         """Rename a sheet and update defined-name references atomically."""

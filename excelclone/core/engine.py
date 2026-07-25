@@ -113,6 +113,26 @@ class FormulaEngine:
             }
         return self._calculate_nodes(selected)
 
+    def rebuild_index(self) -> RecalculationResult:
+        """Rebuild dependency state after structural workbook changes."""
+        for sheet in self.workbook:
+            spill_coordinates = [
+                coordinate
+                for coordinate, cell in sheet.iter_populated()
+                if cell.is_spill
+            ]
+            for row, column in spill_coordinates:
+                sheet.clear_cell(row, column)
+        self.graph = DependencyGraph()
+        self._asts.clear()
+        self._range_precedents.clear()
+        self._volatile.clear()
+        self._spill_cells.clear()
+        self._spill_owners.clear()
+        self._spill_blockers.clear()
+        self._index_existing_formulas()
+        return self.recalculate()
+
     def _index_existing_formulas(self) -> None:
         for sheet in self.workbook:
             for (row, column), cell in sheet.iter_populated():

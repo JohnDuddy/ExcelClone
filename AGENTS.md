@@ -42,12 +42,12 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M4 is complete: 162 registered functions, volatility, dynamic-array spills, and
-200 Excel-cached golden cases are covered by the regression suite. The current
-milestone is M5: the virtualized grid, editing, selection, formula bar, sheet
-tabs, clipboard, and command-based undo/redo.
+M5 is complete: the virtualized grid, editing, selection summaries, formula bar,
+sheet tabs, TSV clipboard, and command history are covered by the regression
+suite. The current milestone is M6: number formats, cell presentation,
+conditional formatting, delegates, freeze panes, and formula/grid views.
 
 ## Known Issues
 
-The grid is intentionally absent until M5. No shipped M1 through M4 behavior is
-known to be broken.
+Advanced formatting and data tools remain scheduled. No shipped M1 through M5
+behavior is known to be broken.
