@@ -240,6 +240,13 @@ class Workbook:
         duplicate._defined_names = self._defined_names.copy()
         return duplicate
 
+    def restore_from(self, snapshot: Workbook) -> None:
+        """Replace workbook state from an independent snapshot."""
+        restored = snapshot.copy()
+        self._sheets = restored._sheets
+        self._active_sheet = restored._active_sheet
+        self._defined_names = restored._defined_names
+
     def _next_sheet_name(self) -> str:
         number = 1
         existing = {name.casefold() for name in self.sheet_names}

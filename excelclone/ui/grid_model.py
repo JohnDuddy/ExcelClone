@@ -11,6 +11,7 @@ from PySide6.QtGui import QBrush, QColor, QFont
 from excelclone.commands.base import CommandHistory
 from excelclone.commands.edits import SetCellCommand
 from excelclone.core.conditional import ConditionalFormatEngine, ConditionalResult
+from excelclone.core.data_tools import validation_for_cell, validate_value
 from excelclone.core.engine import FormulaEngine, SpillCellReadOnlyError
 from excelclone.core.formats import format_value
 from excelclone.core.refs import MAX_COLUMNS, MAX_ROWS, index_to_column
@@ -121,12 +122,26 @@ class GridModel(QAbstractTableModel):
             return False
         if self.sheet.get_cell(index.row(), index.column()).is_spill:
             return False
+        parsed_value = _parse_user_input(value)
+        validation = validation_for_cell(self.sheet, index.row(), index.column())
+        if validation is not None:
+            result = validate_value(
+                validation,
+                parsed_value,
+                self.engine.workbook,
+                self.active_sheet_name,
+                (index.row(), index.column()),
+            )
+            if not result.valid:
+                self.last_error = result.message
+                self.editRejected.emit(self.last_error)
+                return False
         command = SetCellCommand(
             self.engine,
             self.active_sheet_name,
             index.row(),
             index.column(),
-            _parse_user_input(value),
+            parsed_value,
         )
         try:
             self.history.execute(command)

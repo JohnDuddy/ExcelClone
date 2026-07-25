@@ -37,3 +37,11 @@ manifest. `test_io_roundtrip.py` writes XLSX through OpenPyXL, reads it back
 through the adapter, recalculates formulas, and independently reopens the file
 with OpenPyXL. `test_csv_io.py` verifies raw bytes where newline or encoding
 behavior matters.
+
+## Structural And Data Operations
+
+Translation tests inspect parsed references rather than depending only on
+formula spelling. Structural command tests cover cross-sheet recalculation,
+range growth/shrinkage, deleted-reference errors, and metadata movement. A
+mixed-operation regression executes and undoes 50 edits including inserts,
+deletes, ranges, and rich pastes.

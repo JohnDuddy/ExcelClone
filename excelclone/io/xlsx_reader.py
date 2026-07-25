@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ from openpyxl.cell.cell import MergedCell
 from openpyxl.styles.colors import COLOR_INDEX
 
 from excelclone.core.cell import BorderStyle, CellFormat
+from excelclone.core.data_tools import DataValidation, apply_filter
 from excelclone.core.engine import FormulaEngine
 from excelclone.core.refs import CellReference, parse_a1
 from excelclone.core.tokenizer import FormulaSyntaxError
@@ -134,10 +136,8 @@ def _read_worksheet(worksheet: Any, sheet: Any, warnings: list[str]) -> None:
         warnings.append(
             f"XLSX conditional formatting on sheet {worksheet.title!r} was dropped."
         )
-    if worksheet.data_validations.count:
-        warnings.append(
-            f"Data validation on sheet {worksheet.title!r} was dropped."
-        )
+    _read_validations(worksheet, sheet, warnings)
+    _read_filter(worksheet, sheet, warnings)
 
 
 def _read_cell_format(cell: Any) -> CellFormat:
@@ -216,3 +216,119 @@ def _read_defined_name(
         warnings.append(
             f"Defined name {defined_name.name!r} is not a simple cell range and was dropped."
         )
+
+
+def _read_validations(
+    worksheet: Any,
+    sheet: Any,
+    warnings: list[str],
+) -> None:
+    kind_names = {
+        "whole": "whole_number",
+        "decimal": "decimal",
+        "date": "date",
+        "textLength": "text_length",
+        "list": "list",
+        "custom": "custom",
+    }
+    operators = {
+        "equal": "equal",
+        "notEqual": "not_equal",
+        "greaterThan": "greater_than",
+        "greaterThanOrEqual": "greater_equal",
+        "lessThan": "less_than",
+        "lessThanOrEqual": "less_equal",
+        "between": "between",
+        "notBetween": "not_between",
+    }
+    for source in worksheet.data_validations.dataValidation:
+        kind = kind_names.get(source.type)
+        if kind is None:
+            warnings.append(
+                f"Unsupported validation type {source.type!r} on "
+                f"sheet {worksheet.title!r} was dropped."
+            )
+            continue
+        values: tuple[Any, ...] = ()
+        formula: str | None = None
+        if kind == "list":
+            text = str(source.formula1 or "")
+            if text.startswith('"') and text.endswith('"'):
+                values = tuple(text[1:-1].split(","))
+            else:
+                warnings.append(
+                    f"Range-based validation list on sheet "
+                    f"{worksheet.title!r} was dropped."
+                )
+                continue
+        elif kind == "custom":
+            formula = "=" + str(source.formula1 or "").removeprefix("=")
+        else:
+            values = tuple(
+                _parse_validation_scalar(value)
+                for value in (source.formula1, source.formula2)
+                if value is not None
+            )
+        for target in source.sqref.ranges:
+            sheet.data_validations.append(
+                DataValidation(
+                    parse_a1(str(target)),
+                    kind,
+                    operators.get(source.operator, "between"),
+                    values,
+                    formula,
+                    bool(source.allow_blank),
+                    source.prompt or "",
+                    source.error
+                    or "The value does not satisfy this cell's validation rule.",
+                )
+            )
+
+
+def _read_filter(
+    worksheet: Any,
+    sheet: Any,
+    warnings: list[str],
+) -> None:
+    reference = worksheet.auto_filter.ref
+    columns = worksheet.auto_filter.filterColumn
+    if not reference or not columns:
+        return
+    if len(columns) > 1:
+        warnings.append(
+            f"Only the first autofilter column on sheet "
+            f"{worksheet.title!r} was imported."
+        )
+    target = parse_a1(reference)
+    if not hasattr(target, "min_column"):
+        return
+    source = columns[0]
+    values = {
+        _parse_validation_scalar(value)
+        for value in source.filters.filter
+    }
+    apply_filter(
+        sheet,
+        target,
+        column=target.min_column + int(source.colId),
+        allowed_values=values,
+        has_header=True,
+    )
+
+
+def _parse_validation_scalar(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    upper = value.upper()
+    if upper in ("TRUE", "FALSE"):
+        return upper == "TRUE"
+    try:
+        return int(value)
+    except ValueError:
+        try:
+            return float(value)
+        except ValueError:
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                return value

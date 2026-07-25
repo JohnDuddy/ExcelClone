@@ -108,3 +108,18 @@ dimension, and frozen-pane subset. The reader detects representable content
 that will be dropped and returns deduplicated warnings for the UI to display.
 This is preferable to leaking OpenPyXL objects into the core or silently
 pretending unsupported workbook features survived.
+
+## 2026-07-25 — Structural formula translation
+
+Copy/fill shifts only relative reference parts. Row/column edits instead shift
+absolute and relative targets alike, expand or shrink ranges, and emit
+`#REF!` when a referenced cell is deleted. Both transformations operate on the
+formula AST and render valid formula text; raw string substitution is not used.
+
+## 2026-07-25 — Complex-command snapshots
+
+Structural edits, sorting, filtering, and data cleanup can touch formulas and
+metadata across many coordinates. These commands retain a sparse workbook
+snapshot, then restore it through `Workbook.restore_from` on undo. Immutable
+cells make the snapshot proportional to populated state and avoid fragile
+operation-specific inverse algorithms.

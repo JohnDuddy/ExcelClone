@@ -22,6 +22,9 @@ class Sheet:
         "column_widths",
         "hidden_rows",
         "hidden_columns",
+        "filtered_rows",
+        "auto_filter",
+        "data_validations",
         "merged_ranges",
         "conditional_formats",
         "freeze_panes",
@@ -38,6 +41,9 @@ class Sheet:
         self.column_widths: dict[int, float] = {}
         self.hidden_rows: set[int] = set()
         self.hidden_columns: set[int] = set()
+        self.filtered_rows: set[int] = set()
+        self.auto_filter: Any = None
+        self.data_validations: list[Any] = []
         self.merged_ranges: list[RangeReference] = []
         self.conditional_formats: list[Any] = []
         self.freeze_panes: tuple[int, int] | None = None
@@ -136,12 +142,32 @@ class Sheet:
         duplicate.column_widths = self.column_widths.copy()
         duplicate.hidden_rows = self.hidden_rows.copy()
         duplicate.hidden_columns = self.hidden_columns.copy()
+        duplicate.filtered_rows = self.filtered_rows.copy()
+        duplicate.auto_filter = self.auto_filter
+        duplicate.data_validations = list(self.data_validations)
         duplicate.merged_ranges = list(self.merged_ranges)
         duplicate.conditional_formats = list(self.conditional_formats)
         duplicate.freeze_panes = self.freeze_panes
         duplicate.tab_color = self.tab_color
         duplicate.visible = self.visible
         return duplicate
+
+    def restore_from(self, snapshot: Sheet) -> None:
+        """Replace this sheet's data and metadata from a snapshot."""
+        restored = snapshot.copy(name=self.name)
+        self._cells = restored._cells
+        self.row_heights = restored.row_heights
+        self.column_widths = restored.column_widths
+        self.hidden_rows = restored.hidden_rows
+        self.hidden_columns = restored.hidden_columns
+        self.filtered_rows = restored.filtered_rows
+        self.auto_filter = restored.auto_filter
+        self.data_validations = restored.data_validations
+        self.merged_ranges = restored.merged_ranges
+        self.conditional_formats = restored.conditional_formats
+        self.freeze_panes = restored.freeze_panes
+        self.tab_color = restored.tab_color
+        self.visible = restored.visible
 
     @staticmethod
     def _validate_coordinate(row: int, column: int) -> None:

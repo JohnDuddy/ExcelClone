@@ -43,6 +43,12 @@ their own mutation. The UI submits commands to a bounded history rather than
 editing a sheet directly, giving the same seam to toolbar actions, keyboard
 editing, paste, sorting, and tests.
 
+Small edits retain prior cells or metadata. Structural and data-table commands
+snapshot the immutable-cell workbook graph, perform one headless operation,
+and restore that graph on undo. Formula AST translation runs before sparse
+coordinates move; a dependency-index rebuild then recalculates the resulting
+workbook without stale graph edges.
+
 ## Performance Shape
 
 Sheets allocate cells only when content or non-default formatting exists. The Qt

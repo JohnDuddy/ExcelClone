@@ -55,6 +55,18 @@ All notable changes follow Keep a Changelog conventions.
   optional date detection.
 - File menu open/save workflows, dirty document titles, model-safe workbook
   replacement, and ten persisted recent files.
+- AST rendering and reference translation for copy/fill, row/column
+  insertion/deletion, range shrink/expansion, `#REF!`, and sheet renames.
+- Atomic row/column structural commands that move sparse cells and metadata,
+  update cross-sheet formulas, and rebuild dependencies.
+- Multi-key sorting, value-list filters, find/replace scopes, data validation,
+  duplicate removal, and text-to-columns as headless data services.
+- Rich internal clipboard cells and Paste Special for all content, values,
+  formulas, formats, and transpose.
+- Numeric, date, weekday, month, and formula fill with Ctrl+D/Ctrl+R support.
+- Command-driven merges, dimensions, sheet move/rename/duplicate/visibility/tab
+  color, and a 50-operation mixed undo regression.
+- XLSX and OGrid persistence for autofilter and data-validation state.
 
 ### Fixed
 

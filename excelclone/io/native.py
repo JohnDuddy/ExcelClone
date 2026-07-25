@@ -11,6 +11,7 @@ from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 from excelclone.core.cell import BorderStyle, Cell, CellFormat
 from excelclone.core.conditional import ConditionalRule, FormatPatch
+from excelclone.core.data_tools import AutoFilter, DataValidation
 from excelclone.core.refs import parse_a1
 from excelclone.core.workbook import Workbook
 
@@ -122,6 +123,17 @@ def _sheet_to_data(sheet: Any) -> dict[str, Any]:
             for item in sheet.conditional_formats
             if isinstance(item, ConditionalRule)
         ],
+        "data_validations": [
+            _validation_to_data(item)
+            for item in sheet.data_validations
+            if isinstance(item, DataValidation)
+        ],
+        "auto_filter": (
+            _filter_to_data(sheet.auto_filter)
+            if isinstance(sheet.auto_filter, AutoFilter)
+            else None
+        ),
+        "filtered_rows": sorted(sheet.filtered_rows),
         "freeze_panes": list(sheet.freeze_panes) if sheet.freeze_panes else None,
         "tab_color": sheet.tab_color,
         "visible": sheet.visible,
@@ -161,6 +173,15 @@ def _restore_sheet(sheet: Any, data: dict[str, Any]) -> None:
         _conditional_rule_from_data(item)
         for item in data.get("conditional_formats", ())
     ]
+    sheet.data_validations = [
+        _validation_from_data(item)
+        for item in data.get("data_validations", ())
+    ]
+    filter_data = data.get("auto_filter")
+    sheet.auto_filter = (
+        _filter_from_data(filter_data) if isinstance(filter_data, dict) else None
+    )
+    sheet.filtered_rows = {int(value) for value in data.get("filtered_rows", ())}
     panes = data.get("freeze_panes")
     sheet.freeze_panes = tuple(panes) if panes is not None else None
     sheet.tab_color = data.get("tab_color")
@@ -253,6 +274,58 @@ def _conditional_rule_from_data(data: dict[str, Any]) -> ConditionalRule:
         formula=data.get("formula"),
         colors=tuple(data.get("colors", ("#f8696b", "#ffeb84", "#63be7b"))),
         stop_if_true=bool(data.get("stop_if_true", False)),
+    )
+
+
+def _validation_to_data(validation: DataValidation) -> dict[str, Any]:
+    return {
+        "range": validation.range.to_a1(),
+        "kind": validation.kind,
+        "operator": validation.operator,
+        "values": [_encode_value(value) for value in validation.values],
+        "formula": validation.formula,
+        "allow_blank": validation.allow_blank,
+        "input_message": validation.input_message,
+        "error_message": validation.error_message,
+    }
+
+
+def _validation_from_data(data: dict[str, Any]) -> DataValidation:
+    return DataValidation(
+        range=parse_a1(data["range"]),
+        kind=data["kind"],
+        operator=data.get("operator", "between"),
+        values=tuple(_decode_value(value) for value in data.get("values", ())),
+        formula=data.get("formula"),
+        allow_blank=bool(data.get("allow_blank", True)),
+        input_message=data.get("input_message", ""),
+        error_message=data.get(
+            "error_message",
+            "The value does not satisfy this cell's validation rule.",
+        ),
+    )
+
+
+def _filter_to_data(auto_filter: AutoFilter) -> dict[str, Any]:
+    return {
+        "range": auto_filter.range.to_a1(),
+        "column": auto_filter.column,
+        "allowed_values": [
+            _encode_value(value)
+            for value in sorted(auto_filter.allowed_values, key=repr)
+        ],
+        "has_header": auto_filter.has_header,
+    }
+
+
+def _filter_from_data(data: dict[str, Any]) -> AutoFilter:
+    return AutoFilter(
+        range=parse_a1(data["range"]),
+        column=int(data["column"]),
+        allowed_values=frozenset(
+            _decode_value(value) for value in data.get("allowed_values", ())
+        ),
+        has_header=bool(data.get("has_header", True)),
     )
 
 

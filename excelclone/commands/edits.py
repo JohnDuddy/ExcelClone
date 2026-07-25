@@ -9,8 +9,24 @@ from typing import Any
 from excelclone.commands.base import Command
 from excelclone.core.cell import Cell, CellFormat
 from excelclone.core.conditional import FormatPatch
+from excelclone.core.data_tools import (
+    DataValidation,
+    FindOptions,
+    SortKey,
+    apply_filter,
+    clear_filter,
+    remove_duplicates,
+    replace_matches,
+    sort_range,
+    text_to_columns,
+)
 from excelclone.core.engine import FormulaEngine, RecalculationResult
+from excelclone.core.fill import fill_range
+from excelclone.core.operations import edit_structure
+from excelclone.core.refs import Reference, RangeReference
 from excelclone.core.sheet import Sheet
+from excelclone.core.translation import rename_formula_sheet, translate_formula_copy
+from excelclone.core.workbook import Workbook
 
 
 @dataclass
@@ -199,6 +215,525 @@ class SetFreezePanesCommand(Command):
 
 
 @dataclass
+class _StructuralCommand(Command):
+    engine: FormulaEngine
+    sheet_name: str
+    index: int
+    count: int = 1
+    snapshot: Workbook | None = field(default=None, init=False)
+
+    axis = "row"
+    delete = False
+
+    @property
+    def description(self) -> str:
+        verb = "Delete" if self.delete else "Insert"
+        noun = "columns" if self.axis == "column" else "rows"
+        return f"{verb} {noun}"
+
+    def do(self) -> None:
+        if self.snapshot is None:
+            self.snapshot = self.engine.workbook.copy()
+        edit_structure(
+            self.engine.workbook,
+            self.sheet_name,
+            axis=self.axis,
+            index=self.index,
+            count=self.count,
+            delete=self.delete,
+        )
+        self.engine.rebuild_index()
+
+    def undo(self) -> None:
+        if self.snapshot is None:
+            raise RuntimeError("Command has not been executed")
+        self.engine.workbook.restore_from(self.snapshot)
+        self.engine.rebuild_index()
+
+
+class InsertRowsCommand(_StructuralCommand):
+    """Insert rows and translate workbook references."""
+
+
+class DeleteRowsCommand(_StructuralCommand):
+    """Delete rows and translate workbook references."""
+
+    delete = True
+
+
+class InsertColumnsCommand(_StructuralCommand):
+    """Insert columns and translate workbook references."""
+
+    axis = "column"
+
+
+class DeleteColumnsCommand(_StructuralCommand):
+    """Delete columns and translate workbook references."""
+
+    axis = "column"
+    delete = True
+
+
+@dataclass
+class _WorkbookSnapshotCommand(Command):
+    engine: FormulaEngine
+    snapshot: Workbook | None = field(default=None, init=False)
+
+    def _capture(self) -> None:
+        if self.snapshot is None:
+            self.snapshot = self.engine.workbook.copy()
+
+    def _rebuild(self) -> None:
+        self.engine.rebuild_index()
+
+    def undo(self) -> None:
+        if self.snapshot is None:
+            raise RuntimeError("Command has not been executed")
+        self.engine.workbook.restore_from(self.snapshot)
+        self.engine.rebuild_index()
+
+
+@dataclass
+class SortRangeCommand(_WorkbookSnapshotCommand):
+    """Sort one rectangle as an atomic command."""
+
+    sheet_name: str
+    target: RangeReference
+    keys: tuple[SortKey, ...]
+    has_header: bool = False
+
+    @property
+    def description(self) -> str:
+        return "Sort range"
+
+    def do(self) -> None:
+        self._capture()
+        sort_range(
+            self.engine.workbook,
+            self.sheet_name,
+            self.target,
+            self.keys,
+            has_header=self.has_header,
+        )
+        self._rebuild()
+
+
+@dataclass
+class ApplyFilterCommand(_WorkbookSnapshotCommand):
+    """Apply a value-list filter as an atomic command."""
+
+    sheet_name: str
+    target: RangeReference
+    column: int
+    allowed_values: frozenset[Any]
+    has_header: bool = True
+
+    @property
+    def description(self) -> str:
+        return "Apply filter"
+
+    def do(self) -> None:
+        self._capture()
+        apply_filter(
+            self.engine.workbook.get_sheet(self.sheet_name),
+            self.target,
+            column=self.column,
+            allowed_values=self.allowed_values,
+            has_header=self.has_header,
+        )
+
+
+@dataclass
+class ClearFilterCommand(_WorkbookSnapshotCommand):
+    """Clear filter-generated hidden rows."""
+
+    sheet_name: str
+
+    @property
+    def description(self) -> str:
+        return "Clear filter"
+
+    def do(self) -> None:
+        self._capture()
+        clear_filter(self.engine.workbook.get_sheet(self.sheet_name))
+
+
+@dataclass
+class AddValidationCommand(_WorkbookSnapshotCommand):
+    """Append one data-validation rule."""
+
+    sheet_name: str
+    validation: DataValidation
+
+    @property
+    def description(self) -> str:
+        return "Add validation"
+
+    def do(self) -> None:
+        self._capture()
+        self.engine.workbook.get_sheet(self.sheet_name).data_validations.append(
+            self.validation
+        )
+
+
+@dataclass
+class FillRangeCommand(_WorkbookSnapshotCommand):
+    """Fill a target range from a source pattern."""
+
+    sheet_name: str
+    source: Reference
+    target: Reference
+
+    @property
+    def description(self) -> str:
+        return "Fill range"
+
+    def do(self) -> None:
+        self._capture()
+        fill_range(
+            self.engine.workbook.get_sheet(self.sheet_name),
+            self.source,
+            self.target,
+        )
+        self._rebuild()
+
+
+@dataclass
+class PasteCellsCommand(_WorkbookSnapshotCommand):
+    """Paste a rich cell matrix with Paste Special behavior."""
+
+    sheet_name: str
+    start_row: int
+    start_column: int
+    cells: tuple[tuple[Cell, ...], ...]
+    source_origin: tuple[int, int]
+    mode: str = "all"
+    transpose: bool = False
+
+    @property
+    def description(self) -> str:
+        return "Paste cells"
+
+    def do(self) -> None:
+        if self.mode not in ("all", "values", "formulas", "formats"):
+            raise ValueError(f"Unknown paste mode: {self.mode!r}")
+        self._capture()
+        matrix = (
+            tuple(tuple(row[index] for row in self.cells) for index in range(len(self.cells[0])))
+            if self.transpose
+            else self.cells
+        )
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        for row_offset, row_cells in enumerate(matrix):
+            for column_offset, source in enumerate(row_cells):
+                row = self.start_row + row_offset
+                column = self.start_column + column_offset
+                current = sheet.get_cell(row, column)
+                source_row, source_column = (
+                    (
+                        self.source_origin[0] + column_offset,
+                        self.source_origin[1] + row_offset,
+                    )
+                    if self.transpose
+                    else (
+                        self.source_origin[0] + row_offset,
+                        self.source_origin[1] + column_offset,
+                    )
+                )
+                if self.mode == "formats":
+                    selected = replace(current, format=source.format)
+                elif self.mode == "values":
+                    selected = Cell(
+                        raw_input=source.display_value,
+                        cached_value=source.display_value,
+                        format=current.format,
+                    )
+                else:
+                    raw = source.raw_input
+                    if source.is_formula:
+                        raw = translate_formula_copy(
+                            source.raw_input,
+                            rows=row - source_row,
+                            columns=column - source_column,
+                        )
+                    selected = Cell(
+                        raw_input=raw,
+                        cached_value=(
+                            None if isinstance(raw, str) and raw.startswith("=")
+                            else raw
+                        ),
+                        format=source.format if self.mode == "all" else current.format,
+                        error=None,
+                    )
+                sheet.put_cell(row, column, selected)
+        self._rebuild()
+
+
+@dataclass
+class ReplaceAllCommand(_WorkbookSnapshotCommand):
+    """Replace all matches in a workbook or sheet."""
+
+    options: FindOptions
+    sheet_name: str | None = None
+    replaced_count: int = field(default=0, init=False)
+
+    @property
+    def description(self) -> str:
+        return "Replace all"
+
+    def do(self) -> None:
+        self._capture()
+        self.replaced_count = replace_matches(
+            self.engine.workbook,
+            self.options,
+            sheet_name=self.sheet_name,
+        )
+        self._rebuild()
+
+
+@dataclass
+class RemoveDuplicatesCommand(_WorkbookSnapshotCommand):
+    """Remove duplicate range rows as one edit."""
+
+    sheet_name: str
+    target: RangeReference
+    key_columns: tuple[int, ...]
+    has_header: bool = True
+    removed_count: int = field(default=0, init=False)
+
+    @property
+    def description(self) -> str:
+        return "Remove duplicates"
+
+    def do(self) -> None:
+        self._capture()
+        self.removed_count = remove_duplicates(
+            self.engine.workbook.get_sheet(self.sheet_name),
+            self.target,
+            key_columns=self.key_columns,
+            has_header=self.has_header,
+        )
+        self._rebuild()
+
+
+@dataclass
+class TextToColumnsCommand(_WorkbookSnapshotCommand):
+    """Split delimited text into adjacent columns."""
+
+    sheet_name: str
+    target: RangeReference
+    delimiter: str = ","
+    output_columns: int = field(default=0, init=False)
+
+    @property
+    def description(self) -> str:
+        return "Text to columns"
+
+    def do(self) -> None:
+        self._capture()
+        self.output_columns = text_to_columns(
+            self.engine.workbook.get_sheet(self.sheet_name),
+            self.target,
+            delimiter=self.delimiter,
+        )
+        self._rebuild()
+
+
+@dataclass
+class MergeCellsCommand(_WorkbookSnapshotCommand):
+    """Merge a rectangle while retaining its upper-left cell."""
+
+    sheet_name: str
+    target: RangeReference
+
+    @property
+    def description(self) -> str:
+        return "Merge cells"
+
+    def do(self) -> None:
+        self._capture()
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        if any(_ranges_overlap(self.target, item) for item in sheet.merged_ranges):
+            raise ValueError("Merge range overlaps an existing merge")
+        for row in range(self.target.min_row, self.target.max_row + 1):
+            for column in range(
+                self.target.min_column,
+                self.target.max_column + 1,
+            ):
+                if (row, column) != (
+                    self.target.min_row,
+                    self.target.min_column,
+                ):
+                    sheet.clear_cell(row, column)
+        sheet.merged_ranges.append(self.target)
+        self._rebuild()
+
+
+@dataclass
+class SetRowHeightCommand(_WorkbookSnapshotCommand):
+    """Set selected row heights."""
+
+    sheet_name: str
+    rows: tuple[int, ...]
+    height: float
+
+    @property
+    def description(self) -> str:
+        return "Set row height"
+
+    def do(self) -> None:
+        if self.height <= 0:
+            raise ValueError("Row height must be positive")
+        self._capture()
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        for row in self.rows:
+            sheet.row_heights[row] = self.height
+
+
+@dataclass
+class SetColumnWidthCommand(_WorkbookSnapshotCommand):
+    """Set selected column widths."""
+
+    sheet_name: str
+    columns: tuple[int, ...]
+    width: float
+
+    @property
+    def description(self) -> str:
+        return "Set column width"
+
+    def do(self) -> None:
+        if self.width <= 0:
+            raise ValueError("Column width must be positive")
+        self._capture()
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        for column in self.columns:
+            sheet.column_widths[column] = self.width
+
+
+@dataclass
+class MoveSheetCommand(Command):
+    """Move one sheet tab and restore its old index on undo."""
+
+    engine: FormulaEngine
+    old_index: int
+    new_index: int
+
+    @property
+    def description(self) -> str:
+        return "Move sheet"
+
+    def do(self) -> None:
+        self.engine.workbook.move_sheet(self.old_index, self.new_index)
+
+    def undo(self) -> None:
+        self.engine.workbook.move_sheet(self.new_index, self.old_index)
+
+
+@dataclass
+class DuplicateSheetCommand(Command):
+    """Duplicate a sheet and remove the duplicate on undo."""
+
+    engine: FormulaEngine
+    identifier: str | int
+    name: str | None = None
+    duplicate: Sheet | None = field(default=None, init=False)
+    index: int | None = field(default=None, init=False)
+
+    @property
+    def description(self) -> str:
+        return "Duplicate sheet"
+
+    def do(self) -> None:
+        if self.duplicate is None:
+            self.duplicate = self.engine.workbook.duplicate_sheet(
+                self.identifier,
+                name=self.name,
+            )
+            self.index = self.engine.workbook.index_of(self.duplicate.name)
+        else:
+            self.engine.workbook.restore_sheet(self.duplicate, index=self.index)
+        self.engine.rebuild_index()
+
+    def undo(self) -> None:
+        if self.duplicate is None:
+            raise RuntimeError("Command has not been executed")
+        self.engine.workbook.delete_sheet(self.duplicate.name)
+        self.engine.rebuild_index()
+
+
+@dataclass
+class SetSheetVisibilityCommand(Command):
+    """Hide or unhide a sheet."""
+
+    engine: FormulaEngine
+    sheet_name: str
+    visible: bool
+    previous: bool | None = field(default=None, init=False)
+    previous_active: str | None = field(default=None, init=False)
+
+    @property
+    def description(self) -> str:
+        return "Unhide sheet" if self.visible else "Hide sheet"
+
+    def do(self) -> None:
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        if not self.visible and sum(item.visible for item in self.engine.workbook) <= 1:
+            raise ValueError("A workbook must contain one visible sheet")
+        if self.previous is None:
+            self.previous = sheet.visible
+            self.previous_active = self.engine.workbook.active_sheet.name
+        sheet.visible = self.visible
+        if not self.visible and self.engine.workbook.active_sheet is sheet:
+            self.engine.workbook.active_sheet = next(
+                item for item in self.engine.workbook if item.visible
+            )
+
+    def undo(self) -> None:
+        if self.previous is None:
+            raise RuntimeError("Command has not been executed")
+        self.engine.workbook.get_sheet(self.sheet_name).visible = self.previous
+        if self.previous_active is not None:
+            self.engine.workbook.active_sheet = self.previous_active
+
+
+@dataclass
+class SetSheetTabColorCommand(Command):
+    """Set a sheet tab color."""
+
+    engine: FormulaEngine
+    sheet_name: str
+    color: str | None
+    previous: str | None = field(default=None, init=False)
+    _captured: bool = field(default=False, init=False)
+
+    @property
+    def description(self) -> str:
+        return "Set tab color"
+
+    def do(self) -> None:
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        if not self._captured:
+            self.previous = sheet.tab_color
+            self._captured = True
+        sheet.tab_color = self.color
+
+    def undo(self) -> None:
+        if not self._captured:
+            raise RuntimeError("Command has not been executed")
+        self.engine.workbook.get_sheet(self.sheet_name).tab_color = self.previous
+
+
+def _ranges_overlap(left: RangeReference, right: RangeReference) -> bool:
+    return not (
+        left.max_row < right.min_row
+        or right.max_row < left.min_row
+        or left.max_column < right.min_column
+        or right.max_column < left.min_column
+    )
+
+
+@dataclass
 class AddSheetCommand(Command):
     """Add a sheet and remove it on undo."""
 
@@ -275,11 +810,45 @@ class RenameSheetCommand(Command):
         )
         if self.old_name is None:
             self.old_name = selected.name
+        _rename_formula_sheet_references(
+            self.engine.workbook,
+            selected.name,
+            self.new_name,
+        )
         self.engine.workbook.rename_sheet(selected.name, self.new_name)
         self.engine.rebuild_index()
 
     def undo(self) -> None:
         if self.old_name is None:
             raise RuntimeError("Command has not been executed")
+        _rename_formula_sheet_references(
+            self.engine.workbook,
+            self.new_name,
+            self.old_name,
+        )
         self.engine.workbook.rename_sheet(self.new_name, self.old_name)
         self.engine.rebuild_index()
+
+
+def _rename_formula_sheet_references(
+    workbook: Workbook,
+    old_name: str,
+    new_name: str,
+) -> None:
+    for sheet in workbook:
+        for (row, column), cell in tuple(sheet.iter_populated()):
+            if cell.is_formula:
+                sheet.put_cell(
+                    row,
+                    column,
+                    replace(
+                        cell,
+                        raw_input=rename_formula_sheet(
+                            cell.raw_input,
+                            old_name,
+                            new_name,
+                        ),
+                        cached_value=None,
+                        error=None,
+                    ),
+                )

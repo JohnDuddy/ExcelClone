@@ -5,16 +5,35 @@ from dataclasses import dataclass
 from excelclone.commands.base import Command, CommandHistory
 from excelclone.commands.edits import (
     AddSheetCommand,
+    AddValidationCommand,
+    ApplyFilterCommand,
+    ClearFilterCommand,
+    DeleteRowsCommand,
     DeleteSheetCommand,
+    DuplicateSheetCommand,
+    InsertRowsCommand,
+    MergeCellsCommand,
+    MoveSheetCommand,
+    PasteCellsCommand,
+    RemoveDuplicatesCommand,
     RenameSheetCommand,
+    ReplaceAllCommand,
+    SetColumnWidthCommand,
     SetCellCommand,
     SetFormatCommand,
     SetFreezePanesCommand,
     SetRangeCommand,
+    SetRowHeightCommand,
+    SetSheetTabColorCommand,
+    SetSheetVisibilityCommand,
+    SortRangeCommand,
+    TextToColumnsCommand,
 )
 from excelclone.core.conditional import FormatPatch
-from excelclone.core.cell import CellFormat
+from excelclone.core.cell import Cell, CellFormat
+from excelclone.core.data_tools import DataValidation, FindOptions, SortKey
 from excelclone.core.engine import FormulaEngine
+from excelclone.core.refs import parse_a1
 from excelclone.core.workbook import Workbook
 
 
@@ -157,6 +176,21 @@ def test_rename_sheet_command_is_reversible() -> None:
     assert engine.workbook.sheet_names == ("Sheet1", "Data")
 
 
+def test_rename_sheet_command_updates_formula_references_on_do_and_undo() -> None:
+    engine = FormulaEngine(Workbook())
+    engine.workbook.add_sheet("Data")
+    engine.set_cell("Data", 0, 0, 4)
+    engine.set_cell("Sheet1", 0, 0, "=Data!A1*2")
+    history = CommandHistory()
+
+    history.execute(RenameSheetCommand(engine, "Data", "Inputs"))
+    assert engine.workbook.active_sheet.get_cell(0, 0).raw_input == "=Inputs!A1*2"
+    assert engine.workbook.active_sheet.get_cell(0, 0).display_value == 8
+
+    history.undo()
+    assert engine.workbook.active_sheet.get_cell(0, 0).raw_input == "=Data!A1*2"
+
+
 def test_set_format_command_formats_range_without_changing_content() -> None:
     engine = FormulaEngine(Workbook())
     engine.set_cell("Sheet1", 0, 0, 4)
@@ -214,3 +248,163 @@ def test_set_freeze_panes_command_is_reversible() -> None:
 
     history.undo()
     assert engine.workbook.active_sheet.freeze_panes is None
+
+
+def test_sort_filter_and_validation_commands_are_reversible() -> None:
+    engine = FormulaEngine(Workbook())
+    sheet = engine.workbook.active_sheet
+    for row, value in enumerate(("Value", 3, 1, 2)):
+        engine.set_cell("Sheet1", row, 0, value)
+    history = CommandHistory()
+
+    history.execute(
+        SortRangeCommand(
+            engine,
+            "Sheet1",
+            parse_a1("A1:A4"),
+            (SortKey(0),),
+            has_header=True,
+        )
+    )
+    assert [sheet.get_cell(row, 0).display_value for row in range(1, 4)] == [1, 2, 3]
+    history.undo()
+    sheet = engine.workbook.active_sheet
+    assert [sheet.get_cell(row, 0).display_value for row in range(1, 4)] == [3, 1, 2]
+
+    history.execute(
+        ApplyFilterCommand(
+            engine,
+            "Sheet1",
+            parse_a1("A1:A4"),
+            0,
+            frozenset({1, 3}),
+        )
+    )
+    sheet = engine.workbook.active_sheet
+    assert sheet.filtered_rows == {3}
+    history.execute(ClearFilterCommand(engine, "Sheet1"))
+    sheet = engine.workbook.active_sheet
+    assert sheet.filtered_rows == set()
+    history.undo()
+    sheet = engine.workbook.active_sheet
+    assert sheet.filtered_rows == {3}
+
+    validation = DataValidation(
+        parse_a1("A2:A4"),
+        "whole_number",
+        "between",
+        (1, 3),
+    )
+    history.execute(AddValidationCommand(engine, "Sheet1", validation))
+    sheet = engine.workbook.active_sheet
+    assert sheet.data_validations == [validation]
+    history.undo()
+    sheet = engine.workbook.active_sheet
+    assert sheet.data_validations == []
+
+
+def test_undo_restores_state_across_50_mixed_operations() -> None:
+    engine = FormulaEngine(Workbook())
+    history = CommandHistory(limit=200)
+    original = engine.workbook.copy()
+
+    for cycle in range(10):
+        history.execute(SetCellCommand(engine, "Sheet1", cycle + 5, 0, cycle))
+        history.execute(InsertRowsCommand(engine, "Sheet1", 1, 1))
+        history.execute(DeleteRowsCommand(engine, "Sheet1", 1, 1))
+        history.execute(
+            SetRangeCommand(
+                engine,
+                "Sheet1",
+                cycle + 20,
+                1,
+                ((cycle, cycle + 1),),
+            )
+        )
+        history.execute(
+            PasteCellsCommand(
+                engine,
+                "Sheet1",
+                cycle + 40,
+                3,
+                ((Cell(raw_input=cycle, cached_value=cycle),),),
+                (0, 0),
+            )
+        )
+
+    for _ in range(50):
+        history.undo()
+
+    assert tuple(engine.workbook.active_sheet.iter_populated()) == tuple(
+        original.active_sheet.iter_populated()
+    )
+    assert not history.can_undo
+
+
+def test_merge_dimensions_replace_and_cleanup_commands_undo() -> None:
+    engine = FormulaEngine(Workbook())
+    history = CommandHistory()
+    for row, values in enumerate((("Name", "Data"), ("A", "x|y"), ("A", "z"))):
+        for column, value in enumerate(values):
+            engine.set_cell("Sheet1", row, column, value)
+
+    history.execute(
+        MergeCellsCommand(engine, "Sheet1", parse_a1("D1:E2"))
+    )
+    history.execute(SetRowHeightCommand(engine, "Sheet1", (0, 1), 25))
+    history.execute(SetColumnWidthCommand(engine, "Sheet1", (0,), 20))
+    history.execute(
+        ReplaceAllCommand(
+            engine,
+            FindOptions("Name", "Label", whole_cell=True),
+            "Sheet1",
+        )
+    )
+    history.execute(
+        RemoveDuplicatesCommand(
+            engine,
+            "Sheet1",
+            parse_a1("A1:B3"),
+            (0,),
+        )
+    )
+    history.execute(
+        TextToColumnsCommand(engine, "Sheet1", parse_a1("B2:B2"), "|")
+    )
+
+    sheet = engine.workbook.active_sheet
+    assert sheet.merged_ranges == [parse_a1("D1:E2")]
+    assert sheet.row_heights[0] == 25
+    assert sheet.column_widths[0] == 20
+    assert sheet.get_cell(0, 0).raw_input == "Label"
+    assert sheet.get_cell(1, 2).raw_input == "y"
+
+    for _ in range(6):
+        history.undo()
+    restored = engine.workbook.active_sheet
+    assert restored.merged_ranges == []
+    assert restored.row_heights == {}
+    assert restored.column_widths == {}
+    assert restored.get_cell(0, 0).raw_input == "Name"
+
+
+def test_sheet_move_duplicate_visibility_and_tab_color_commands_undo() -> None:
+    engine = FormulaEngine(Workbook())
+    engine.workbook.add_sheet("Data")
+    history = CommandHistory()
+
+    history.execute(MoveSheetCommand(engine, 1, 0))
+    assert engine.workbook.sheet_names == ("Data", "Sheet1")
+    history.execute(DuplicateSheetCommand(engine, "Data", "Data Copy"))
+    assert "Data Copy" in engine.workbook.sheet_names
+    history.execute(SetSheetTabColorCommand(engine, "Data", "#123456"))
+    assert engine.workbook.get_sheet("Data").tab_color == "#123456"
+    history.execute(SetSheetVisibilityCommand(engine, "Data", False))
+    assert not engine.workbook.get_sheet("Data").visible
+    assert engine.workbook.active_sheet.visible
+
+    for _ in range(4):
+        history.undo()
+    assert engine.workbook.sheet_names == ("Sheet1", "Data")
+    assert engine.workbook.get_sheet("Data").visible
+    assert engine.workbook.get_sheet("Data").tab_color is None

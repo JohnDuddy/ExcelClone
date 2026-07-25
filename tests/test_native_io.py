@@ -7,6 +7,7 @@ import pytest
 
 from excelclone.core.cell import BorderStyle, CellFormat
 from excelclone.core.conditional import ConditionalRule, FormatPatch
+from excelclone.core.data_tools import DataValidation, apply_filter
 from excelclone.core.refs import parse_a1
 from excelclone.core.workbook import Workbook
 from excelclone.io.native import CURRENT_SCHEMA_VERSION, load_ogrid, save_ogrid
@@ -52,6 +53,21 @@ def rich_workbook() -> Workbook:
             stop_if_true=True,
         )
     )
+    sheet.data_validations.append(
+        DataValidation(
+            parse_a1("A1:A10"),
+            "decimal",
+            "greater_than",
+            (0,),
+        )
+    )
+    apply_filter(
+        sheet,
+        parse_a1("A1:A10"),
+        column=0,
+        allowed_values={12.5},
+        has_header=False,
+    )
     workbook.add_sheet("Data").visible = False
     workbook.active_sheet = "Data"
     workbook.define_name("InputValue", "Sheet1!$A$1")
@@ -80,6 +96,9 @@ def test_ogrid_round_trip_is_lossless(tmp_path) -> None:
     assert restored.freeze_panes == source.freeze_panes
     assert restored.tab_color == source.tab_color
     assert restored.conditional_formats == source.conditional_formats
+    assert restored.data_validations == source.data_validations
+    assert restored.auto_filter == source.auto_filter
+    assert restored.filtered_rows == source.filtered_rows
     assert not loaded.get_sheet("Data").visible
 
 

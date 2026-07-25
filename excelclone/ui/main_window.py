@@ -9,9 +9,11 @@ from PySide6.QtCore import QModelIndex, Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QApplication,
     QColorDialog,
     QDialog,
     QFileDialog,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -22,13 +24,33 @@ from PySide6.QtWidgets import (
 from excelclone.commands.base import CommandHistory
 from excelclone.commands.edits import (
     AddSheetCommand,
+    AddValidationCommand,
+    ApplyFilterCommand,
+    ClearFilterCommand,
     DeleteSheetCommand,
+    DuplicateSheetCommand,
+    InsertColumnsCommand,
+    InsertRowsCommand,
+    MergeCellsCommand,
+    MoveSheetCommand,
+    PasteCellsCommand,
+    RemoveDuplicatesCommand,
+    RenameSheetCommand,
+    ReplaceAllCommand,
+    SetColumnWidthCommand,
     SetFormatCommand,
     SetFreezePanesCommand,
+    SetRowHeightCommand,
+    SetSheetTabColorCommand,
+    SetSheetVisibilityCommand,
+    SortRangeCommand,
+    TextToColumnsCommand,
 )
+from excelclone.core.clipboard import RICH_CELL_MIME, decode_cell_matrix
 from excelclone.core.conditional import FormatPatch
+from excelclone.core.data_tools import find_cells
 from excelclone.core.engine import FormulaEngine
-from excelclone.core.refs import CellReference, parse_a1
+from excelclone.core.refs import CellReference, RangeReference, parse_a1
 from excelclone.core.workbook import Workbook
 from excelclone.io.csv_io import read_delimited, write_delimited
 from excelclone.io.native import load_ogrid, save_ogrid
@@ -36,6 +58,13 @@ from excelclone.io.xlsx_reader import read_xlsx
 from excelclone.io.xlsx_writer import write_xlsx
 from excelclone.ui.delegates import CellDelegate
 from excelclone.ui.dialogs.format_cells import FormatCellsDialog
+from excelclone.ui.dialogs.data_tools import (
+    FilterDialog,
+    FindReplaceDialog,
+    PasteSpecialDialog,
+    SortDialog,
+    ValidationDialog,
+)
 from excelclone.ui.formula_bar import FormulaBar
 from excelclone.ui.grid_model import GridModel
 from excelclone.ui.grid_view import GridView
@@ -116,6 +145,16 @@ class MainWindow(QMainWindow):
         self.recalculate_action.triggered.connect(self.recalculate)
         self.add_sheet_action = QAction("New Sheet", self)
         self.add_sheet_action.triggered.connect(self.add_sheet)
+        self.rename_sheet_action = QAction("Rename Sheet", self)
+        self.rename_sheet_action.triggered.connect(self.rename_active_sheet)
+        self.duplicate_sheet_action = QAction("Duplicate Sheet", self)
+        self.duplicate_sheet_action.triggered.connect(self.duplicate_active_sheet)
+        self.hide_sheet_action = QAction("Hide Sheet", self)
+        self.hide_sheet_action.triggered.connect(self.hide_active_sheet)
+        self.unhide_sheet_action = QAction("Unhide Sheet", self)
+        self.unhide_sheet_action.triggered.connect(self.unhide_sheet)
+        self.tab_color_action = QAction("Tab Color", self)
+        self.tab_color_action.triggered.connect(self.choose_tab_color)
 
         file_menu = self.menuBar().addMenu("&File")
         file_menu.addAction(self.new_action)
@@ -129,6 +168,11 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(self.redo_action)
         sheet_menu = self.menuBar().addMenu("&Sheet")
         sheet_menu.addAction(self.add_sheet_action)
+        sheet_menu.addAction(self.rename_sheet_action)
+        sheet_menu.addAction(self.duplicate_sheet_action)
+        sheet_menu.addAction(self.hide_sheet_action)
+        sheet_menu.addAction(self.unhide_sheet_action)
+        sheet_menu.addAction(self.tab_color_action)
         formulas_menu = self.menuBar().addMenu("&Formulas")
         formulas_menu.addAction(self.recalculate_action)
         self.addActions(
@@ -141,6 +185,11 @@ class MainWindow(QMainWindow):
                 self.open_action,
                 self.save_action,
                 self.save_as_action,
+                self.rename_sheet_action,
+                self.duplicate_sheet_action,
+                self.hide_sheet_action,
+                self.unhide_sheet_action,
+                self.tab_color_action,
             ]
         )
         self._update_history_actions(self.history)
@@ -153,12 +202,16 @@ class MainWindow(QMainWindow):
         self.sheet_tabs.addRequested.connect(self.add_sheet)
         self.sheet_tabs.activeChanged.connect(self.switch_sheet)
         self.sheet_tabs.closeRequested.connect(self.delete_sheet)
+        self.sheet_tabs.moved.connect(self.move_sheet)
+        self.sheet_tabs.renameRequested.connect(self.rename_sheet_at)
         self.history.add_listener(self._update_history_actions)
         self.history.add_listener(self._mark_dirty)
+        self.history.add_listener(self._sync_sheet_view)
         self.grid_model.editRejected.connect(
             lambda message: self.statusBar().showMessage(message, 5000)
         )
         self.ribbon.actionRequested.connect(self._ribbon_action)
+        self.grid.sync_sheet_metadata()
 
     def new_workbook(self) -> None:
         """Replace the current document with a blank workbook."""
@@ -272,6 +325,7 @@ class MainWindow(QMainWindow):
         index = self.grid_model.index(0, 0)
         self.grid.setCurrentIndex(index)
         self.on_current_cell_changed(index)
+        self.grid.sync_sheet_metadata()
         self.current_path = path
         self.dirty = False
         if path is not None:
@@ -363,6 +417,97 @@ class MainWindow(QMainWindow):
         self.sheet_tabs.sync(self.engine.workbook)
         self.sheet_tabs.tab_bar.setCurrentIndex(len(self.engine.workbook) - 1)
 
+    def move_sheet(self, old_index: int, new_index: int) -> None:
+        """Move a dragged tab through history."""
+        if old_index == new_index:
+            return
+        self.history.execute(
+            MoveSheetCommand(self.engine, old_index, new_index)
+        )
+        self.sheet_tabs.sync(self.engine.workbook)
+
+    def rename_sheet_at(self, index: int) -> None:
+        """Prompt to rename a sheet tab."""
+        if 0 <= index < len(self.engine.workbook):
+            self._prompt_rename_sheet(index)
+
+    def rename_active_sheet(self) -> None:
+        """Prompt to rename the active sheet."""
+        self._prompt_rename_sheet(self.engine.workbook.active_sheet_index)
+
+    def _prompt_rename_sheet(self, index: int) -> None:
+        sheet = self.engine.workbook.get_sheet(index)
+        name, accepted = QInputDialog.getText(
+            self,
+            "Rename Sheet",
+            "Sheet name",
+            text=sheet.name,
+        )
+        if not accepted or name == sheet.name:
+            return
+        try:
+            self.history.execute(
+                RenameSheetCommand(self.engine, sheet.name, name)
+            )
+        except ValueError as error:
+            self.statusBar().showMessage(str(error), 3000)
+
+    def duplicate_active_sheet(self) -> None:
+        """Duplicate the active sheet."""
+        self.history.execute(
+            DuplicateSheetCommand(
+                self.engine,
+                self.engine.workbook.active_sheet.name,
+            )
+        )
+
+    def hide_active_sheet(self) -> None:
+        """Hide the active sheet while retaining one visible sheet."""
+        try:
+            self.history.execute(
+                SetSheetVisibilityCommand(
+                    self.engine,
+                    self.engine.workbook.active_sheet.name,
+                    False,
+                )
+            )
+        except ValueError as error:
+            self.statusBar().showMessage(str(error), 3000)
+
+    def unhide_sheet(self) -> None:
+        """Prompt to unhide one hidden sheet."""
+        hidden = [sheet.name for sheet in self.engine.workbook if not sheet.visible]
+        if not hidden:
+            self.statusBar().showMessage("There are no hidden sheets", 2000)
+            return
+        name, accepted = QInputDialog.getItem(
+            self,
+            "Unhide Sheet",
+            "Sheet",
+            hidden,
+            editable=False,
+        )
+        if accepted:
+            self.history.execute(
+                SetSheetVisibilityCommand(self.engine, name, True)
+            )
+
+    def choose_tab_color(self) -> None:
+        """Choose the active sheet's tab color."""
+        sheet = self.engine.workbook.active_sheet
+        selected = QColorDialog.getColor(
+            QColor(sheet.tab_color or "#4f81bd"),
+            self,
+        )
+        if selected.isValid():
+            self.history.execute(
+                SetSheetTabColorCommand(
+                    self.engine,
+                    sheet.name,
+                    selected.name(),
+                )
+            )
+
     def delete_sheet(self, index: int) -> None:
         """Delete a tab through the command history."""
         if len(self.engine.workbook) == 1:
@@ -377,6 +522,7 @@ class MainWindow(QMainWindow):
         if 0 <= index < len(self.engine.workbook):
             self.grid_model.set_active_sheet(self.engine.workbook.get_sheet(index).name)
             self.on_current_cell_changed(self.grid.currentIndex())
+            self.grid.sync_sheet_metadata()
 
     def recalculate(self) -> None:
         """Run full workbook recalculation."""
@@ -403,12 +549,21 @@ class MainWindow(QMainWindow):
             f"Redo {history.redo_description}" if history.can_redo else "Redo"
         )
 
+    def _sync_sheet_view(self, history: CommandHistory) -> None:
+        """Synchronize tabs and sparse sheet metadata after a command."""
+        active_name = self.engine.workbook.active_sheet.name
+        if self.grid_model.active_sheet_name != active_name:
+            self.grid_model.set_active_sheet(active_name)
+        self.sheet_tabs.sync(self.engine.workbook)
+        self.grid.sync_sheet_metadata()
+
     def _ribbon_action(self, name: str) -> None:
         actions = {
             "Undo": self.history.undo,
             "Redo": self.history.redo,
             "Copy": self.grid.copy_selection,
             "Paste": self.grid.paste_clipboard,
+            "Paste Special": self.paste_special,
             "Recalculate": self.recalculate,
             "Sheet Recalculate": lambda: self.engine.recalculate(
                 sheet_name=self.grid_model.active_sheet_name
@@ -419,17 +574,311 @@ class MainWindow(QMainWindow):
             "Font Color": lambda: self._choose_format_color("font_color"),
             "Fill": lambda: self._choose_format_color("fill_color"),
             "Wrap": lambda: self._toggle_format("wrap_text"),
+            "Merge": self.merge_selection,
+            "Row Height": self.set_row_height,
+            "Column Width": self.set_column_width,
+            "Autofit": self.autofit_selection,
+            "Find": self.find_replace,
             "Format Cells": self.show_format_cells,
             "Gridlines": self.toggle_gridlines,
             "Formula View": self.toggle_formula_view,
             "Zoom": self.increase_zoom,
             "Freeze Panes": self.toggle_freeze_panes,
+            "Rows": self.insert_rows,
+            "Columns": self.insert_columns,
+            "Sort": self.sort_selection,
+            "Filter": self.filter_selection,
+            "Clear Filter": self.clear_active_filter,
+            "Validate": self.validate_selection,
+            "Remove Duplicates": self.remove_duplicates,
+            "Text to Columns": self.text_to_columns,
         }
         action = actions.get(name)
         if action is not None:
             action()
         else:
             self.statusBar().showMessage(f"{name} is scheduled for a later milestone", 3000)
+
+    def paste_special(self) -> None:
+        """Paste rich clipboard cells using a selected content mode."""
+        mime = QApplication.clipboard().mimeData()
+        if not mime.hasFormat(RICH_CELL_MIME):
+            self.statusBar().showMessage(
+                "Paste Special requires cells copied inside OpenGrid",
+                3000,
+            )
+            return
+        try:
+            cells, origin = decode_cell_matrix(bytes(mime.data(RICH_CELL_MIME)))
+        except ValueError as error:
+            self.statusBar().showMessage(str(error), 3000)
+            return
+        dialog = PasteSpecialDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        current = self.grid.currentIndex()
+        if not current.isValid():
+            current = self.grid_model.index(0, 0)
+        self.history.execute(
+            PasteCellsCommand(
+                self.engine,
+                self.grid_model.active_sheet_name,
+                current.row(),
+                current.column(),
+                cells,
+                origin,
+                dialog.mode.currentText(),
+                dialog.transpose.isChecked(),
+            )
+        )
+
+    def insert_rows(self) -> None:
+        """Insert rows above the selected range."""
+        target = self._selected_range()
+        self.history.execute(
+            InsertRowsCommand(
+                self.engine,
+                self.grid_model.active_sheet_name,
+                target.min_row,
+                target.max_row - target.min_row + 1,
+            )
+        )
+
+    def insert_columns(self) -> None:
+        """Insert columns left of the selected range."""
+        target = self._selected_range()
+        self.history.execute(
+            InsertColumnsCommand(
+                self.engine,
+                self.grid_model.active_sheet_name,
+                target.min_column,
+                target.max_column - target.min_column + 1,
+            )
+        )
+
+    def sort_selection(self) -> None:
+        """Open the multi-key sort dialog for the current selection."""
+        target = self._selected_range()
+        dialog = SortDialog(target, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.sort_keys():
+            self.history.execute(
+                SortRangeCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    target,
+                    dialog.sort_keys(),
+                    dialog.has_header.isChecked(),
+                )
+            )
+
+    def filter_selection(self) -> None:
+        """Filter the selected range by checked values in the current column."""
+        target = self._selected_range()
+        current = self.grid.currentIndex()
+        column = (
+            current.column()
+            if current.isValid()
+            and target.min_column <= current.column() <= target.max_column
+            else target.min_column
+        )
+        values = tuple(
+            dict.fromkeys(
+                self.grid_model.sheet.get_cell(row, column).display_value
+                for row in range(target.min_row + 1, target.max_row + 1)
+            )
+        )
+        dialog = FilterDialog(values, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.history.execute(
+                ApplyFilterCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    target,
+                    column,
+                    dialog.allowed_values(),
+                )
+            )
+
+    def clear_active_filter(self) -> None:
+        """Clear the active sheet filter."""
+        self.history.execute(
+            ClearFilterCommand(
+                self.engine,
+                self.grid_model.active_sheet_name,
+            )
+        )
+
+    def validate_selection(self) -> None:
+        """Add a validation rule to the selected range."""
+        target = self._selected_range()
+        dialog = ValidationDialog(target, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.history.execute(
+                AddValidationCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    dialog.validation(),
+                )
+            )
+
+    def find_replace(self) -> None:
+        """Find the first match or replace all matches."""
+        dialog = FindReplaceDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        options = dialog.options()
+        if not options.query:
+            return
+        if dialog.replace_all.isChecked():
+            command = ReplaceAllCommand(self.engine, options)
+            self.history.execute(command)
+            self.statusBar().showMessage(
+                f"Replaced {command.replaced_count} cells",
+                3000,
+            )
+            return
+        matches = find_cells(self.engine.workbook, options)
+        if not matches:
+            self.statusBar().showMessage("No matches found", 3000)
+            return
+        first = matches[0]
+        self.grid_model.set_active_sheet(first.sheet or self.grid_model.active_sheet_name)
+        self.sheet_tabs.sync(self.engine.workbook)
+        index = self.grid_model.index(first.row, first.column)
+        self.grid.setCurrentIndex(index)
+        self.grid.scrollTo(index)
+        self.statusBar().showMessage(f"Found {len(matches)} matches", 3000)
+
+    def remove_duplicates(self) -> None:
+        """Remove duplicate selected rows using all selected columns as keys."""
+        target = self._selected_range()
+        command = RemoveDuplicatesCommand(
+            self.engine,
+            self.grid_model.active_sheet_name,
+            target,
+            tuple(range(target.min_column, target.max_column + 1)),
+        )
+        self.history.execute(command)
+        self.statusBar().showMessage(
+            f"Removed {command.removed_count} duplicate rows",
+            3000,
+        )
+
+    def text_to_columns(self) -> None:
+        """Split selected text with a user-selected delimiter."""
+        delimiter, accepted = QInputDialog.getText(
+            self,
+            "Text to Columns",
+            "Delimiter",
+            text=",",
+        )
+        if not accepted:
+            return
+        command = TextToColumnsCommand(
+            self.engine,
+            self.grid_model.active_sheet_name,
+            self._selected_range(),
+            delimiter,
+        )
+        try:
+            self.history.execute(command)
+        except ValueError as error:
+            self.statusBar().showMessage(str(error), 3000)
+
+    def merge_selection(self) -> None:
+        """Merge selected cells and retain the upper-left value."""
+        target = self._selected_range()
+        if len(target) < 2:
+            return
+        try:
+            self.history.execute(
+                MergeCellsCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    target,
+                )
+            )
+        except ValueError as error:
+            self.statusBar().showMessage(str(error), 3000)
+
+    def set_row_height(self) -> None:
+        """Set selected row heights in points."""
+        target = self._selected_range()
+        height, accepted = QInputDialog.getDouble(
+            self,
+            "Row Height",
+            "Height (points)",
+            18.0,
+            1.0,
+            409.0,
+            1,
+        )
+        if accepted:
+            self.history.execute(
+                SetRowHeightCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    tuple(range(target.min_row, target.max_row + 1)),
+                    height,
+                )
+            )
+
+    def set_column_width(self) -> None:
+        """Set selected column widths in character units."""
+        target = self._selected_range()
+        width, accepted = QInputDialog.getDouble(
+            self,
+            "Column Width",
+            "Width (characters)",
+            12.0,
+            1.0,
+            255.0,
+            1,
+        )
+        if accepted:
+            self.history.execute(
+                SetColumnWidthCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    tuple(range(target.min_column, target.max_column + 1)),
+                    width,
+                )
+            )
+
+    def autofit_selection(self) -> None:
+        """Autofit selected columns from formatted display lengths."""
+        target = self._selected_range()
+        sheet = self.grid_model.sheet
+        for column in range(target.min_column, target.max_column + 1):
+            width = max(
+                (
+                    len(
+                        str(
+                            self.grid_model.data(
+                                self.grid_model.index(row, column)
+                            )
+                            or ""
+                        )
+                    )
+                    for row in range(target.min_row, target.max_row + 1)
+                ),
+                default=8,
+            )
+            self.history.execute(
+                SetColumnWidthCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    (column,),
+                    min(255.0, max(3.0, width + 2.0)),
+                )
+            )
+
+    def _selected_range(self) -> RangeReference:
+        bounds = self.grid.selection_bounds() or (0, 0, 0, 0)
+        return RangeReference(
+            CellReference(bounds[0], bounds[1]),
+            CellReference(bounds[2], bounds[3]),
+        )
 
     def format_selection(self, patch: FormatPatch) -> None:
         """Apply a format patch to the selected bounding rectangle."""

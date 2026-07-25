@@ -84,6 +84,7 @@ def test_copy_and_paste_use_tab_separated_windows_clipboard() -> None:
 
     assert model.data(model.index(2, 2)) == "3"
     assert model.data(model.index(3, 3)) == "6"
+    app.clipboard().clear()
     window.close()
 
 
@@ -161,4 +162,30 @@ def test_main_window_path_dispatch_supports_xlsx_csv_and_tsv(tmp_path) -> None:
         window.open_path(path)
         assert window.grid_model.data(window.grid_model.index(0, 0)) == "7"
 
+    window.close()
+
+
+def test_internal_clipboard_preserves_formulas_and_formats() -> None:
+    app = application()
+    window = MainWindow()
+    model = window.grid_model
+    model.setData(model.index(0, 0), "2")
+    model.setData(model.index(0, 1), "=A1*3")
+    window.grid.setCurrentIndex(model.index(0, 1))
+    window._ribbon_action("Bold")
+    selection = window.grid.selectionModel()
+    selection.select(
+        model.index(0, 0),
+        selection.SelectionFlag.ClearAndSelect,
+    )
+    selection.select(model.index(0, 1), selection.SelectionFlag.Select)
+
+    window.grid.copy_selection()
+    window.grid.setCurrentIndex(model.index(2, 2))
+    window.grid.paste_clipboard()
+
+    assert model.sheet.get_cell(2, 3).raw_input == "=C3*3"
+    assert model.sheet.get_cell(2, 3).format.bold
+    assert app.clipboard().text() == "2\t6"
+    app.clipboard().clear()
     window.close()

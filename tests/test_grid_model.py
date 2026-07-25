@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication
 from excelclone.commands.base import CommandHistory
 from excelclone.core.cell import CellFormat
 from excelclone.core.conditional import ConditionalRule, FormatPatch
+from excelclone.core.data_tools import DataValidation
 from excelclone.core.engine import FormulaEngine
 from excelclone.core.refs import MAX_COLUMNS, MAX_ROWS, parse_a1
 from excelclone.core.workbook import Workbook
@@ -138,3 +139,23 @@ def test_grid_model_formula_view_toggles_raw_formula_display() -> None:
     assert model.data(model.index(0, 1)) == "=A1+2"
     model.set_formula_view(False)
     assert model.data(model.index(0, 1)) == "5"
+
+
+def test_grid_model_rejects_values_that_fail_cell_validation() -> None:
+    application()
+    engine = FormulaEngine(Workbook())
+    engine.workbook.active_sheet.data_validations.append(
+        DataValidation(
+            parse_a1("A1"),
+            "whole_number",
+            "between",
+            (1, 10),
+            error_message="Enter a whole number from 1 through 10.",
+        )
+    )
+    model = GridModel(engine, CommandHistory())
+
+    assert not model.setData(model.index(0, 0), "20")
+    assert model.last_error == "Enter a whole number from 1 through 10."
+    assert model.sheet.get_cell(0, 0).is_empty
+    assert model.setData(model.index(0, 0), "5")

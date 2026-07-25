@@ -40,7 +40,10 @@ complete.
 - [x] Undoable fonts, fills, alignment, wrapping, and eight border styles (`test_commands.py`, `test_format_dialog.py`)
 - [x] Conditional value, ranking, average, duplicate, formula, color-scale, data-bar, and icon rules (`test_conditional_formats.py`)
 - [x] Delegate rendering and formula/gridline/zoom view controls (`test_grid_model.py`, `test_ui_workflow.py`)
-- [ ] Fill handle, rich clipboard, visible frozen panes, and split views
+- [x] Rich internal clipboard and Paste Special values/formulas/formats/transpose (`test_fill_and_paste.py`, `test_ui_workflow.py`)
+- [x] Numeric/date/weekday/month/formula fill plus Ctrl+D/Ctrl+R (`test_fill_and_paste.py`)
+- [x] Merge cells, row heights, column widths, and autofit command paths (`test_commands.py`)
+- [ ] Mouse fill handle, visible frozen panes, and split views
 
 ## M7-M9 Data And Visualization
 
@@ -49,7 +52,13 @@ complete.
 - [x] Explicit XLSX dropped-feature warnings (`test_io_roundtrip.py`)
 - [x] CSV/TSV encoding, delimiter, scalar/date detection, and export (`test_csv_io.py`)
 - [x] File menu workflow and persisted ten-item recent-files list (`test_ui_workflow.py`, `test_settings.py`)
-- [ ] Sort, filter, validation, find/replace, and paste special
+- [x] Reference-safe row/column insert-delete with atomic undo (`test_structural_commands.py`, `test_translation.py`)
+- [x] Multi-key sort and value-list autofilter (`test_data_tools.py`, `test_data_dialogs.py`)
+- [x] Find/replace with value/formula, regex, case, and whole-cell scope (`test_data_tools.py`)
+- [x] List, numeric, date, length, and custom-formula validation (`test_data_tools.py`, `test_grid_model.py`)
+- [x] Remove duplicates and text-to-columns (`test_data_tools.py`, `test_commands.py`)
+- [x] Sheet rename/move/duplicate/hide/tab-color commands (`test_commands.py`)
+- [x] Undo restores exact state across 50 mixed operations (`test_commands.py`)
 - [ ] Live range-bound charts
 
 ## M10 Distribution

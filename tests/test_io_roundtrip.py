@@ -5,6 +5,7 @@ from openpyxl.chart import BarChart, Reference
 
 from excelclone.core.cell import BorderStyle, CellFormat
 from excelclone.core.engine import FormulaEngine
+from excelclone.core.data_tools import DataValidation, apply_filter
 from excelclone.core.refs import parse_a1
 from excelclone.core.workbook import Workbook
 from excelclone.io.xlsx_reader import read_xlsx
@@ -46,6 +47,21 @@ def xlsx_workbook() -> Workbook:
     workbook.add_sheet("Data").set_cell(0, 0, "other")
     workbook.active_sheet = "Data"
     workbook.define_name("InputValue", "Sheet1!$A$1")
+    sheet.data_validations.append(
+        DataValidation(
+            parse_a1("A1:A10"),
+            "decimal",
+            "greater_than",
+            (0,),
+        )
+    )
+    apply_filter(
+        sheet,
+        parse_a1("A1:A10"),
+        column=0,
+        allowed_values={1234.5},
+        has_header=False,
+    )
     return workbook
 
 
@@ -84,6 +100,16 @@ def test_xlsx_round_trip_preserves_supported_workbook_features(tmp_path) -> None
     assert sheet.freeze_panes == (1, 1)
     assert sheet.tab_color == "#33aa55"
     assert loaded.get_name("InputValue").reference == parse_a1("Sheet1!$A$1")
+    assert sheet.data_validations == [
+        DataValidation(
+            parse_a1("A1:A10"),
+            "decimal",
+            "greater_than",
+            (0,),
+        )
+    ]
+    assert sheet.auto_filter is not None
+    assert sheet.auto_filter.allowed_values == frozenset({1234.5})
 
 
 def test_written_xlsx_reopens_with_openpyxl_and_requests_recalculation(tmp_path) -> None:

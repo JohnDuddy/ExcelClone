@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QHBoxLayout, QTabBar, QToolButton, QWidget
 
 from excelclone.core.workbook import Workbook
@@ -17,6 +18,7 @@ class SheetTabs(QWidget):
     closeRequested = Signal(int)
     activeChanged = Signal(int)
     moved = Signal(int, int)
+    renameRequested = Signal(int)
 
     def __init__(self, parent: Any = None) -> None:
         super().__init__(parent)
@@ -35,6 +37,7 @@ class SheetTabs(QWidget):
         self.tab_bar.currentChanged.connect(self.activeChanged.emit)
         self.tab_bar.tabCloseRequested.connect(self.closeRequested.emit)
         self.tab_bar.tabMoved.connect(self.moved.emit)
+        self.tab_bar.tabBarDoubleClicked.connect(self.renameRequested.emit)
         layout.addWidget(self.add_button)
         layout.addWidget(self.tab_bar, 1)
 
@@ -44,6 +47,9 @@ class SheetTabs(QWidget):
         while self.tab_bar.count():
             self.tab_bar.removeTab(self.tab_bar.count() - 1)
         for sheet in workbook:
-            self.tab_bar.addTab(sheet.name)
+            index = self.tab_bar.addTab(sheet.name)
+            self.tab_bar.setTabVisible(index, sheet.visible)
+            if sheet.tab_color:
+                self.tab_bar.setTabTextColor(index, QColor(sheet.tab_color))
         self.tab_bar.setCurrentIndex(workbook.active_sheet_index)
         self.tab_bar.blockSignals(False)
