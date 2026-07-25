@@ -42,12 +42,12 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M1 establishes the repository, documentation, pinned environment, and launchable
-PySide6 shell. The next milestone is M2: sparse cell, sheet, workbook, and
-reference modules.
+M2 is complete: immutable cells, sparse sheets, multi-sheet workbooks, defined
+names, and A1/R1C1 references are covered by the regression suite. The current
+milestone is M3: tokenizer, parser, evaluator, formula errors, and dependency
+graph.
 
 ## Known Issues
 
-The spreadsheet engine and grid are intentionally absent until their scheduled
-milestones. No shipped M1 behavior is known to be broken.
-
+The formula engine and grid are intentionally absent until their scheduled
+milestones. No shipped M1 or M2 behavior is known to be broken.

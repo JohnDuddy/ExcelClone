@@ -13,9 +13,10 @@ complete.
 
 ## M2 Core Model
 
-- [ ] Sparse cell storage
-- [ ] Multi-sheet workbook and named ranges
-- [ ] A1, absolute, range, whole-row, whole-column, and R1C1 references
+- [x] Sparse immutable cell storage (`test_sheet.py`)
+- [x] Multi-sheet workbook and scoped named ranges (`test_workbook.py`)
+- [x] A1, absolute, range, whole-row, whole-column, and R1C1 references (`test_refs.py`)
+- [x] Lazy range iteration and reference translation (`test_refs.py`)
 
 ## M3-M4 Formula Engine
 
@@ -42,4 +43,3 @@ complete.
 - [ ] Autosave, crash recovery, and performance targets
 - [ ] Idempotent Windows installer and desktop shortcut
 - [ ] Self-contained `dist/ExcelClone.zip`
-

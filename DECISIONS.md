@@ -24,3 +24,14 @@ off-by-one conversion inside storage and recalculation code.
 The required title uses a Unicode em dash. Source otherwise remains ASCII where
 there is no product-text reason to use Unicode.
 
+## 2026-07-25 — Immutable cells
+
+`Cell` and `CellFormat` are immutable values. A `Sheet` replaces cells rather
+than exposing in-place mutation, which makes command undo state reliable and
+prevents blank reads from accidentally allocating or modifying storage.
+
+## 2026-07-25 — Lazy ranges
+
+`RangeReference` is iterable but does not materialize its coordinates. This is
+required because valid whole-column and whole-row references can contain more
+than one million cells while the workbook itself remains sparse.
