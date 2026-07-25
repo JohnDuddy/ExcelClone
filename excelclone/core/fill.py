@@ -132,6 +132,7 @@ def _filled_cell(
         raw_input=generated,
         cached_value=generated,
         format=template.format,
+        hyperlink=template.hyperlink,
     )
 
 

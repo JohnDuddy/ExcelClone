@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from dataclasses import replace
 from typing import Any
 
-from excelclone.core.cell import EMPTY_CELL, Cell, CellFormat
+from excelclone.core.cell import EMPTY_CELL, Cell, CellFormat, Hyperlink
 from excelclone.core.refs import MAX_COLUMNS, MAX_ROWS, CellReference, RangeReference
 
 _UNSET = object()
@@ -83,6 +83,7 @@ class Sheet:
         cached_value: Any = _UNSET,
         cell_format: CellFormat | None = None,
         error: str | None = None,
+        hyperlink: Hyperlink | None = None,
     ) -> Cell:
         """Replace a coordinate and return its previous immutable cell."""
         self._validate_coordinate(row, column)
@@ -97,6 +98,7 @@ class Sheet:
             cached_value=cached_value,
             format=cell_format if cell_format is not None else CellFormat(),
             error=error,
+            hyperlink=hyperlink,
         )
         return self.put_cell(row, column, cell)
 

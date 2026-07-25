@@ -494,6 +494,7 @@ class PasteCellsCommand(_WorkbookSnapshotCommand):
                         raw_input=source.display_value,
                         cached_value=source.display_value,
                         format=current.format,
+                        hyperlink=current.hyperlink,
                     )
                 else:
                     raw = source.raw_input
@@ -511,6 +512,11 @@ class PasteCellsCommand(_WorkbookSnapshotCommand):
                         ),
                         format=source.format if self.mode == "all" else current.format,
                         error=None,
+                        hyperlink=(
+                            source.hyperlink
+                            if self.mode == "all"
+                            else current.hyperlink
+                        ),
                     )
                 sheet.put_cell(row, column, selected)
         self._rebuild()

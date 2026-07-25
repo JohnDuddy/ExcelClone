@@ -64,8 +64,9 @@ crashing the application.
 
 - `.ogrid` is the lossless native format.
 - `.xlsx` preserves supported formulas, values, styles, dimensions, names,
-  merges, filters, validation, and frozen panes. OpenGrid reports unsupported
-  features before dropping them.
+  merges, filters, validation, frozen panes, and external/internal hyperlinks.
+  Click a linked cell to open its URL or navigate to its workbook destination.
+  OpenGrid reports unsupported features before dropping them.
 - `.csv` and `.tsv` import and export the active sheet.
 - Unsaved workbooks receive a recovery snapshot every five minutes under
   `%LOCALAPPDATA%\ExcelClone\autosave`.

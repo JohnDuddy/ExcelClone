@@ -89,12 +89,19 @@ All notable changes follow Keep a Changelog conventions.
   environment, offline wheel installation, smoke test, and direct
   `pythonw.exe` Desktop shortcut.
 - Self-contained `dist/ExcelClone.zip` with all Windows runtime wheels.
+- External HTTPS/file/mail links and internal workbook-location links as
+  immutable cell metadata, including clickable grid presentation, native and
+  XLSX round trips, rich clipboard copies, and internal navigation.
 - Measured release targets: 1.12 s cold launch, 0.78 s 50,000-cell XLSX load,
   0.65 s 100,000-row scroll simulation, under 0.30 s 10,000-cell incremental
   chain recalculation, 3.83 s 100,000-formula full recalculation, and 0.18 s
   10,000-cell paste undo.
 
 ### Fixed
+
+- XLSX hyperlinks are no longer reported and discarded during import; external
+  links open with the Windows default handler and internal links select their
+  workbook destination.
 
 - Whole-row and whole-column references now ignore shifts along their fully
   spanned axis, preventing out-of-grid translation.

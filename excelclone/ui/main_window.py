@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QModelIndex, QTimer, Qt
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import QModelIndex, QTimer, QUrl, Qt
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QApplication,
@@ -90,6 +91,7 @@ class MainWindow(QMainWindow):
         parent: Any = None,
         settings_store: SettingsStore | None = None,
         autosave_manager: AutosaveManager | None = None,
+        hyperlink_opener: Callable[[QUrl], bool] | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("OpenGrid — Personal Spreadsheet")
@@ -98,6 +100,7 @@ class MainWindow(QMainWindow):
         self.settings = settings_store or SettingsStore()
         self.autosave_manager = autosave_manager or AutosaveManager()
         self.logger = configure_logging()
+        self._hyperlink_opener = hyperlink_opener or QDesktopServices.openUrl
         self.current_path: Path | None = None
         self.dirty = False
         self._suppress_dirty = False
@@ -217,6 +220,8 @@ class MainWindow(QMainWindow):
     def _connect_signals(self) -> None:
         self.grid.currentCellChanged.connect(self.on_current_cell_changed)
         self.grid.selectionSummaryChanged.connect(self.selection_label.setText)
+        self.grid.externalHyperlinkRequested.connect(self._open_external_hyperlink)
+        self.grid.internalHyperlinkRequested.connect(self.goto_reference)
         self.formula_bar.commitRequested.connect(self.commit_formula_bar)
         self.formula_bar.gotoRequested.connect(self.goto_reference)
         self.sheet_tabs.addRequested.connect(self.add_sheet)
@@ -490,8 +495,14 @@ class MainWindow(QMainWindow):
         try:
             reference = parse_a1(text, default_sheet=self.grid_model.active_sheet_name)
         except ValueError as error:
-            self.statusBar().showMessage(str(error), 5000)
-            return
+            try:
+                reference = self.engine.workbook.get_name(
+                    text.removeprefix("#"),
+                    scope=self.grid_model.active_sheet_name,
+                ).reference
+            except (KeyError, ValueError):
+                self.statusBar().showMessage(str(error), 5000)
+                return
         if not isinstance(reference, CellReference):
             row, column = reference.min_row, reference.min_column
             sheet_name = reference.sheet
@@ -505,6 +516,35 @@ class MainWindow(QMainWindow):
         self.grid.setCurrentIndex(index)
         self.grid.scrollTo(index)
         self.on_current_cell_changed(index)
+
+    def _open_external_hyperlink(self, target: str) -> None:
+        """Open a safe external hyperlink with the Windows default handler."""
+        parsed = QUrl(target)
+        if not parsed.scheme():
+            path = Path(target)
+            if not path.is_absolute() and self.current_path is not None:
+                path = self.current_path.parent / path
+            url = (
+                QUrl.fromLocalFile(str(path.resolve()))
+                if path.exists()
+                else QUrl.fromUserInput(target)
+            )
+        else:
+            url = parsed
+        if not url.isValid() or url.scheme().casefold() not in {
+            "http",
+            "https",
+            "mailto",
+            "file",
+            "ftp",
+        }:
+            self.statusBar().showMessage(
+                f"Blocked unsupported hyperlink: {target}",
+                5000,
+            )
+            return
+        if not self._hyperlink_opener(url):
+            self.statusBar().showMessage(f"Could not open hyperlink: {target}", 5000)
 
     def add_sheet(self) -> None:
         """Add a generated sheet through the command history."""
@@ -1147,6 +1187,8 @@ class MainWindow(QMainWindow):
         secondary.setItemDelegate(CellDelegate(secondary))
         secondary.currentCellChanged.connect(self.on_current_cell_changed)
         secondary.selectionSummaryChanged.connect(self.selection_label.setText)
+        secondary.externalHyperlinkRequested.connect(self._open_external_hyperlink)
+        secondary.internalHyperlinkRequested.connect(self.goto_reference)
         secondary.setShowGrid(self.grid.showGrid())
         secondary.set_zoom(self.grid.zoom_percent)
         secondary.sync_sheet_metadata()

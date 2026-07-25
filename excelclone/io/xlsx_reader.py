@@ -11,7 +11,7 @@ from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
 from openpyxl.styles.colors import COLOR_INDEX
 
-from excelclone.core.cell import BorderStyle, CellFormat
+from excelclone.core.cell import BorderStyle, CellFormat, Hyperlink
 from excelclone.core.data_tools import DataValidation, apply_filter
 from excelclone.core.engine import FormulaEngine
 from excelclone.core.refs import CellReference, parse_a1
@@ -69,21 +69,19 @@ def _read_worksheet(worksheet: Any, sheet: Any, warnings: list[str]) -> None:
         if isinstance(cell, MergedCell):
             continue
         cell_format = _read_cell_format(cell)
-        if cell.value is None and cell_format.is_default:
+        hyperlink = _read_hyperlink(cell)
+        if cell.value is None and cell_format.is_default and hyperlink is None:
             continue
         sheet.set_cell(
             cell.row - 1,
             cell.column - 1,
             cell.value,
             cell_format=cell_format,
+            hyperlink=hyperlink,
         )
         if cell.comment is not None:
             warnings.append(
                 f"Comments on sheet {worksheet.title!r} are not supported and were dropped."
-            )
-        if cell.hyperlink is not None:
-            warnings.append(
-                f"Hyperlinks on sheet {worksheet.title!r} are not supported and were dropped."
             )
 
     for index, dimension in worksheet.row_dimensions.items():
@@ -138,6 +136,23 @@ def _read_worksheet(worksheet: Any, sheet: Any, warnings: list[str]) -> None:
         )
     _read_validations(worksheet, sheet, warnings)
     _read_filter(worksheet, sheet, warnings)
+
+
+def _read_hyperlink(cell: Any) -> Hyperlink | None:
+    source = cell.hyperlink
+    if source is None:
+        return None
+    location = getattr(source, "location", None)
+    tooltip = getattr(source, "tooltip", None)
+    if location:
+        return Hyperlink(str(location).removeprefix("#"), True, tooltip)
+    target = getattr(source, "target", None)
+    if not target:
+        return None
+    text = str(target)
+    if text.startswith("#"):
+        return Hyperlink(text[1:], True, tooltip)
+    return Hyperlink(text, False, tooltip)
 
 
 def _read_cell_format(cell: Any) -> CellFormat:

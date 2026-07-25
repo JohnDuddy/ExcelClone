@@ -40,6 +40,10 @@ through the adapter, recalculates formulas, and independently reopens the file
 with OpenPyXL. `test_csv_io.py` verifies raw bytes where newline or encoding
 behavior matters.
 
+`test_hyperlinks.py` creates only synthetic external and internal links. It
+verifies XLSX and OGrid round trips, rich clipboard preservation, link styling,
+external activation requests, internal navigation, and removal after editing.
+
 ## Structural And Data Operations
 
 Translation tests inspect parsed references rather than depending only on

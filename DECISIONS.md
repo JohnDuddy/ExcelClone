@@ -153,3 +153,12 @@ transitive runtime requirements. Installation uses `pip --no-index` rather than
 assuming a package cache or network. The extracted folder is the install root,
 so the direct `pythonw.exe` shortcut remains transparent and relocatable before
 installation.
+
+## 2026-07-25 — Hyperlinks as cell metadata
+
+Hyperlinks are immutable cell metadata rather than formulas or UI-only state.
+External targets retain their original URL/file text; internal targets retain
+their workbook location and optional tooltip. This lets XLSX, native OGrid,
+clipboard, fill, structural edits, and undo preserve links through the same
+cell value seam. OGrid schema 2 adds the optional hyperlink field, with a
+no-op v1 migration treating its absence as an unlinked cell.

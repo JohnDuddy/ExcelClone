@@ -9,16 +9,26 @@ from pathlib import Path
 from typing import Any, Callable
 from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
-from excelclone.core.cell import BorderStyle, Cell, CellFormat
+from excelclone.core.cell import BorderStyle, Cell, CellFormat, Hyperlink
 from excelclone.core.chart import ChartSpec
 from excelclone.core.conditional import ConditionalRule, FormatPatch
 from excelclone.core.data_tools import AutoFilter, DataValidation
 from excelclone.core.refs import parse_a1
 from excelclone.core.workbook import Workbook
 
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 Migration = Callable[[dict[str, Any], dict[str, dict[str, Any]]], None]
-MIGRATIONS: dict[int, Migration] = {}
+
+
+def _migrate_v1_to_v2(
+    manifest: dict[str, Any],
+    sheet_data: dict[str, dict[str, Any]],
+) -> None:
+    """Accept v1 cells, whose missing hyperlink field means no hyperlink."""
+    del manifest, sheet_data
+
+
+MIGRATIONS: dict[int, Migration] = {1: _migrate_v1_to_v2}
 
 
 def save_ogrid(workbook: Workbook, path: str | Path) -> Path:
@@ -109,6 +119,15 @@ def _sheet_to_data(sheet: Any) -> dict[str, Any]:
                 "format": _format_to_data(cell.format),
                 "error": cell.error,
                 "spill_parent": list(cell.spill_parent) if cell.spill_parent else None,
+                "hyperlink": (
+                    {
+                        "target": cell.hyperlink.target,
+                        "internal": cell.hyperlink.internal,
+                        "tooltip": cell.hyperlink.tooltip,
+                    }
+                    if cell.hyperlink is not None
+                    else None
+                ),
             }
             for (row, column), cell in sheet.iter_populated()
         ],
@@ -148,6 +167,7 @@ def _sheet_to_data(sheet: Any) -> dict[str, Any]:
 
 def _restore_sheet(sheet: Any, data: dict[str, Any]) -> None:
     for item in data.get("cells", ()):
+        hyperlink_data = item.get("hyperlink")
         sheet.put_cell(
             int(item["row"]),
             int(item["column"]),
@@ -159,6 +179,16 @@ def _restore_sheet(sheet: Any, data: dict[str, Any]) -> None:
                 spill_parent=(
                     tuple(item["spill_parent"])
                     if item.get("spill_parent") is not None
+                    else None
+                ),
+                hyperlink=(
+                    Hyperlink(
+                        str(hyperlink_data["target"]),
+                        bool(hyperlink_data.get("internal", False)),
+                        hyperlink_data.get("tooltip"),
+                    )
+                    if isinstance(hyperlink_data, dict)
+                    and hyperlink_data.get("target")
                     else None
                 ),
             ),

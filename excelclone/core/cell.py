@@ -41,6 +41,19 @@ class CellFormat:
 
 
 @dataclass(frozen=True, slots=True)
+class Hyperlink:
+    """A cell hyperlink targeting a URL/file or an internal workbook location."""
+
+    target: str
+    internal: bool = False
+    tooltip: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.target:
+            raise ValueError("Hyperlink target cannot be empty")
+
+
+@dataclass(frozen=True, slots=True)
 class Cell:
     """Cell input, cached result, presentation format, and formula error."""
 
@@ -49,6 +62,7 @@ class Cell:
     format: CellFormat = field(default_factory=CellFormat)
     error: str | None = None
     spill_parent: tuple[int, int] | None = None
+    hyperlink: Hyperlink | None = None
 
     @property
     def is_formula(self) -> bool:
@@ -63,6 +77,7 @@ class Cell:
             and self.cached_value is None
             and self.error is None
             and self.spill_parent is None
+            and self.hyperlink is None
             and self.format.is_default
         )
 

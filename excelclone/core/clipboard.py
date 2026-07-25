@@ -7,7 +7,7 @@ from dataclasses import fields
 from datetime import date, datetime, time
 from typing import Any
 
-from excelclone.core.cell import BorderStyle, Cell, CellFormat
+from excelclone.core.cell import BorderStyle, Cell, CellFormat, Hyperlink
 
 RICH_CELL_MIME = "application/x-opengrid-cells+json"
 
@@ -53,15 +53,34 @@ def _cell_to_data(cell: Cell) -> dict[str, Any]:
         "cached": _encode_value(cell.cached_value),
         "format": _format_to_data(cell.format),
         "error": cell.error,
+        "hyperlink": (
+            {
+                "target": cell.hyperlink.target,
+                "internal": cell.hyperlink.internal,
+                "tooltip": cell.hyperlink.tooltip,
+            }
+            if cell.hyperlink is not None
+            else None
+        ),
     }
 
 
 def _cell_from_data(data: dict[str, Any]) -> Cell:
+    link_data = data.get("hyperlink")
     return Cell(
         raw_input=_decode_value(data.get("raw")),
         cached_value=_decode_value(data.get("cached")),
         format=_format_from_data(data.get("format", {})),
         error=data.get("error"),
+        hyperlink=(
+            Hyperlink(
+                str(link_data["target"]),
+                bool(link_data.get("internal", False)),
+                link_data.get("tooltip"),
+            )
+            if isinstance(link_data, dict) and link_data.get("target")
+            else None
+        ),
     )
 
 

@@ -42,6 +42,8 @@ class GridView(QTableView):
 
     currentCellChanged = Signal(QModelIndex)
     selectionSummaryChanged = Signal(str)
+    externalHyperlinkRequested = Signal(str)
+    internalHyperlinkRequested = Signal(str)
 
     def __init__(self, parent: Any = None) -> None:
         super().__init__(parent)
@@ -82,6 +84,7 @@ class GridView(QTableView):
         self.verticalScrollBar().valueChanged.connect(
             self._sync_vertical_frozen_scroll
         )
+        self.clicked.connect(self.activate_hyperlink)
 
     def setModel(self, model: GridModel) -> None:
         super().setModel(model)
@@ -355,6 +358,22 @@ class GridView(QTableView):
         columns = [index.column() for index in indexes]
         return min(rows), min(columns), max(rows), max(columns)
 
+    def activate_hyperlink(self, index: QModelIndex) -> bool:
+        """Emit the appropriate activation request for a linked cell."""
+        if not index.isValid():
+            return False
+        hyperlink = self.grid_model.sheet.get_cell(
+            index.row(),
+            index.column(),
+        ).hyperlink
+        if hyperlink is None:
+            return False
+        if hyperlink.internal:
+            self.internalHyperlinkRequested.emit(hyperlink.target)
+        else:
+            self.externalHyperlinkRequested.emit(hyperlink.target)
+        return True
+
     def set_zoom(self, percent: int) -> None:
         """Set a clamped spreadsheet zoom from 25 through 400 percent."""
         self.zoom_percent = max(25, min(400, int(percent)))
@@ -538,6 +557,7 @@ class GridView(QTableView):
         view.setEditTriggers(self.editTriggers())
         view.setWordWrap(False)
         view.setStyleSheet(f"QTableView {{ background: white; {border} }}")
+        view.clicked.connect(self.activate_hyperlink)
         view.hide()
         return view
 

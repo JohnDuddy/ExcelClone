@@ -20,6 +20,7 @@ from excelclone.core.tokenizer import FormulaSyntaxError
 DATA_BAR_ROLE = int(Qt.ItemDataRole.UserRole) + 1
 ICON_ROLE = int(Qt.ItemDataRole.UserRole) + 2
 EFFECTIVE_FORMAT_ROLE = int(Qt.ItemDataRole.UserRole) + 3
+HYPERLINK_ROLE = int(Qt.ItemDataRole.UserRole) + 4
 
 _INTEGER_RE = re.compile(r"^[+-]?[0-9]+$")
 _FLOAT_RE = re.compile(
@@ -75,14 +76,20 @@ class GridModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.ToolTipRole:
             if cell.error is not None:
                 return cell.error
+            if cell.hyperlink is not None:
+                return cell.hyperlink.tooltip or (
+                    f"Open link: {cell.hyperlink.target}"
+                )
             return str(cell.raw_input) if cell.is_formula else None
         if role == Qt.ItemDataRole.FontRole:
             font = QFont(cell_format.font_family, round(cell_format.font_size))
             font.setBold(cell_format.bold)
             font.setItalic(cell_format.italic)
-            font.setUnderline(cell_format.underline)
+            font.setUnderline(cell_format.underline or cell.hyperlink is not None)
             return font
         if role == Qt.ItemDataRole.ForegroundRole:
+            if cell.hyperlink is not None:
+                return QBrush(QColor("#0563c1"))
             formatted = format_value(cell.display_value, cell_format.number_format)
             return QBrush(QColor(formatted.color or cell_format.font_color))
         if role == Qt.ItemDataRole.BackgroundRole and cell_format.fill_color:
@@ -110,6 +117,8 @@ class GridModel(QAbstractTableModel):
             return presentation.icon
         if role == EFFECTIVE_FORMAT_ROLE:
             return cell_format
+        if role == HYPERLINK_ROLE:
+            return cell.hyperlink
         return None
 
     def setData(

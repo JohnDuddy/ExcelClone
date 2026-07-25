@@ -10,6 +10,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation as OpenPyxlValidation
+from openpyxl.worksheet.hyperlink import Hyperlink as OpenPyxlHyperlink
 
 from excelclone.core.cell import BorderStyle, CellFormat
 from excelclone.core.data_tools import AutoFilter, DataValidation
@@ -44,6 +45,14 @@ def _write_worksheet(source: Any, worksheet: Any) -> None:
             else source_cell.display_value
         )
         _write_cell_format(target, source_cell.format)
+        if source_cell.hyperlink is not None:
+            link = source_cell.hyperlink
+            target.hyperlink = OpenPyxlHyperlink(
+                ref=target.coordinate,
+                location=link.target if link.internal else None,
+                target=None if link.internal else link.target,
+                tooltip=link.tooltip,
+            )
 
     for row, height in source.row_heights.items():
         worksheet.row_dimensions[row + 1].height = height
