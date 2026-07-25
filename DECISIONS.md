@@ -77,3 +77,18 @@ Grid edits, pasted ranges, and sheet changes execute commands through one
 `CommandHistory`. UI widgets never write directly to sheet storage. This keeps
 toolbar, keyboard, formula-bar, and future data-tool mutations equally
 undoable.
+
+## 2026-07-25 — Formatting boundary
+
+Number-format rendering and conditional-rule evaluation are headless core
+services. The Qt model consumes one effective `CellFormat`, while a delegate
+adds only visual data bars, icons, and borders. This keeps formatting semantics
+identical across the grid and future file adapters without moving business
+rules into paint code.
+
+## 2026-07-25 — Format-only commands
+
+Formatting a range replaces immutable cell formats without invoking formula
+recalculation. Undo restores only the prior formats, not captured formula
+caches, so an intervening manual recalculation cannot be accidentally rolled
+back by a presentation edit.

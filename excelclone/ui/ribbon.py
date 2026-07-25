@@ -20,7 +20,19 @@ class Ribbon(QTabWidget):
         self.setDocumentMode(True)
         self.setMaximumHeight(104)
         definitions = {
-            "Home": ("Undo", "Redo", "Copy", "Paste", "Bold", "Fill"),
+            "Home": (
+                "Undo",
+                "Redo",
+                "Copy",
+                "Paste",
+                "Bold",
+                "Italic",
+                "Underline",
+                "Font Color",
+                "Fill",
+                "Wrap",
+                "Format Cells",
+            ),
             "Insert": ("Chart", "Rows", "Columns"),
             "Data": ("Sort", "Filter", "Validate"),
             "Formulas": ("Insert Function", "Recalculate", "Sheet Recalculate"),
@@ -44,4 +56,3 @@ class Ribbon(QTabWidget):
                 layout.addWidget(button)
             layout.addStretch(1)
             self.addTab(page, tab_name)
-

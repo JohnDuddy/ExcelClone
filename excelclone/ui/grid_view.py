@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtCore import QModelIndex, QItemSelection, QItemSelectionModel, Qt, Signal
-from PySide6.QtGui import QKeyEvent
+from PySide6.QtGui import QFont, QKeyEvent
 from PySide6.QtWidgets import QApplication, QAbstractItemView, QTableView
 
 from excelclone.commands.edits import SetRangeCommand
@@ -32,6 +32,7 @@ class GridView(QTableView):
         self.setWordWrap(False)
         self.verticalHeader().setDefaultSectionSize(22)
         self.horizontalHeader().setDefaultSectionSize(96)
+        self.zoom_percent = 100
 
     def setModel(self, model: GridModel) -> None:
         super().setModel(model)
@@ -179,3 +180,28 @@ class GridView(QTableView):
         for index in indexes:
             self.grid_model.setData(index, "" if raw is None else str(raw))
 
+    def selection_bounds(self) -> tuple[int, int, int, int] | None:
+        """Return the bounding rectangle of selected cells."""
+        indexes = self.selectedIndexes()
+        if not indexes:
+            current = self.currentIndex()
+            indexes = [current] if current.isValid() else []
+        if not indexes:
+            return None
+        rows = [index.row() for index in indexes]
+        columns = [index.column() for index in indexes]
+        return min(rows), min(columns), max(rows), max(columns)
+
+    def set_zoom(self, percent: int) -> None:
+        """Set a clamped spreadsheet zoom from 25 through 400 percent."""
+        self.zoom_percent = max(25, min(400, int(percent)))
+        scale = self.zoom_percent / 100
+        self.verticalHeader().setDefaultSectionSize(max(8, round(22 * scale)))
+        self.horizontalHeader().setDefaultSectionSize(max(24, round(96 * scale)))
+        font = QFont(self.font())
+        base_size = self.property("baseFontSize")
+        if base_size is None:
+            base_size = max(1.0, self.font().pointSizeF())
+            self.setProperty("baseFontSize", base_size)
+        font.setPointSizeF(float(base_size) * scale)
+        self.setFont(font)

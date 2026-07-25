@@ -42,12 +42,13 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M5 is complete: the virtualized grid, editing, selection summaries, formula bar,
-sheet tabs, TSV clipboard, and command history are covered by the regression
-suite. The current milestone is M6: number formats, cell presentation,
-conditional formatting, delegates, freeze panes, and formula/grid views.
+M6 is complete: headless number formatting, command-driven cell presentation,
+conditional formatting, delegate visuals, and formula/gridline/zoom controls
+are covered by the regression suite. The current milestone is M7: XLSX,
+CSV/TSV, and lossless native OGrid file I/O.
 
 ## Known Issues
 
-Advanced formatting and data tools remain scheduled. No shipped M1 through M5
-behavior is known to be broken.
+Visible frozen-pane overlays, split views, rich clipboard data, fill handles,
+file I/O, advanced data tools, and charts remain scheduled. No shipped M1
+through M6 behavior is known to be broken.

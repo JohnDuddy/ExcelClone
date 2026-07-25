@@ -36,8 +36,11 @@ complete.
 - [x] Movable sheet-tab model with command-driven add/delete (`test_ui_workflow.py`, `test_commands.py`)
 - [x] Command-based 200-level undo and redo (`test_commands.py`)
 - [x] F4 absolute-reference cycling (`test_ui_workflow.py`)
-- [ ] Fill, clipboard, sheet tabs, formatting, freeze panes, and views
-- [ ] Number and conditional-format engines
+- [x] Number formats, including four-section custom codes and Excel's 1900 leap-day behavior (`test_formats.py`)
+- [x] Undoable fonts, fills, alignment, wrapping, and eight border styles (`test_commands.py`, `test_format_dialog.py`)
+- [x] Conditional value, ranking, average, duplicate, formula, color-scale, data-bar, and icon rules (`test_conditional_formats.py`)
+- [x] Delegate rendering and formula/gridline/zoom view controls (`test_grid_model.py`, `test_ui_workflow.py`)
+- [ ] Fill handle, rich clipboard, visible frozen panes, and split views
 
 ## M7-M9 Data And Visualization
 

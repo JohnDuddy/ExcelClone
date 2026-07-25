@@ -8,8 +8,12 @@ from excelclone.commands.edits import (
     DeleteSheetCommand,
     RenameSheetCommand,
     SetCellCommand,
+    SetFormatCommand,
+    SetFreezePanesCommand,
     SetRangeCommand,
 )
+from excelclone.core.conditional import FormatPatch
+from excelclone.core.cell import CellFormat
 from excelclone.core.engine import FormulaEngine
 from excelclone.core.workbook import Workbook
 
@@ -151,3 +155,62 @@ def test_rename_sheet_command_is_reversible() -> None:
     history.undo()
 
     assert engine.workbook.sheet_names == ("Sheet1", "Data")
+
+
+def test_set_format_command_formats_range_without_changing_content() -> None:
+    engine = FormulaEngine(Workbook())
+    engine.set_cell("Sheet1", 0, 0, 4)
+    engine.set_cell("Sheet1", 0, 1, "=A1*3")
+    history = CommandHistory()
+
+    history.execute(
+        SetFormatCommand(
+            engine,
+            "Sheet1",
+            0,
+            0,
+            0,
+            1,
+            FormatPatch(bold=True, number_format="#,##0.00"),
+        )
+    )
+
+    sheet = engine.workbook.active_sheet
+    assert sheet.get_cell(0, 0).format.bold
+    assert sheet.get_cell(0, 1).format.number_format == "#,##0.00"
+    assert sheet.get_cell(0, 1).raw_input == "=A1*3"
+    assert sheet.get_cell(0, 1).display_value == 12
+
+
+def test_set_format_command_undo_restores_individual_formats_and_sparse_cells() -> None:
+    engine = FormulaEngine(Workbook())
+    sheet = engine.workbook.active_sheet
+    sheet.set_cell(0, 0, "keep", cell_format=CellFormat(italic=True))
+    history = CommandHistory()
+    history.execute(
+        SetFormatCommand(
+            engine,
+            "Sheet1",
+            0,
+            0,
+            0,
+            1,
+            FormatPatch(fill_color="#ffeeaa"),
+        )
+    )
+
+    history.undo()
+
+    assert sheet.get_cell(0, 0).format == CellFormat(italic=True)
+    assert sheet.get_cell(0, 1).is_empty
+
+
+def test_set_freeze_panes_command_is_reversible() -> None:
+    engine = FormulaEngine(Workbook())
+    history = CommandHistory()
+
+    history.execute(SetFreezePanesCommand(engine, "Sheet1", (2, 3)))
+    assert engine.workbook.active_sheet.freeze_panes == (2, 3)
+
+    history.undo()
+    assert engine.workbook.active_sheet.freeze_panes is None

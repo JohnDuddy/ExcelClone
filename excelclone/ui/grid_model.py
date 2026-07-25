@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
 from typing import Any
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal
@@ -11,9 +10,15 @@ from PySide6.QtGui import QBrush, QColor, QFont
 
 from excelclone.commands.base import CommandHistory
 from excelclone.commands.edits import SetCellCommand
+from excelclone.core.conditional import ConditionalFormatEngine, ConditionalResult
 from excelclone.core.engine import FormulaEngine, SpillCellReadOnlyError
+from excelclone.core.formats import format_value
 from excelclone.core.refs import MAX_COLUMNS, MAX_ROWS, index_to_column
 from excelclone.core.tokenizer import FormulaSyntaxError
+
+DATA_BAR_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+ICON_ROLE = int(Qt.ItemDataRole.UserRole) + 2
+EFFECTIVE_FORMAT_ROLE = int(Qt.ItemDataRole.UserRole) + 3
 
 _INTEGER_RE = re.compile(r"^[+-]?[0-9]+$")
 _FLOAT_RE = re.compile(
@@ -38,6 +43,8 @@ class GridModel(QAbstractTableModel):
         self.history = history
         self.active_sheet_name = engine.workbook.active_sheet.name
         self.last_error = ""
+        self.formula_view = False
+        self.conditional_formats = ConditionalFormatEngine(engine.workbook)
         self.history.add_listener(self._history_changed)
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
@@ -54,8 +61,14 @@ class GridModel(QAbstractTableModel):
         if not index.isValid():
             return None
         cell = self.sheet.get_cell(index.row(), index.column())
+        presentation = self._presentation(index)
+        cell_format = presentation.format
         if role == Qt.ItemDataRole.DisplayRole:
-            return _display_text(cell.display_value)
+            if self.formula_view and cell.is_formula:
+                return cell.raw_input
+            if cell.display_value is None:
+                return None
+            return format_value(cell.display_value, cell_format.number_format).text
         if role == Qt.ItemDataRole.EditRole:
             return "" if cell.raw_input is None else str(cell.raw_input)
         if role == Qt.ItemDataRole.ToolTipRole:
@@ -63,15 +76,16 @@ class GridModel(QAbstractTableModel):
                 return cell.error
             return str(cell.raw_input) if cell.is_formula else None
         if role == Qt.ItemDataRole.FontRole:
-            font = QFont(cell.format.font_family, round(cell.format.font_size))
-            font.setBold(cell.format.bold)
-            font.setItalic(cell.format.italic)
-            font.setUnderline(cell.format.underline)
+            font = QFont(cell_format.font_family, round(cell_format.font_size))
+            font.setBold(cell_format.bold)
+            font.setItalic(cell_format.italic)
+            font.setUnderline(cell_format.underline)
             return font
         if role == Qt.ItemDataRole.ForegroundRole:
-            return QBrush(QColor(cell.format.font_color))
-        if role == Qt.ItemDataRole.BackgroundRole and cell.format.fill_color:
-            return QBrush(QColor(cell.format.fill_color))
+            formatted = format_value(cell.display_value, cell_format.number_format)
+            return QBrush(QColor(formatted.color or cell_format.font_color))
+        if role == Qt.ItemDataRole.BackgroundRole and cell_format.fill_color:
+            return QBrush(QColor(cell_format.fill_color))
         if role == Qt.ItemDataRole.TextAlignmentRole:
             horizontal = {
                 "left": Qt.AlignmentFlag.AlignLeft,
@@ -82,13 +96,19 @@ class GridModel(QAbstractTableModel):
                     if isinstance(cell.display_value, (int, float))
                     else Qt.AlignmentFlag.AlignLeft
                 ),
-            }.get(cell.format.horizontal_alignment, Qt.AlignmentFlag.AlignLeft)
+            }.get(cell_format.horizontal_alignment, Qt.AlignmentFlag.AlignLeft)
             vertical = {
                 "top": Qt.AlignmentFlag.AlignTop,
                 "center": Qt.AlignmentFlag.AlignVCenter,
                 "bottom": Qt.AlignmentFlag.AlignBottom,
-            }.get(cell.format.vertical_alignment, Qt.AlignmentFlag.AlignBottom)
+            }.get(cell_format.vertical_alignment, Qt.AlignmentFlag.AlignBottom)
             return horizontal | vertical
+        if role == DATA_BAR_ROLE:
+            return presentation.data_bar
+        if role == ICON_ROLE:
+            return presentation.icon
+        if role == EFFECTIVE_FORMAT_ROLE:
+            return cell_format
         return None
 
     def setData(
@@ -159,6 +179,21 @@ class GridModel(QAbstractTableModel):
         """Notify views that sparse workbook content may have changed."""
         self.layoutChanged.emit()
 
+    def set_formula_view(self, enabled: bool) -> None:
+        """Show raw formula text instead of calculated values."""
+        selected = bool(enabled)
+        if selected == self.formula_view:
+            return
+        self.formula_view = selected
+        self.layoutChanged.emit()
+
+    def _presentation(self, index: QModelIndex) -> ConditionalResult:
+        return self.conditional_formats.evaluate(
+            self.sheet,
+            index.row(),
+            index.column(),
+        )
+
     def _history_changed(self, history: CommandHistory) -> None:
         self.refresh()
 
@@ -216,16 +251,4 @@ def _parse_user_input(value: Any) -> Any:
         except ValueError:
             return value
     return value
-
-
-def _display_text(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return "TRUE" if value else "FALSE"
-    if isinstance(value, float) and value.is_integer():
-        return str(int(value))
-    if isinstance(value, (date, datetime)):
-        return value.isoformat(sep=" ") if isinstance(value, datetime) else value.isoformat()
-    return str(value)
 

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from dataclasses import replace
 from typing import Any
 
 from excelclone.commands.base import Command
 from excelclone.core.cell import Cell, CellFormat
+from excelclone.core.conditional import FormatPatch
 from excelclone.core.engine import FormulaEngine, RecalculationResult
 from excelclone.core.sheet import Sheet
 
@@ -117,6 +119,83 @@ class SetRangeCommand(Command):
                 cell.raw_input,
                 cell_format=cell.format,
             )
+
+
+@dataclass
+class SetFormatCommand(Command):
+    """Apply a format patch to a rectangle as one reversible edit."""
+
+    engine: FormulaEngine
+    sheet_name: str
+    start_row: int
+    start_column: int
+    end_row: int
+    end_column: int
+    patch: FormatPatch
+    previous: dict[tuple[int, int], Cell] = field(default_factory=dict, init=False)
+    _captured: bool = field(default=False, init=False)
+
+    @property
+    def description(self) -> str:
+        return "Format cells"
+
+    def do(self) -> None:
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        self.sheet_name = sheet.name
+        minimum_row, maximum_row = sorted((self.start_row, self.end_row))
+        minimum_column, maximum_column = sorted(
+            (self.start_column, self.end_column)
+        )
+        if not self._captured:
+            self.previous = {
+                (row, column): sheet.get_cell(row, column)
+                for row in range(minimum_row, maximum_row + 1)
+                for column in range(minimum_column, maximum_column + 1)
+            }
+            self._captured = True
+        for (row, column), original in self.previous.items():
+            current = sheet.get_cell(row, column)
+            sheet.put_cell(
+                row,
+                column,
+                replace(current, format=self.patch.apply(original.format)),
+            )
+
+    def undo(self) -> None:
+        if not self._captured:
+            raise RuntimeError("Command has not been executed")
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        for (row, column), cell in self.previous.items():
+            current = sheet.get_cell(row, column)
+            sheet.put_cell(row, column, replace(current, format=cell.format))
+
+
+@dataclass
+class SetFreezePanesCommand(Command):
+    """Set or clear a sheet's frozen-pane origin."""
+
+    engine: FormulaEngine
+    sheet_name: str
+    freeze_panes: tuple[int, int] | None
+    previous: tuple[int, int] | None = field(default=None, init=False)
+    _captured: bool = field(default=False, init=False)
+
+    @property
+    def description(self) -> str:
+        return "Freeze panes" if self.freeze_panes is not None else "Unfreeze panes"
+
+    def do(self) -> None:
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        self.sheet_name = sheet.name
+        if not self._captured:
+            self.previous = sheet.freeze_panes
+            self._captured = True
+        sheet.freeze_panes = self.freeze_panes
+
+    def undo(self) -> None:
+        if not self._captured:
+            raise RuntimeError("Command has not been executed")
+        self.engine.workbook.get_sheet(self.sheet_name).freeze_panes = self.previous
 
 
 @dataclass

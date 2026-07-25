@@ -35,6 +35,16 @@ All notable changes follow Keep a Changelog conventions.
 - Tabbed ribbon shell and movable workbook sheet tabs.
 - Reversible command history with a 200-entry limit, adjacent edit merging,
   atomic range edits, and sheet add/delete/rename restoration.
+- Headless Excel-style number formatting with named presets, date/time serials,
+  custom placeholders, four-section selection, scaling, literals, and colors.
+- Immutable range-format commands and a multi-tab Format Cells dialog covering
+  fonts, fills, alignment, wrapping, and eight border styles.
+- Conditional formatting for value comparisons, rankings, averages,
+  duplicates, formulas, color scales, data bars, and icon sets.
+- A cell delegate for borders and conditional visuals, plus formula-view,
+  gridline, zoom, and freeze-pane metadata controls.
+- AST-level mixed-reference translation used by range-relative conditional
+  formulas.
 
 ### Fixed
 
@@ -44,3 +54,4 @@ All notable changes follow Keep a Changelog conventions.
   references.
 - `NPER` now accepts valid same-sign logarithm terms while rejecting cash-flow
   sets that have no financial solution.
+- Optional `#` integer placeholders now suppress insignificant zero values.

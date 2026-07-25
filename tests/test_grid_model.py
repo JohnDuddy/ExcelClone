@@ -5,13 +5,16 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication
 
 from excelclone.commands.base import CommandHistory
+from excelclone.core.cell import CellFormat
+from excelclone.core.conditional import ConditionalRule, FormatPatch
 from excelclone.core.engine import FormulaEngine
-from excelclone.core.refs import MAX_COLUMNS, MAX_ROWS
+from excelclone.core.refs import MAX_COLUMNS, MAX_ROWS, parse_a1
 from excelclone.core.workbook import Workbook
-from excelclone.ui.grid_model import GridModel
+from excelclone.ui.grid_model import DATA_BAR_ROLE, ICON_ROLE, GridModel
 
 
 def application() -> QApplication:
@@ -78,3 +81,60 @@ def test_switching_active_sheet_resets_model_data() -> None:
 
     assert model.active_sheet_name == "Data"
     assert model.data(model.index(0, 0), Qt.ItemDataRole.DisplayRole) == "other"
+
+
+def test_grid_model_uses_number_format_and_conditional_effective_format() -> None:
+    application()
+    workbook = Workbook()
+    workbook.active_sheet.set_cell(
+        0,
+        0,
+        1234.5,
+        cell_format=CellFormat(number_format="#,##0.00"),
+    )
+    workbook.active_sheet.conditional_formats.append(
+        ConditionalRule(
+            parse_a1("A1:A2"),
+            "cell_value",
+            "greater_than",
+            (1000,),
+            FormatPatch(font_color="#cc0000", bold=True),
+        )
+    )
+    model = GridModel(FormulaEngine(workbook), CommandHistory())
+    index = model.index(0, 0)
+
+    assert model.data(index, Qt.ItemDataRole.DisplayRole) == "1,234.50"
+    assert model.data(index, Qt.ItemDataRole.ForegroundRole).color() == QColor("#cc0000")
+    assert model.data(index, Qt.ItemDataRole.FontRole).bold()
+
+
+def test_grid_model_exposes_conditional_visual_roles() -> None:
+    application()
+    workbook = Workbook()
+    sheet = workbook.active_sheet
+    sheet.set_cell(0, 0, 0)
+    sheet.set_cell(1, 0, 10)
+    sheet.conditional_formats.extend(
+        [
+            ConditionalRule(parse_a1("A1:A2"), "data_bar"),
+            ConditionalRule(parse_a1("A1:A2"), "icon_set"),
+        ]
+    )
+    model = GridModel(FormulaEngine(workbook), CommandHistory())
+
+    assert model.data(model.index(1, 0), DATA_BAR_ROLE) == 1.0
+    assert model.data(model.index(1, 0), ICON_ROLE) == "up"
+
+
+def test_grid_model_formula_view_toggles_raw_formula_display() -> None:
+    application()
+    engine = FormulaEngine(Workbook())
+    engine.set_cell("Sheet1", 0, 0, 3)
+    engine.set_cell("Sheet1", 0, 1, "=A1+2")
+    model = GridModel(engine, CommandHistory())
+
+    model.set_formula_view(True)
+    assert model.data(model.index(0, 1)) == "=A1+2"
+    model.set_formula_view(False)
+    assert model.data(model.index(0, 1)) == "5"

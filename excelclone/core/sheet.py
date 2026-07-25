@@ -23,6 +23,7 @@ class Sheet:
         "hidden_rows",
         "hidden_columns",
         "merged_ranges",
+        "conditional_formats",
         "freeze_panes",
         "tab_color",
         "visible",
@@ -38,6 +39,7 @@ class Sheet:
         self.hidden_rows: set[int] = set()
         self.hidden_columns: set[int] = set()
         self.merged_ranges: list[RangeReference] = []
+        self.conditional_formats: list[Any] = []
         self.freeze_panes: tuple[int, int] | None = None
         self.tab_color: str | None = None
         self.visible = True
@@ -135,6 +137,7 @@ class Sheet:
         duplicate.hidden_rows = self.hidden_rows.copy()
         duplicate.hidden_columns = self.hidden_columns.copy()
         duplicate.merged_ranges = list(self.merged_ranges)
+        duplicate.conditional_formats = list(self.conditional_formats)
         duplicate.freeze_panes = self.freeze_panes
         duplicate.tab_color = self.tab_color
         duplicate.visible = self.visible

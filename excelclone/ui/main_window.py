@@ -6,13 +6,29 @@ from typing import Any
 
 from PySide6.QtCore import QModelIndex, Qt
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QLabel, QMainWindow, QMessageBox, QVBoxLayout, QWidget
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
+    QColorDialog,
+    QDialog,
+    QLabel,
+    QMainWindow,
+    QVBoxLayout,
+    QWidget,
+)
 
 from excelclone.commands.base import CommandHistory
-from excelclone.commands.edits import AddSheetCommand, DeleteSheetCommand
+from excelclone.commands.edits import (
+    AddSheetCommand,
+    DeleteSheetCommand,
+    SetFormatCommand,
+    SetFreezePanesCommand,
+)
+from excelclone.core.conditional import FormatPatch
 from excelclone.core.engine import FormulaEngine
 from excelclone.core.refs import CellReference, parse_a1
 from excelclone.core.workbook import Workbook
+from excelclone.ui.delegates import CellDelegate
+from excelclone.ui.dialogs.format_cells import FormatCellsDialog
 from excelclone.ui.formula_bar import FormulaBar
 from excelclone.ui.grid_model import GridModel
 from excelclone.ui.grid_view import GridView
@@ -38,6 +54,7 @@ class MainWindow(QMainWindow):
         self.grid_model = GridModel(self.engine, self.history, self)
         self.grid = GridView()
         self.grid.setModel(self.grid_model)
+        self.grid.setItemDelegate(CellDelegate(self.grid))
         self.formula_bar = FormulaBar()
         self.ribbon = Ribbon()
         self.sheet_tabs = SheetTabs()
@@ -199,9 +216,117 @@ class MainWindow(QMainWindow):
             "Sheet Recalculate": lambda: self.engine.recalculate(
                 sheet_name=self.grid_model.active_sheet_name
             ),
+            "Bold": lambda: self._toggle_format("bold"),
+            "Italic": lambda: self._toggle_format("italic"),
+            "Underline": lambda: self._toggle_format("underline"),
+            "Font Color": lambda: self._choose_format_color("font_color"),
+            "Fill": lambda: self._choose_format_color("fill_color"),
+            "Wrap": lambda: self._toggle_format("wrap_text"),
+            "Format Cells": self.show_format_cells,
+            "Gridlines": self.toggle_gridlines,
+            "Formula View": self.toggle_formula_view,
+            "Zoom": self.increase_zoom,
+            "Freeze Panes": self.toggle_freeze_panes,
         }
         action = actions.get(name)
         if action is not None:
             action()
         else:
             self.statusBar().showMessage(f"{name} is scheduled for a later milestone", 3000)
+
+    def format_selection(self, patch: FormatPatch) -> None:
+        """Apply a format patch to the selected bounding rectangle."""
+        bounds = self.grid.selection_bounds()
+        if bounds is None:
+            return
+        self.history.execute(
+            SetFormatCommand(
+                self.engine,
+                self.grid_model.active_sheet_name,
+                *bounds,
+                patch,
+            )
+        )
+        self.grid_model.refresh()
+
+    def _toggle_format(self, attribute: str) -> None:
+        current = self.grid.currentIndex()
+        if not current.isValid():
+            current = self.grid_model.index(0, 0)
+            self.grid.setCurrentIndex(current)
+        cell_format = self.grid_model.sheet.get_cell(
+            current.row(),
+            current.column(),
+        ).format
+        self.format_selection(FormatPatch(**{attribute: not getattr(cell_format, attribute)}))
+
+    def _choose_format_color(self, attribute: str) -> None:
+        current = self.grid.currentIndex()
+        if not current.isValid():
+            current = self.grid_model.index(0, 0)
+        current_format = self.grid_model.sheet.get_cell(
+            current.row(),
+            current.column(),
+        ).format
+        initial = getattr(current_format, attribute) or "#ffffff"
+        selected = QColorDialog.getColor(QColor(initial), self)
+        if selected.isValid():
+            self.format_selection(FormatPatch(**{attribute: selected.name()}))
+
+    def show_format_cells(self) -> None:
+        """Open the multi-tab Format Cells dialog for the current selection."""
+        current = self.grid.currentIndex()
+        if not current.isValid():
+            current = self.grid_model.index(0, 0)
+            self.grid.setCurrentIndex(current)
+        base = self.grid_model.sheet.get_cell(current.row(), current.column()).format
+        dialog = FormatCellsDialog(base, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.format_selection(dialog.format_patch())
+
+    def toggle_gridlines(self) -> None:
+        """Toggle standard grid rendering."""
+        self.grid.setShowGrid(not self.grid.showGrid())
+
+    def toggle_formula_view(self) -> None:
+        """Toggle calculated values versus raw formulas."""
+        self.grid_model.set_formula_view(not self.grid_model.formula_view)
+
+    def increase_zoom(self) -> None:
+        """Cycle zoom upward in useful increments, wrapping after 400%."""
+        selected = self.grid.zoom_percent + 25
+        self.grid.set_zoom(25 if selected > 400 else selected)
+        self.statusBar().showMessage(f"Zoom: {self.grid.zoom_percent}%", 2000)
+
+    def toggle_freeze_panes(self) -> None:
+        """Freeze rows above and columns left of the current cell."""
+        sheet = self.grid_model.sheet
+        if sheet.freeze_panes is not None:
+            self.history.execute(
+                SetFreezePanesCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    None,
+                )
+            )
+            self.statusBar().showMessage("Panes unfrozen", 2000)
+            return
+        current = self.grid.currentIndex()
+        if not current.isValid() or (current.row() == 0 and current.column() == 0):
+            self.statusBar().showMessage(
+                "Select the first scrolling cell before freezing panes",
+                3000,
+            )
+            return
+        self.history.execute(
+            SetFreezePanesCommand(
+                self.engine,
+                self.grid_model.active_sheet_name,
+                (current.row(), current.column()),
+            )
+        )
+        self.statusBar().showMessage(
+            f"Frozen above row {current.row() + 1} and left of "
+            f"{CellReference(current.row(), current.column()).to_a1()}",
+            3000,
+        )

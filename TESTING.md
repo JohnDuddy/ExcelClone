@@ -25,8 +25,7 @@ marked `performance` and remain part of the full release verification.
 
 ## Golden Workbook
 
-The M4 fixture `tests/fixtures/golden.xlsx` will contain formula text and cached
+The M4 fixture `tests/fixtures/golden.xlsx` contains 200 formula cases and cached
 values calculated by Microsoft Excel. Each case records the source formula,
 input cells, expected value, and comparison tolerance. New cases must be
 calculated in Excel rather than derived by the OpenGrid evaluator.
-

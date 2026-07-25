@@ -153,6 +153,48 @@ def collect_function_names(node: Node) -> tuple[str, ...]:
     return tuple(dict.fromkeys(collected))
 
 
+def shift_references(node: Node, *, rows: int = 0, columns: int = 0) -> Node:
+    """Shift relative reference parts throughout an immutable formula AST."""
+    if isinstance(node, ReferenceNode):
+        return ReferenceNode(node.reference.shifted(rows=rows, columns=columns))
+    if isinstance(node, UnaryNode):
+        return replace(
+            node,
+            operand=shift_references(node.operand, rows=rows, columns=columns),
+        )
+    if isinstance(node, PercentNode):
+        return replace(
+            node,
+            operand=shift_references(node.operand, rows=rows, columns=columns),
+        )
+    if isinstance(node, (BinaryNode, ReferenceOperatorNode)):
+        return replace(
+            node,
+            left=shift_references(node.left, rows=rows, columns=columns),
+            right=shift_references(node.right, rows=rows, columns=columns),
+        )
+    if isinstance(node, FunctionNode):
+        return replace(
+            node,
+            arguments=tuple(
+                shift_references(item, rows=rows, columns=columns)
+                for item in node.arguments
+            ),
+        )
+    if isinstance(node, ArrayNode):
+        return replace(
+            node,
+            rows=tuple(
+                tuple(
+                    shift_references(item, rows=rows, columns=columns)
+                    for item in row
+                )
+                for row in node.rows
+            ),
+        )
+    return node
+
+
 class _Parser:
     def __init__(self, tokens: list[Token]) -> None:
         self.tokens = tokens

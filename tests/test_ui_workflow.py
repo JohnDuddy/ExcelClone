@@ -7,6 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
+from excelclone.ui.delegates import CellDelegate
 from excelclone.ui.formula_bar import cycle_absolute_reference
 from excelclone.ui.main_window import MainWindow
 
@@ -90,3 +91,38 @@ def test_cycle_absolute_reference_matches_f4_sequence() -> None:
     assert cycle_absolute_reference("=$A$1", 5) == ("=A$1", 4)
     assert cycle_absolute_reference("=A$1", 4) == ("=$A1", 4)
     assert cycle_absolute_reference("=$A1", 4) == ("=A1", 3)
+
+
+def test_main_window_uses_cell_delegate_and_format_actions_are_undoable() -> None:
+    application()
+    window = MainWindow()
+    index = window.grid_model.index(0, 0)
+    window.grid.setCurrentIndex(index)
+
+    window._ribbon_action("Bold")
+    assert window.grid_model.sheet.get_cell(0, 0).format.bold
+    window.history.undo()
+    assert not window.grid_model.sheet.get_cell(0, 0).format.bold
+    assert isinstance(window.grid.itemDelegate(), CellDelegate)
+    window.close()
+
+
+def test_view_actions_toggle_gridlines_formulas_zoom_and_freeze_panes() -> None:
+    application()
+    window = MainWindow()
+    model = window.grid_model
+    model.setData(model.index(0, 0), "=1+1")
+
+    window._ribbon_action("Formula View")
+    assert model.data(model.index(0, 0)) == "=1+1"
+    window._ribbon_action("Gridlines")
+    assert not window.grid.showGrid()
+    window._ribbon_action("Zoom")
+    assert window.grid.zoom_percent == 125
+
+    window.grid.setCurrentIndex(model.index(2, 3))
+    window._ribbon_action("Freeze Panes")
+    assert model.sheet.freeze_panes == (2, 3)
+    window._ribbon_action("Freeze Panes")
+    assert model.sheet.freeze_panes is None
+    window.close()

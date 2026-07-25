@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from excelclone.core.parser import collect_references, parse_formula
+from excelclone.core.parser import collect_references, parse_formula, shift_references
 from excelclone.core.refs import CellReference, RangeReference
 from excelclone.core.tokenizer import FormulaSyntaxError
 
@@ -37,6 +37,19 @@ from excelclone.core.tokenizer import FormulaSyntaxError
 )
 def test_valid_formulas_parse(formula: str) -> None:
     assert parse_formula(formula) is not None
+
+
+def test_shift_references_moves_relative_parts_and_preserves_absolute_parts() -> None:
+    shifted = shift_references(parse_formula("=A1+$B1+C$2+$D$3"), rows=2, columns=3)
+
+    references = collect_references(shifted)
+
+    assert [reference.to_a1() for reference in references] == [
+        "D3",
+        "$B3",
+        "F$2",
+        "$D$3",
+    ]
 
 
 @pytest.mark.parametrize(
