@@ -42,14 +42,12 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M9 is complete: range-bound chart data, all seven matplotlib chart types,
-wizard configuration, movable panels, live refresh, PNG export, commands, and
-native persistence are covered by the regression suite. The current milestone
-is M10: performance verification, autosave/recovery, logging, remaining view
-polish, installer assets, offline dependency bundle, and final ZIP acceptance.
+M10 is complete. OpenGrid includes measured performance coverage, five-minute
+autosave and startup recovery, rotating local logs, frozen-pane overlays, split
+views, a mouse fill handle, searchable function help, generated Windows icon,
+offline wheelhouse, idempotent installer, and self-contained release ZIP.
 
 ## Known Issues
 
-Visible frozen-pane overlays, split views, and a mouse fill handle remain
-scheduled for the M10 polish pass. No shipped M1 through M9 behavior is known
-to be broken.
+No shipped v1 behavior is known to be broken. VBA, pivots, Power Query,
+collaboration, and embedded Office objects remain intentionally outside v1.

@@ -9,10 +9,21 @@ from PySide6.QtCore import (
     QModelIndex,
     QItemSelection,
     QItemSelectionModel,
+    QRect,
     Qt,
     Signal,
 )
-from PySide6.QtGui import QFont, QKeyEvent
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QFont,
+    QKeyEvent,
+    QMouseEvent,
+    QPaintEvent,
+    QPainter,
+    QPen,
+    QResizeEvent,
+)
 from PySide6.QtWidgets import QApplication, QAbstractItemView, QTableView
 
 from excelclone.commands.edits import FillRangeCommand, PasteCellsCommand, SetRangeCommand
@@ -49,12 +60,43 @@ class GridView(QTableView):
         self.zoom_percent = 100
         self._applied_hidden_rows: set[int] = set()
         self._applied_hidden_columns: set[int] = set()
+        self._fill_handle_rect = QRect()
+        self._fill_drag_source: tuple[int, int, int, int] | None = None
+        self._fill_drag_target: QModelIndex | None = None
+        self._frozen_rows = self._create_frozen_view(
+            "frozenRows",
+            "border: 0; border-bottom: 2px solid #557063;",
+        )
+        self._frozen_columns = self._create_frozen_view(
+            "frozenColumns",
+            "border: 0; border-right: 2px solid #557063;",
+        )
+        self._frozen_corner = self._create_frozen_view(
+            "frozenCorner",
+            "border: 0; border-right: 2px solid #557063;"
+            "border-bottom: 2px solid #557063;",
+        )
+        self.horizontalScrollBar().valueChanged.connect(
+            self._sync_horizontal_frozen_scroll
+        )
+        self.verticalScrollBar().valueChanged.connect(
+            self._sync_vertical_frozen_scroll
+        )
 
     def setModel(self, model: GridModel) -> None:
         super().setModel(model)
+        for overlay in self._frozen_views:
+            overlay.setModel(model)
+            overlay.setSelectionModel(self.selectionModel())
         self.selectionModel().currentChanged.connect(
             lambda current, previous: self.currentCellChanged.emit(current)
         )
+
+    def setItemDelegate(self, delegate: Any) -> None:
+        super().setItemDelegate(delegate)
+        if hasattr(self, "_frozen_rows"):
+            for overlay in self._frozen_views:
+                overlay.setItemDelegate(delegate)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         modifiers = event.modifiers()
@@ -111,6 +153,7 @@ class GridView(QTableView):
         else:
             summary = f"Count: {count}"
         self.selectionSummaryChanged.emit(summary)
+        self.viewport().update()
 
     @property
     def grid_model(self) -> GridModel:
@@ -325,6 +368,15 @@ class GridView(QTableView):
             self.setProperty("baseFontSize", base_size)
         font.setPointSizeF(float(base_size) * scale)
         self.setFont(font)
+        for overlay in self._frozen_views:
+            overlay.verticalHeader().setDefaultSectionSize(
+                self.verticalHeader().defaultSectionSize()
+            )
+            overlay.horizontalHeader().setDefaultSectionSize(
+                self.horizontalHeader().defaultSectionSize()
+            )
+            overlay.setFont(font)
+        self._sync_frozen_views()
 
     def sync_sheet_metadata(self) -> None:
         """Apply sparse dimensions, hidden axes, and merged spans to the view."""
@@ -351,3 +403,239 @@ class GridView(QTableView):
                 merged.max_row - merged.min_row + 1,
                 merged.max_column - merged.min_column + 1,
             )
+        self._sync_frozen_views()
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        """Paint the Excel-style fill handle and active drag outline."""
+        super().paintEvent(event)
+        self._fill_handle_rect = QRect()
+        bounds = self.selection_bounds()
+        if bounds is None:
+            return
+        lower_right = self.visualRect(
+            self.grid_model.index(bounds[2], bounds[3])
+        )
+        if lower_right.isValid() and lower_right.intersects(self.viewport().rect()):
+            self._fill_handle_rect = QRect(
+                lower_right.right() - 3,
+                lower_right.bottom() - 3,
+                7,
+                7,
+            )
+        painter = QPainter(self.viewport())
+        if not self._fill_handle_rect.isNull():
+            painter.setPen(QPen(QColor("#ffffff"), 1))
+            painter.setBrush(QBrush(QColor("#217346")))
+            painter.drawRect(self._fill_handle_rect)
+        if self._fill_drag_source is not None and self._fill_drag_target is not None:
+            preview = self._fill_preview_rect(
+                self._fill_drag_source,
+                self._fill_drag_target.row(),
+                self._fill_drag_target.column(),
+            )
+            if preview is not None:
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.setPen(QPen(QColor("#217346"), 2, Qt.PenStyle.DashLine))
+                painter.drawRect(preview.adjusted(1, 1, -1, -1))
+        painter.end()
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if (
+            event.button() == Qt.MouseButton.LeftButton
+            and not self._fill_handle_rect.isNull()
+            and self._fill_handle_rect.contains(event.position().toPoint())
+        ):
+            self._fill_drag_source = self.selection_bounds()
+            self._fill_drag_target = None
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self._fill_drag_source is not None:
+            target = self.indexAt(event.position().toPoint())
+            if target.isValid():
+                self._fill_drag_target = target
+                self.viewport().update()
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        if self._fill_drag_source is not None:
+            target = self.indexAt(event.position().toPoint())
+            source = self._fill_drag_source
+            self._fill_drag_source = None
+            self._fill_drag_target = None
+            if target.isValid():
+                self.fill_drag_to(target.row(), target.column(), source)
+            self.viewport().update()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._sync_frozen_views()
+
+    def fill_drag_to(
+        self,
+        row: int,
+        column: int,
+        source_bounds: tuple[int, int, int, int] | None = None,
+    ) -> bool:
+        """Extend the selected source along one axis through a fill command."""
+        bounds = source_bounds or self.selection_bounds()
+        if bounds is None:
+            return False
+        min_row, min_column, max_row, max_column = bounds
+        vertical_extension = max(min_row - row, row - max_row, 0)
+        horizontal_extension = max(min_column - column, column - max_column, 0)
+        if vertical_extension == 0 and horizontal_extension == 0:
+            return False
+        source = RangeReference(
+            CellReference(min_row, min_column),
+            CellReference(max_row, max_column),
+        )
+        if vertical_extension >= horizontal_extension:
+            target = RangeReference(
+                CellReference(min(min_row, row), min_column),
+                CellReference(max(max_row, row), max_column),
+            )
+        else:
+            target = RangeReference(
+                CellReference(min_row, min(min_column, column)),
+                CellReference(max_row, max(max_column, column)),
+            )
+        self.grid_model.history.execute(
+            FillRangeCommand(
+                self.grid_model.engine,
+                self.grid_model.active_sheet_name,
+                source,
+                target,
+            )
+        )
+        return True
+
+    @property
+    def frozen_views(self) -> tuple[QTableView, QTableView, QTableView]:
+        """Expose the row, column, and corner overlays for view coordination."""
+        return self._frozen_views
+
+    @property
+    def _frozen_views(self) -> tuple[QTableView, QTableView, QTableView]:
+        return self._frozen_rows, self._frozen_columns, self._frozen_corner
+
+    def _create_frozen_view(self, name: str, border: str) -> QTableView:
+        view = QTableView(self.viewport())
+        view.setObjectName(name)
+        view.horizontalHeader().hide()
+        view.verticalHeader().hide()
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        view.setEditTriggers(self.editTriggers())
+        view.setWordWrap(False)
+        view.setStyleSheet(f"QTableView {{ background: white; {border} }}")
+        view.hide()
+        return view
+
+    def _sync_horizontal_frozen_scroll(self, value: int) -> None:
+        self._frozen_rows.horizontalScrollBar().setValue(value)
+
+    def _sync_vertical_frozen_scroll(self, value: int) -> None:
+        self._frozen_columns.verticalScrollBar().setValue(value)
+
+    def _sync_frozen_views(self) -> None:
+        if self.model() is None:
+            return
+        panes = self.grid_model.sheet.freeze_panes
+        if panes is None or panes == (0, 0):
+            for view in self._frozen_views:
+                view.hide()
+            return
+        frozen_rows, frozen_columns = panes
+        for overlay in self._frozen_views:
+            overlay.setShowGrid(self.showGrid())
+            overlay.verticalHeader().setDefaultSectionSize(
+                self.verticalHeader().defaultSectionSize()
+            )
+            overlay.horizontalHeader().setDefaultSectionSize(
+                self.horizontalHeader().defaultSectionSize()
+            )
+        sheet = self.grid_model.sheet
+        for row, height in sheet.row_heights.items():
+            pixels = max(1, round(height * 4 / 3))
+            for overlay in self._frozen_views:
+                overlay.setRowHeight(row, pixels)
+        for column, width in sheet.column_widths.items():
+            pixels = max(1, round(width * 7))
+            for overlay in self._frozen_views:
+                overlay.setColumnWidth(column, pixels)
+
+        viewport = self.viewport().rect()
+        frozen_height = self._section_extent(
+            self.verticalHeader(),
+            frozen_rows,
+            viewport.height(),
+        )
+        frozen_width = self._section_extent(
+            self.horizontalHeader(),
+            frozen_columns,
+            viewport.width(),
+        )
+        if frozen_rows:
+            self._frozen_rows.setGeometry(0, 0, viewport.width(), frozen_height)
+            self._frozen_rows.horizontalScrollBar().setValue(
+                self.horizontalScrollBar().value()
+            )
+            self._frozen_rows.show()
+        else:
+            self._frozen_rows.hide()
+        if frozen_columns:
+            self._frozen_columns.setGeometry(0, 0, frozen_width, viewport.height())
+            self._frozen_columns.verticalScrollBar().setValue(
+                self.verticalScrollBar().value()
+            )
+            self._frozen_columns.show()
+        else:
+            self._frozen_columns.hide()
+        if frozen_rows and frozen_columns:
+            self._frozen_corner.setGeometry(0, 0, frozen_width, frozen_height)
+            self._frozen_corner.horizontalScrollBar().setValue(0)
+            self._frozen_corner.verticalScrollBar().setValue(0)
+            self._frozen_corner.show()
+        else:
+            self._frozen_corner.hide()
+        self._frozen_rows.raise_()
+        self._frozen_columns.raise_()
+        self._frozen_corner.raise_()
+
+    @staticmethod
+    def _section_extent(header: Any, count: int, limit: int) -> int:
+        extent = 0
+        for section in range(count):
+            extent += header.sectionSize(section)
+            if extent >= limit:
+                return limit
+        return extent
+
+    def _fill_preview_rect(
+        self,
+        bounds: tuple[int, int, int, int],
+        row: int,
+        column: int,
+    ) -> QRect | None:
+        min_row, min_column, max_row, max_column = bounds
+        vertical_extension = max(min_row - row, row - max_row, 0)
+        horizontal_extension = max(min_column - column, column - max_column, 0)
+        if vertical_extension == 0 and horizontal_extension == 0:
+            return None
+        if vertical_extension >= horizontal_extension:
+            min_row, max_row = min(min_row, row), max(max_row, row)
+        else:
+            min_column, max_column = min(min_column, column), max(max_column, column)
+        top_left = self.visualRect(self.grid_model.index(min_row, min_column))
+        bottom_right = self.visualRect(self.grid_model.index(max_row, max_column))
+        return top_left.united(bottom_right)

@@ -62,3 +62,19 @@ observable without pixel tests.
 Sheets allocate cells only when content or non-default formatting exists. The Qt
 model advertises Excel-sized dimensions without materializing them. Dependency
 edges and cached formula values scale with populated and referenced cells.
+
+Frozen panes are three clipped `QTableView` overlays sharing the same virtual
+model and selection state; no cells are copied. Split view adds a second
+independently scrollable `GridView` over that model. Fill-handle gestures emit
+the same `FillRangeCommand` used by keyboard filling.
+
+## Recovery And Distribution
+
+Dirty workbooks are serialized atomically through the native OGrid adapter
+every five minutes. A small JSON sidecar identifies the source path and UTC
+timestamp; recovery loads through the normal versioned file boundary. Normal
+save removes the matching snapshot. Diagnostics use a bounded rotating log.
+
+The release archive contains source, generated ICO frames, pinned requirements,
+and a Windows wheelhouse. The installer creates a local virtual environment and
+uses `pip --no-index`, so runtime installation and use make no network calls.

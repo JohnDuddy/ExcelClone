@@ -131,3 +131,25 @@ objects or duplicated data. A headless extractor converts current workbook
 caches to categories and series each time a panel refreshes. Rendering and PNG
 export share one Qt/matplotlib path, while core chart behavior remains usable
 in file and structural tests without a `QApplication`.
+
+## 2026-07-25 — Frozen panes as shared virtual views
+
+Frozen panes use three clipped table overlays that share the primary
+`GridModel`. This preserves virtualization and command behavior while pinning
+top rows, left columns, and their intersection without duplicating workbook
+state. Split view similarly shares the model but keeps an independent viewport.
+
+## 2026-07-25 — Atomic native autosave
+
+Recovery copies use the lossless OGrid adapter and are atomically replaced,
+with a JSON sidecar for source identity and timestamp. This avoids a second
+serialization format and ensures recovery exercises the same migration and
+validation path as user files.
+
+## 2026-07-25 — Offline wheelhouse distribution
+
+The release ZIP includes Windows wheels for all pinned packages and their
+transitive runtime requirements. Installation uses `pip --no-index` rather than
+assuming a package cache or network. The extracted folder is the install root,
+so the direct `pythonw.exe` shortcut remains transparent and relocatable before
+installation.

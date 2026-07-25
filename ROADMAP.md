@@ -1,7 +1,7 @@
 # Roadmap
 
-OpenGrid v1 follows the milestones in `FEATURES.md`. The following capabilities
-are explicitly outside v1:
+OpenGrid v1 is complete under the regression contract in `FEATURES.md`. The
+following capabilities are explicitly outside v1:
 
 - VBA and macros
 - Pivot tables
@@ -9,6 +9,5 @@ are explicitly outside v1:
 - Real-time collaboration
 - Embedded Office objects
 
-They are candidates for later versions only after the v1 regression contract
-and performance targets are satisfied.
-
+They are candidates for a later major version and are not silently approximated
+or dropped without warning.

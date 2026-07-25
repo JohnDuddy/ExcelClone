@@ -49,7 +49,13 @@ class Ribbon(QTabWidget):
                 "Text to Columns",
             ),
             "Formulas": ("Insert Function", "Recalculate", "Sheet Recalculate"),
-            "View": ("Freeze Panes", "Gridlines", "Formula View", "Zoom"),
+            "View": (
+                "Freeze Panes",
+                "Split View",
+                "Gridlines",
+                "Formula View",
+                "Zoom",
+            ),
         }
         for tab_name, actions in definitions.items():
             page = QWidget()

@@ -43,7 +43,7 @@ complete.
 - [x] Rich internal clipboard and Paste Special values/formulas/formats/transpose (`test_fill_and_paste.py`, `test_ui_workflow.py`)
 - [x] Numeric/date/weekday/month/formula fill plus Ctrl+D/Ctrl+R (`test_fill_and_paste.py`)
 - [x] Merge cells, row heights, column widths, and autofit command paths (`test_commands.py`)
-- [ ] Mouse fill handle, visible frozen panes, and split views
+- [x] Mouse fill handle, visible frozen panes, and split views (`test_polish_ui.py`)
 
 ## M7-M9 Data And Visualization
 
@@ -66,6 +66,6 @@ complete.
 
 ## M10 Distribution
 
-- [ ] Autosave, crash recovery, and performance targets
-- [ ] Idempotent Windows installer and desktop shortcut
-- [ ] Self-contained `dist/ExcelClone.zip`
+- [x] Autosave, crash recovery, rotating logs, and performance targets (`test_autosave.py`, `test_performance.py`, `test_polish_ui.py`)
+- [x] Idempotent offline Windows installer and desktop shortcut (`test_distribution.py`)
+- [x] Self-contained `dist/ExcelClone.zip` (`test_distribution.py`, clean-install acceptance)

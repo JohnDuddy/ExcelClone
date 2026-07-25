@@ -77,6 +77,22 @@ All notable changes follow Keep a Changelog conventions.
   switches, and workbook loads.
 - Undoable chart add/remove, structural range translation, sheet-rename
   translation, and native OGrid chart persistence.
+- Five-minute dirty-workbook autosave, recover/discard startup flow, and
+  rotating `%LOCALAPPDATA%` diagnostics.
+- Real frozen-row, frozen-column, and corner overlays plus a synchronized
+  two-pane worksheet split view.
+- Mouse fill-handle painting, drag preview, series/formula extension, and
+  command-based undo.
+- Searchable metadata-driven help and insertion for all 162 functions.
+- Programmatically generated 16/32/48/256 Windows grid icon.
+- Idempotent PowerShell installer with Python 3.13 discovery, isolated virtual
+  environment, offline wheel installation, smoke test, and direct
+  `pythonw.exe` Desktop shortcut.
+- Self-contained `dist/ExcelClone.zip` with all Windows runtime wheels.
+- Measured release targets: 1.12 s cold launch, 0.78 s 50,000-cell XLSX load,
+  0.65 s 100,000-row scroll simulation, under 0.30 s 10,000-cell incremental
+  chain recalculation, 3.83 s 100,000-formula full recalculation, and 0.18 s
+  10,000-cell paste undo.
 
 ### Fixed
 

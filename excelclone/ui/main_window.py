@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QModelIndex, Qt
+from PySide6.QtCore import QModelIndex, QTimer, Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -62,6 +63,7 @@ from excelclone.ui.delegates import CellDelegate
 from excelclone.ui.charting import ChartPanel
 from excelclone.ui.dialogs.chart_wizard import ChartWizard
 from excelclone.ui.dialogs.format_cells import FormatCellsDialog
+from excelclone.ui.dialogs.function_help import FunctionHelpDialog
 from excelclone.ui.dialogs.data_tools import (
     FilterDialog,
     FindReplaceDialog,
@@ -75,6 +77,8 @@ from excelclone.ui.grid_view import GridView
 from excelclone.ui.ribbon import Ribbon
 from excelclone.ui.sheet_tabs import SheetTabs
 from excelclone.util.settings import SettingsStore
+from excelclone.util.autosave import AutosaveManager, RecoveryCandidate
+from excelclone.util.logging_setup import configure_logging
 
 
 class MainWindow(QMainWindow):
@@ -85,12 +89,15 @@ class MainWindow(QMainWindow):
         workbook: Workbook | None = None,
         parent: Any = None,
         settings_store: SettingsStore | None = None,
+        autosave_manager: AutosaveManager | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("OpenGrid — Personal Spreadsheet")
         self.setMinimumSize(800, 600)
         self.resize(1280, 800)
         self.settings = settings_store or SettingsStore()
+        self.autosave_manager = autosave_manager or AutosaveManager()
+        self.logger = configure_logging()
         self.current_path: Path | None = None
         self.dirty = False
         self._suppress_dirty = False
@@ -102,6 +109,10 @@ class MainWindow(QMainWindow):
         self.grid = GridView()
         self.grid.setModel(self.grid_model)
         self.grid.setItemDelegate(CellDelegate(self.grid))
+        self.secondary_grid: GridView | None = None
+        self.grid_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.grid_splitter.setChildrenCollapsible(False)
+        self.grid_splitter.addWidget(self.grid)
         self.formula_bar = FormulaBar()
         self.ribbon = Ribbon()
         self.sheet_tabs = SheetTabs()
@@ -113,7 +124,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(0)
         layout.addWidget(self.ribbon)
         layout.addWidget(self.formula_bar)
-        layout.addWidget(self.grid, 1)
+        layout.addWidget(self.grid_splitter, 1)
         layout.addWidget(self.sheet_tabs)
         self.setCentralWidget(container)
 
@@ -123,6 +134,10 @@ class MainWindow(QMainWindow):
 
         self._create_actions()
         self._connect_signals()
+        self.autosave_timer = QTimer(self)
+        self.autosave_timer.setInterval(5 * 60 * 1000)
+        self.autosave_timer.timeout.connect(self.autosave_now)
+        self.autosave_timer.start()
         self.on_current_cell_changed(self.grid_model.index(0, 0))
         self._update_title()
 
@@ -216,7 +231,7 @@ class MainWindow(QMainWindow):
             lambda message: self.statusBar().showMessage(message, 5000)
         )
         self.ribbon.actionRequested.connect(self._ribbon_action)
-        self.grid.sync_sheet_metadata()
+        self._sync_grid_metadata()
         self._sync_charts()
 
     def new_workbook(self) -> None:
@@ -296,6 +311,7 @@ class MainWindow(QMainWindow):
     def save_path(self, path: str | Path) -> Path:
         """Save the current workbook using extension-based dispatch."""
         destination = Path(path)
+        previous_path = self.current_path
         suffix = destination.suffix.lower()
         if suffix == ".ogrid":
             save_ogrid(self.engine.workbook, destination)
@@ -309,11 +325,82 @@ class MainWindow(QMainWindow):
             )
         self.current_path = destination
         self.dirty = False
+        self.autosave_manager.clear_for_source(previous_path)
+        if destination != previous_path:
+            self.autosave_manager.clear_for_source(destination)
         self.settings.add_recent_file(destination)
         self._refresh_recent_menu()
         self._update_title()
         self.statusBar().showMessage(f"Saved {destination.name}", 3000)
         return destination
+
+    def autosave_now(self) -> RecoveryCandidate | None:
+        """Persist a recovery snapshot when the workbook has unsaved changes."""
+        if not self.dirty:
+            return None
+        try:
+            candidate = self.autosave_manager.save(
+                self.engine.workbook,
+                self.current_path,
+            )
+        except (OSError, ValueError, TypeError):
+            self.logger.exception("Autosave failed")
+            self.statusBar().showMessage("Autosave failed; see the local log", 5000)
+            return None
+        self.logger.info("Autosaved workbook to %s", candidate.autosave_path)
+        self.statusBar().showMessage("Recovery copy saved", 2000)
+        return candidate
+
+    def offer_recovery(self) -> None:
+        """Offer the newest recovery snapshot after application startup."""
+        candidates = self.autosave_manager.candidates()
+        if not candidates:
+            return
+        candidate = candidates[0]
+        source_name = (
+            candidate.source_path.name
+            if candidate.source_path is not None
+            else "Untitled workbook"
+        )
+        dialog = QMessageBox(self)
+        dialog.setIcon(QMessageBox.Icon.Warning)
+        dialog.setWindowTitle("Recover Unsaved Workbook")
+        dialog.setText(f"A recovery copy is available for {source_name}.")
+        dialog.setInformativeText(
+            f"Saved {candidate.saved_at.astimezone():%Y-%m-%d %H:%M:%S %Z}. "
+            "Recover it, discard it, or keep it for the next launch."
+        )
+        recover_button = dialog.addButton(
+            "Recover",
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+        discard_button = dialog.addButton(
+            "Discard",
+            QMessageBox.ButtonRole.DestructiveRole,
+        )
+        dialog.addButton("Later", QMessageBox.ButtonRole.RejectRole)
+        dialog.exec()
+        clicked = dialog.clickedButton()
+        if clicked is discard_button:
+            self.autosave_manager.discard(candidate)
+            self.logger.info("Discarded recovery copy %s", candidate.autosave_path)
+            return
+        if clicked is not recover_button:
+            return
+        try:
+            workbook = self.autosave_manager.recover(candidate)
+        except (OSError, ValueError):
+            self.logger.exception("Recovery failed for %s", candidate.autosave_path)
+            QMessageBox.critical(
+                self,
+                "Recovery Failed",
+                "The recovery copy could not be opened. See the local log for details.",
+            )
+            return
+        self._install_workbook(workbook, path=candidate.source_path)
+        self.dirty = True
+        self._update_title()
+        self.statusBar().showMessage("Recovered unsaved workbook", 5000)
 
     def _install_workbook(
         self,
@@ -332,7 +419,7 @@ class MainWindow(QMainWindow):
         index = self.grid_model.index(0, 0)
         self.grid.setCurrentIndex(index)
         self.on_current_cell_changed(index)
-        self.grid.sync_sheet_metadata()
+        self._sync_grid_metadata()
         self._sync_charts()
         self.current_path = path
         self.dirty = False
@@ -530,7 +617,7 @@ class MainWindow(QMainWindow):
         if 0 <= index < len(self.engine.workbook):
             self.grid_model.set_active_sheet(self.engine.workbook.get_sheet(index).name)
             self.on_current_cell_changed(self.grid.currentIndex())
-            self.grid.sync_sheet_metadata()
+            self._sync_grid_metadata()
             self._sync_charts()
 
     def recalculate(self) -> None:
@@ -565,7 +652,7 @@ class MainWindow(QMainWindow):
         if self.grid_model.active_sheet_name != active_name:
             self.grid_model.set_active_sheet(active_name)
         self.sheet_tabs.sync(self.engine.workbook)
-        self.grid.sync_sheet_metadata()
+        self._sync_grid_metadata()
         self._sync_charts()
 
     def _ribbon_action(self, name: str) -> None:
@@ -576,6 +663,7 @@ class MainWindow(QMainWindow):
             "Paste": self.grid.paste_clipboard,
             "Paste Special": self.paste_special,
             "Recalculate": self.recalculate,
+            "Insert Function": self.insert_function,
             "Sheet Recalculate": lambda: self.engine.recalculate(
                 sheet_name=self.grid_model.active_sheet_name
             ),
@@ -595,6 +683,7 @@ class MainWindow(QMainWindow):
             "Formula View": self.toggle_formula_view,
             "Zoom": self.increase_zoom,
             "Freeze Panes": self.toggle_freeze_panes,
+            "Split View": self.toggle_split_view,
             "Rows": self.insert_rows,
             "Columns": self.insert_columns,
             "Sort": self.sort_selection,
@@ -609,7 +698,19 @@ class MainWindow(QMainWindow):
         if action is not None:
             action()
         else:
-            self.statusBar().showMessage(f"{name} is scheduled for a later milestone", 3000)
+            self.statusBar().showMessage(f"Unknown command: {name}", 3000)
+
+    def insert_function(self) -> None:
+        """Insert a selected registry function into the formula bar."""
+        dialog = FunctionHelpDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        template = dialog.formula_template()
+        if not template:
+            return
+        self.formula_bar.editor.setText(template)
+        self.formula_bar.editor.setFocus()
+        self.formula_bar.editor.setCursorPosition(len(template) - 1)
 
     def paste_special(self) -> None:
         """Paste rich clipboard cells using a selected content mode."""
@@ -1015,7 +1116,10 @@ class MainWindow(QMainWindow):
 
     def toggle_gridlines(self) -> None:
         """Toggle standard grid rendering."""
-        self.grid.setShowGrid(not self.grid.showGrid())
+        enabled = not self.grid.showGrid()
+        for grid in self._grid_views():
+            grid.setShowGrid(enabled)
+            grid.sync_sheet_metadata()
 
     def toggle_formula_view(self) -> None:
         """Toggle calculated values versus raw formulas."""
@@ -1024,8 +1128,33 @@ class MainWindow(QMainWindow):
     def increase_zoom(self) -> None:
         """Cycle zoom upward in useful increments, wrapping after 400%."""
         selected = self.grid.zoom_percent + 25
-        self.grid.set_zoom(25 if selected > 400 else selected)
+        selected = 25 if selected > 400 else selected
+        for grid in self._grid_views():
+            grid.set_zoom(selected)
         self.statusBar().showMessage(f"Zoom: {self.grid.zoom_percent}%", 2000)
+
+    def toggle_split_view(self) -> None:
+        """Open or close a synchronized second view of the active worksheet."""
+        if self.secondary_grid is not None:
+            secondary = self.secondary_grid
+            self.secondary_grid = None
+            secondary.setParent(None)
+            secondary.deleteLater()
+            self.statusBar().showMessage("Split view closed", 2000)
+            return
+        secondary = GridView()
+        secondary.setModel(self.grid_model)
+        secondary.setItemDelegate(CellDelegate(secondary))
+        secondary.currentCellChanged.connect(self.on_current_cell_changed)
+        secondary.selectionSummaryChanged.connect(self.selection_label.setText)
+        secondary.setShowGrid(self.grid.showGrid())
+        secondary.set_zoom(self.grid.zoom_percent)
+        secondary.sync_sheet_metadata()
+        self.secondary_grid = secondary
+        self.grid_splitter.addWidget(secondary)
+        total_height = max(2, self.grid_splitter.height())
+        self.grid_splitter.setSizes([total_height // 2, total_height // 2])
+        self.statusBar().showMessage("Split view opened", 2000)
 
     def toggle_freeze_panes(self) -> None:
         """Freeze rows above and columns left of the current cell."""
@@ -1059,3 +1188,14 @@ class MainWindow(QMainWindow):
             f"{CellReference(current.row(), current.column()).to_a1()}",
             3000,
         )
+
+    def _grid_views(self) -> tuple[GridView, ...]:
+        return (
+            (self.grid, self.secondary_grid)
+            if self.secondary_grid is not None
+            else (self.grid,)
+        )
+
+    def _sync_grid_metadata(self) -> None:
+        for grid in self._grid_views():
+            grid.sync_sheet_metadata()

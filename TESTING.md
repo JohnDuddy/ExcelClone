@@ -7,12 +7,14 @@ Headless engine tests never construct a `QApplication`. UI tests set
 ## Run
 
 ```powershell
-python -m pytest
-python -m pytest --cov=excelclone.core --cov-report=term-missing
+python -W error -m pytest
+python -W error -m pytest -m "not performance" --cov=excelclone.core --cov-report=term-missing
+python -m pytest tests/test_performance.py
 ```
 
 The coverage gate applies once the core engine exists. Performance tests are
-marked `performance` and remain part of the full release verification.
+marked `performance` and remain part of the full release verification. They run
+without coverage instrumentation because tracing changes the wall-clock result.
 
 ## Test Rules
 
@@ -52,3 +54,11 @@ Headless tests prove category/series extraction and live value changes. Qt
 tests render every supported chart type offscreen, export PNGs, validate wizard
 output, and inspect a bar height before and after a grid edit to prove panel
 refresh behavior.
+
+## Distribution Acceptance
+
+`test_distribution.py` validates ICO frames, required package inputs, offline
+pip flags, and direct shortcut configuration. Release verification additionally
+builds the ZIP, extracts it to a clean directory, runs `install.ps1` against a
+temporary Desktop folder, inspects the resulting `.lnk`, launches the app with
+`pythonw.exe`, and round-trips a formatted 50,000-cell XLSX.
