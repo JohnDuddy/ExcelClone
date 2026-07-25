@@ -20,8 +20,10 @@ complete.
 
 ## M3-M4 Formula Engine
 
-- [ ] Tokenizer, parser, evaluator, and incremental dependency graph
-- [ ] Circular-reference and formula-error behavior
+- [x] Tokenizer and recursive-descent parser with documented precedence (`test_tokenizer.py`, `test_parser.py`)
+- [x] AST evaluator with coercion, references, arrays, and Excel date serials (`test_evaluator.py`)
+- [x] Incremental bidirectional dependency graph (`test_depgraph.py`, `test_formula_engine.py`)
+- [x] Circular-reference and formula-error behavior (`test_formula_engine.py`, `test_evaluator.py`)
 - [ ] Registered 120-function library
 - [ ] Dynamic-array spill behavior
 

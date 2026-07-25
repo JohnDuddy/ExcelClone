@@ -35,3 +35,17 @@ prevents blank reads from accidentally allocating or modifying storage.
 `RangeReference` is iterable but does not materialize its coordinates. This is
 required because valid whole-column and whole-row references can contain more
 than one million cells while the workbook itself remains sparse.
+
+## 2026-07-25 — Formula AST and evaluation
+
+Formula parsing produces immutable AST values. Evaluation retains references as
+lazy `ReferenceValue` areas until a scalar or function explicitly requests
+values. This preserves range identity for unions, intersections, dependency
+extraction, and later dynamic-array behavior.
+
+## 2026-07-25 — Large-range dependency watchers
+
+Ranges up to 100,000 cells receive explicit graph edges. Larger whole-axis
+ranges remain lazy and are checked by range watchers when a coordinate changes.
+This keeps `A:A` dependencies correct without allocating one million graph
+nodes per formula.

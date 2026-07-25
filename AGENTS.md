@@ -42,12 +42,12 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M2 is complete: immutable cells, sparse sheets, multi-sheet workbooks, defined
-names, and A1/R1C1 references are covered by the regression suite. The current
-milestone is M3: tokenizer, parser, evaluator, formula errors, and dependency
-graph.
+M3 is complete: tokenization, recursive-descent parsing, AST evaluation,
+Excel-style errors/coercion, and incremental recalculation are covered by the
+regression suite. The current milestone is M4: the registered 120+ function
+library, volatile functions, dynamic-array spills, and golden cross-checks.
 
 ## Known Issues
 
-The formula engine and grid are intentionally absent until their scheduled
-milestones. No shipped M1 or M2 behavior is known to be broken.
+The function library and grid are intentionally absent until their scheduled
+milestones. No shipped M1 through M3 behavior is known to be broken.
