@@ -1,0 +1,2 @@
+"""Qt-free spreadsheet engine."""
+

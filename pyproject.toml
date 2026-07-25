@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=80.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-grid-personal"
+version = "0.1.0"
+description = "Offline personal spreadsheet application"
+requires-python = ">=3.13,<3.14"
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+markers = [
+    "performance: measured performance acceptance scenarios",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["excelclone/core"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+
