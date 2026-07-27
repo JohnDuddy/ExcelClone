@@ -17,3 +17,6 @@ licenses/*
 !licenses/GPL-3.0.txt
 !licenses/README.md
 
+
+# PyInstaller build artefacts
+packaging/version_info.txt

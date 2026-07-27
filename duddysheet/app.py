@@ -40,7 +40,24 @@ def create_application(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Launch Duddy Spreadsheet and return the Qt process exit code."""
+    """Launch Duddy Spreadsheet and return the Qt process exit code.
+
+    ``--self-test`` verifies a packaged build instead of starting the UI, and
+    ``--version`` reports the version, so a release can be checked from a
+    script without a human driving the interface.
+    """
+    arguments = list(sys.argv[1:] if argv is None else argv)
+
+    if "--version" in arguments:
+        print(f"{PRODUCT_NAME} {VERSION}")
+        return 0
+
+    if "--self-test" in arguments:
+        from duddysheet.selftest import run_self_test
+
+        print(f"{PRODUCT_NAME} {VERSION} self-test\n")
+        return run_self_test()
+
     app, window = create_application(argv)
     window.show()
     return app.exec()
