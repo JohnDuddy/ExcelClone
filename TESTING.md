@@ -87,8 +87,18 @@ python backtest_financial.py --output outputs\financial-backtest-final.md
 
 ## Distribution Acceptance
 
-`test_distribution.py` validates ICO frames, required package inputs, offline
-pip flags, and direct shortcut configuration. Release verification additionally
-builds the ZIP, extracts it to a clean directory, runs `install.ps1` against a
-temporary Desktop folder, inspects the resulting `.lnk`, launches the app with
-`pythonw.exe`, and round-trips a formatted 50,000-cell XLSX.
+`test_distribution.py` validates ICO frames, the Qt module surface, exact
+dependency pinning, the PyInstaller exclusions and bundled documents, and the
+installer script's identity, associations, and uninstall safety. It checks
+configuration rather than running a freeze, which takes minutes.
+
+The freeze itself is verified by running it. `tools/build_release.py` launches
+the packaged executable with `--self-test`, which exercises the formula
+engine, both file formats, a bundled financial model, chart extraction, PDF
+export, and licence verification from inside the bundle. A failure aborts the
+build. This is the only layer that can catch a missing data file, an
+uncollected Qt plugin, or a broken font cache, because none of those exist
+when running from source.
+
+`PACKAGING.md` lists the manual checks that remain, notably comparing print
+preview against a real printer.

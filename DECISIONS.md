@@ -186,3 +186,78 @@ Financial models are Python factories that produce ordinary sparse workbooks,
 not opaque binary templates or a second persistence schema. Their assumptions,
 formulas, formats, and checks therefore use the same engine and file adapters
 as user-created content, and each factory is recalculated and audited in tests.
+
+## 2026-07-27 - Single branding module
+
+Every user-visible product name, vendor string, file-format label, support
+address, and version lives in `duddysheet/branding.py`. Packaging, the
+installer, the About dialog, licensing, and the release checks all read from
+it. A product rename or version bump therefore cannot leave a stale string in
+an installer or a legal document.
+
+## 2026-07-27 - Native extension renamed with legacy read support
+
+The native extension became `.dsheet` when the product was renamed. Files
+written by earlier builds still open, because stranding a user's existing
+documents to tidy up a brand is never a worthwhile trade.
+
+## 2026-07-27 - PySide6-Essentials only
+
+The application imports only QtCore, QtGui, QtWidgets, and QtPrintSupport, so
+it pins PySide6-Essentials rather than PySide6. This removes the PySide6-Addons
+payload and takes the installed Qt footprint from 636 MB to 202 MB. A test
+fails the build if a non-Essentials Qt module is imported, because the
+regression would be silent and expensive.
+
+## 2026-07-27 - Pagination is core, rendering is UI
+
+Deciding what lands on which sheet of paper is spreadsheet behavior, so
+`core/printing.py` computes immutable pages without importing Qt, and
+`ui/printing.py` only paints them. Preview, printing, and PDF export share one
+renderer over one pagination, which makes it impossible for the three to
+disagree, and lets page-break behavior be tested exactly rather than
+inspected by eye.
+
+## 2026-07-27 - PDF export bypasses the print subsystem
+
+PDF export writes through `QPdfWriter` rather than a `QPrinter` set to PDF
+output. Constructing a `QPrinter` on Windows enumerates printers through COM,
+which raises on machines with no printer drivers and is pure cost when the
+destination is a file. Both paths still render through one shared paged-device
+routine.
+
+## 2026-07-27 - Offline asymmetric licensing
+
+Licence keys are Ed25519-signed by the vendor and verified against a public
+key compiled into the build. Verification is offline, which is what allows the
+product to promise no network access and to work in air-gapped environments. A
+symmetric scheme would have required shipping the secret that mints keys.
+
+Signature verification prevents forgery and casual key sharing. It cannot
+prevent binary patching, and revocation is impossible without the phone-home
+this product deliberately does not perform. Those are accepted trade-offs of
+offline activation, not oversights.
+
+## 2026-07-27 - Expiry never strands user data
+
+An expired trial prompts for a key but leaves the application open and the
+user's files reachable. Refusing to launch would put a customer's own work
+behind a paywall and could discard a pending recovery snapshot. Uninstalling
+likewise leaves workbooks, settings, and activation in place.
+
+## 2026-07-27 - Frozen onedir rather than onefile
+
+The release is a PyInstaller onedir build. Onefile would unpack to a temporary
+directory on every launch, costing seconds of startup and tripping endpoint
+protection in exactly the regulated environments this product targets. It
+would also hide the Qt libraries that the LGPL requires users be able to
+replace.
+
+## 2026-07-27 - Compliance failures block the build
+
+A placeholder signing key and missing GNU licence texts are both invisible
+during development and fatal at distribution. `tools/release_check.py` and
+`tools/collect_licenses.py` exit non-zero while either is unresolved, and the
+build refuses to package. The packaged application additionally runs its own
+self-test, so breakage introduced by freezing fails the build rather than the
+customer.

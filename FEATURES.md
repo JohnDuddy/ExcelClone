@@ -82,3 +82,21 @@ complete.
 - [x] Eight-sheet Financial Calculations Lab with all 46 financial functions, 30 common metrics, synthetic inputs, and 12 editable charts (`test_financial_models.py`)
 - [x] Financial ribbon/menu, validated dialogs, undoable output tables, and dirty-workbook template replacement warning (`test_financial_ui.py`)
 - [x] F1 offline financial help with complete 46-function coverage, searchable categories, copyable examples, nine tutorials, quick reference, model instructions, and Help/ribbon access (`test_financial_help.py`, `test_financial_ui.py`)
+
+## M12 Commercial Readiness
+
+- [x] Printing with page setup, print preview, and print areas (`test_printing.py`, `test_printing_ui.py`)
+- [x] Deterministic Qt-free pagination shared by preview, printer, and PDF (`test_printing.py`)
+- [x] Repeating title rows/columns, fit-to-page scaling, gridlines, headings, and page order (`test_printing.py`)
+- [x] Header/footer token expansion (`test_printing.py`)
+- [x] Worksheet PDF export without printer drivers (`test_printing_ui.py`)
+- [x] Page setup persisted in the native format under schema 3 (`test_printing_ui.py`)
+- [x] Ed25519 licence keys verified offline, rejecting forged, tampered, foreign, and malformed keys (`test_licensing.py`)
+- [x] Thirty-day trial with signed state, resisting file edits and clock rollback (`test_licensing.py`)
+- [x] Activation dialog and entitlement status indicator (`test_licensing.py`)
+- [x] Commercial licence, EULA, privacy statement, and third-party notices (`test_licensing_compliance.py`)
+- [x] In-application Qt/LGPL disclosure and licence browser (`test_licensing_compliance.py`)
+- [x] PySide6-Essentials-only Qt surface enforced by test (`test_distribution.py`)
+- [x] PyInstaller onedir freeze and Inno Setup installer configuration (`test_distribution.py`)
+- [x] Packaged-build self-test covering formulas, both file formats, models, charts, PDF, and licensing (`duddysheet/selftest.py`)
+- [x] Release checks blocking a placeholder signing key or missing licence texts (`test_distribution.py`, `test_licensing_compliance.py`)

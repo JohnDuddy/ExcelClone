@@ -1,144 +1,146 @@
 # Duddy Spreadsheet
 
-Duddy Spreadsheet is a personal, offline spreadsheet application for Windows 11. It
-provides an Excel-sized virtual grid, formulas, financial modeling, charts,
-formatting, data tools, and `.xlsx`, `.csv`, `.tsv`, and lossless `.dsheet`
-files without requiring Microsoft Office or an internet connection.
+**An offline financial modeling workbench that reads and writes Excel files.**
 
-## Install
+Duddy Spreadsheet is a Windows desktop application for building, auditing, and
+presenting financial models on machines where cloud tools are not permitted.
+It runs entirely offline, transmits nothing, and needs neither Microsoft
+Office nor an internet connection.
 
-1. Extract `DuddySpreadsheet.zip`.
-2. Open the extracted `DuddySpreadsheet` folder.
-3. Double-click `INSTALL.bat`.
-4. Launch **DuddySpreadsheet** from the Desktop shortcut.
+## Who it is for
 
-The installer verifies Python 3.13, creates `.venv` inside the extracted
-folder, installs only from the included `wheelhouse`, verifies the application,
-and creates a direct `pythonw.exe` shortcut. Rerunning it upgrades the same
-installation and shortcut safely.
+Analysts who cannot use cloud spreadsheets, and teams who would rather not.
 
-For development, run:
+If your work happens inside a regulated bank, a defence contractor, a
+healthcare provider, a legal practice, or any air-gapped or
+data-classification-controlled environment, cloud spreadsheets are usually
+prohibited outright and desktop Excel is licensed per seat through a process
+you do not control. Duddy Spreadsheet is built for that gap: a purchased,
+perpetual, single-file install that works with the network cable unplugged.
 
-```powershell
-python -m pip install -r requirements.txt
-python run.py
-```
+**It is deliberately not a general-purpose Excel replacement.** It has no
+macros, no pivot tables, no Power Query, and no live market feeds. What it
+has is a fast, correct, auditable modeling environment.
 
-## Keyboard Shortcuts
+## What it does
+
+### Financial modeling
+
+- **46 financial functions** covering loans and annuities, regular and
+  irregular cash flows, effective and nominal rates, four depreciation
+  methods, coupon securities, discount securities, and Treasury bills.
+- **Seven ready-built models** — DCF, three-statement forecast, LBO, loan
+  amortisation, rental property, budget/forecast, and a Financial
+  Calculations Lab with 76 live calculations across four chart galleries.
+  Each is an ordinary editable workbook, not a locked template.
+- **Goal Seek, scenarios, and sensitivity tables**, all evaluated on a cloned
+  workbook so exploratory values never contaminate your live model or its
+  undo history.
+- **Model audit** that ranks formula errors, circular references, blank
+  precedents, stale caches, and hard-coded constants buried in formulas.
+
+### Spreadsheet engine
+
+- **196 functions** with searchable in-application help.
+- Excel-sized virtual grid, dynamic-array spilling with `#SPILL!` reporting,
+  and an incremental dependency graph that recalculates only what changed.
+- 200-level undo across every mutation, including structural edits.
+- Conditional formatting, data validation, sorting, filtering, find/replace,
+  remove duplicates, text-to-columns, frozen panes, and split views.
+- **Verified against Microsoft Excel**: 200 formulas are cross-checked
+  against values Excel itself computed, and the suite fails if they diverge.
+
+### Presenting the work
+
+- **Printing and PDF export** with page setup, print preview, print areas,
+  repeating header rows and columns, fit-to-page scaling, and header/footer
+  tokens. Page setup is saved with the workbook.
+- **17 chart types** that stay bound to their ranges through edits, row and
+  column changes, and sheet renames, exportable to PNG, SVG, and PDF.
+
+### Files
+
+| Format | Support |
+|---|---|
+| `.dsheet` | Native format. Lossless, versioned, migration-safe. |
+| `.xlsx` / `.xlsm` | Formulas, values, styles, merges, names, validation, frozen panes, and hyperlinks. Unsupported content is reported before it is dropped, never silently lost. |
+| `.csv` / `.tsv` | Import and export of the active sheet. |
+| `.ogrid` | Legacy files from earlier versions still open. |
+
+Unsaved work is snapshotted every five minutes and offered back after a
+crash.
+
+## Privacy
+
+The application makes no network connection in normal operation. There is no
+telemetry, no analytics, no crash reporting, no account, and no update ping.
+Licence activation is verified offline against a key compiled into the
+build, so it works on an air-gapped machine.
+
+Qt's networking library is excluded from the shipped build entirely, which
+makes this a structural property rather than a policy. See PRIVACY.md.
+
+## Installing
+
+Download and run `DuddySpreadsheet-1.0.0-Setup.exe`. Nothing else is
+required — no Python, no runtime, no administrator rights if you install for
+your user only.
+
+## Licensing
+
+Duddy Spreadsheet is commercial software with a 30-day evaluation period.
+See EULA.md for the terms and THIRD-PARTY-NOTICES.md for the components it
+includes, which are used under their own licences — notably the Qt libraries
+under the LGPL-3.0.
+
+Enter a licence key under **Help > Licence and Activation**.
+
+## Keyboard shortcuts
 
 | Shortcut | Action |
 |---|---|
 | `Ctrl+N`, `Ctrl+O`, `Ctrl+S` | New, open, save |
 | `Ctrl+Shift+S` | Save as |
+| `Ctrl+P` | Print |
+| `Ctrl+Shift+P` | Print preview |
 | `Ctrl+Z`, `Ctrl+Y` | Undo, redo |
 | `Ctrl+C`, `Ctrl+V` | Copy, paste |
 | `Ctrl+Enter` | Fill the selection with the current cell |
 | `Ctrl+D`, `Ctrl+R` | Fill down, fill right |
-| `Delete` | Clear selected contents |
+| `F1` | Financial functions guide |
 | `F2` | Edit the active cell |
-| `F4` | Cycle relative/absolute references while editing a formula |
+| `F4` | Cycle relative/absolute references while editing |
 | `F9` | Recalculate the workbook |
 | `Ctrl+~` | Toggle formula display |
 
-## Formula Reference
+## Deliberately out of scope
 
-Open **Formulas > Insert Function** for searchable signatures and descriptions
-for all 196 registered functions.
+VBA and macros, pivot tables, Power Query, live market data, real-time
+collaboration, embedded Office objects, and a multi-variable optimisation
+solver. These are not silently approximated: the application says so when a
+file uses them.
 
-| Category | Functions |
-|---|---|
-| Math and trig | `SUM`, `SUMIF(S)`, `SUMPRODUCT`, `ROUND`, `CEILING`, `FLOOR`, `MOD`, `POWER`, `SQRT`, `RAND`, `GCD`, `SIN`, `COS`, `PI`, and related functions |
-| Statistical | `AVERAGE(IF/S)`, `COUNT(IF/S)`, `MEDIAN`, `MODE`, `MAXIFS`, `MINIFS`, `STDEV`, `VAR`, `PERCENTILE`, `CORREL`, `FORECAST`, `TREND` |
-| Logical | `IF`, `IFS`, `IFERROR`, `IFNA`, `AND`, `OR`, `NOT`, `XOR`, `SWITCH` |
-| Text | `CONCAT`, `TEXTJOIN`, `LEFT`, `RIGHT`, `MID`, `FIND`, `SEARCH`, `SUBSTITUTE`, `TEXT`, `VALUE`, `TEXTBEFORE`, `TEXTAFTER` |
-| Lookup and arrays | `VLOOKUP`, `HLOOKUP`, `XLOOKUP`, `INDEX`, `MATCH`, `XMATCH`, `OFFSET`, `INDIRECT`, `UNIQUE`, `SORT`, `FILTER`, `TRANSPOSE` |
-| Date and time | `TODAY`, `NOW`, `DATE`, `TIME`, `YEAR`, `MONTH`, `DAY`, `WEEKDAY`, `EOMONTH`, `DATEDIF`, `NETWORKDAYS`, `WORKDAY`, `YEARFRAC` |
-| Financial | Annuities and loans; periodic and irregular cash-flow returns; effective/nominal rates; cumulative interest and principal; fixed, declining, and sum-of-years depreciation; bond price, yield, duration, accrued interest, coupon dates, discount securities, Treasury bills, and fractional-dollar quotations |
-| Information | `ISBLANK`, `ISNUMBER`, `ISTEXT`, `ISERROR`, `ISERR`, `ISNA`, `ISLOGICAL`, `TYPE`, `ERROR.TYPE` |
-
-Dynamic-array results spill into adjacent cells and report `#SPILL!` if a
-target is occupied. Formula errors propagate as spreadsheet values rather than
-crashing the application.
-
-## Charts And Visual Analysis
-
-The **Insert** ribbon offers two chart paths:
-
-- **Quick Chart** expands a single selected cell to its contiguous data table,
-  detects headers, ranks suitable visualizations, and creates the best match in
-  one click.
-- **Chart Studio** shows five explained recommendations beside a live preview,
-  then exposes data, design, theme, label, trendline, extrema, grid, legend,
-  number-format, and secondary-axis controls.
-
-Seventeen live chart types are available: clustered and stacked columns/bars,
-line, step, area, stacked area, pie, donut, scatter, histogram, box-and-whisker,
-waterfall, heatmap, radar, and column/line combo. Charts update after edits or
-recalculation, remain bound through row/column changes and sheet renames, and
-can be edited with undo/redo. Panels include zoom/pan, clipboard copying, and
-print-quality PNG, SVG, or PDF export.
-
-## Financial Modeling
-
-Open the **Financial** ribbon tab or menu for the modeling toolkit:
-
-- **Financial Help** (or `F1`) opens the complete offline guide with searchable
-  reference pages for all 46 financial functions, copyable examples, nine
-  modeling tutorials, sign/rate/day-count quick-reference tables,
-  troubleshooting, and instructions for each built-in model.
-- **Model Templates** creates an editable DCF, three-statement forecast, LBO,
-  loan amortization, rental property, budget/forecast, or Financial
-  Calculations Lab workbook. The lab provides synthetic inputs, 76 live
-  calculations, and 12 editable charts across four galleries. Templates use
-  conventional blue/yellow assumptions, green cross-sheet links, complete
-  schedules, output summaries, and model checks.
-- **Goal Seek** solves one numeric input for a target formula on a cloned
-  workbook. The live input changes only after confirmation and can be undone.
-- **Sensitivity** calculates one- or two-variable data tables and writes the
-  result as one undoable range edit.
-- **Scenarios** evaluates named assumption sets against selected output cells
-  without changing source assumptions, then writes a comparison table.
-- **Model Audit** recalculates the workbook and prioritizes formula errors,
-  circulars, blank direct precedents, uncalculated formulas, and embedded
-  constants that merit review.
-
-The financial library includes 46 worksheet functions across loans, cash
-flows, rates, depreciation, coupon securities, discount securities, and
-Treasury bills. Duddy Spreadsheet remains offline and deterministic: it does not ship
-VBA, pivots, Power Query, live market feeds, or a multi-variable optimization
-solver.
-
-The guide is also available from **Help > Financial Functions Guide**.
-
-## Files And Recovery
-
-- `.dsheet` is the lossless native format.
-- `.xlsx` preserves supported formulas, values, styles, dimensions, names,
-  merges, filters, validation, frozen panes, and external/internal hyperlinks.
-  Click a linked cell to open its URL or navigate to its workbook destination.
-  Duddy Spreadsheet reports unsupported features before dropping them.
-- `.csv` and `.tsv` import and export the active sheet.
-- Unsaved workbooks receive a recovery snapshot every five minutes under
-  `%LOCALAPPDATA%\DuddySpreadsheet\autosave`.
-- Logs rotate under `%LOCALAPPDATA%\DuddySpreadsheet\logs`.
-
-## Troubleshooting
-
-| Problem | Resolution |
-|---|---|
-| Installer cannot find Python | Install 64-bit Python 3.13 from `python.org`, including the Python launcher, then rerun `INSTALL.bat`. |
-| Offline package installation fails | Extract the complete ZIP again; do not remove or rename `wheelhouse`. |
-| Shortcut was moved or removed | Rerun `INSTALL.bat`; it recreates one Desktop shortcut without duplicating it. |
-| An XLSX warning appears | Save as `.dsheet` when the source uses unsupported macros, pivots, embedded objects, or external charts. |
-| The app closed with unsaved work | Relaunch and choose **Recover** in the startup prompt. |
-| A formula shows `#CIRC!` | Remove the circular reference identified in the status bar. |
-
-## Verify
+## Building from source
 
 ```powershell
-python -W error -m pytest
-python -W error -m pytest -m "not performance" --cov=duddysheet/core
-python -m pytest tests/test_performance.py
+python -m pip install -r requirements.txt -r requirements-dev.txt
+python run.py
+
+python -W error -m pytest              # full suite
+python run.py --self-test              # packaged-build verification
+python tools/release_check.py          # release blockers
+python tools/build_release.py          # installer
 ```
 
-See `TESTING.md` for fixture and release-verification details.
+See `PACKAGING.md` for the release process, `ARCHITECTURE.md` for the
+internal design, and `TESTING.md` for verification details.
+
+## Support
+
+support@duddysoftware.com — https://duddysoftware.com
+
+---
+
+Duddy Spreadsheet is not affiliated with, endorsed by, or sponsored by
+Microsoft Corporation. Microsoft and Excel are trademarks of Microsoft
+Corporation.

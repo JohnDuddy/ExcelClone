@@ -96,6 +96,49 @@ every five minutes. A small JSON sidecar identifies the source path and UTC
 timestamp; recovery loads through the normal versioned file boundary. Normal
 save removes the matching snapshot. Diagnostics use a bounded rotating log.
 
-The release archive contains source, generated ICO frames, pinned requirements,
-and a Windows wheelhouse. The installer creates a local virtual environment and
-uses `pip --no-index`, so runtime installation and use make no network calls.
+The release is a frozen application and a signed Windows installer, described
+under Packaging below. Neither installation nor use makes any network call.
+
+## Printing
+
+`core/printing.py` turns a sheet and an immutable `PageSetup` into immutable
+`Page` values without importing Qt. It resolves row heights and column widths
+to points, excludes hidden and filtered lines, applies explicit or
+fit-to-page scaling, reserves space for repeated title rows and columns, and
+tiles the remaining grid into pages. A row or column larger than the page
+still occupies one page rather than looping.
+
+`ui/printing.py` paints those pages. It applies device resolution once as a
+transform so every measurement stays in points, then draws fills, text,
+borders, gridlines, headings, and header/footer bands. Print preview, the
+printer, and PDF export all drive one renderer over one pagination, so they
+cannot drift apart. PDF export uses a PDF writer rather than a printer, which
+avoids the Windows print spooler entirely.
+
+Page setup is sheet metadata, persisted in the native format under schema 3.
+A malformed stored setup falls back to defaults rather than refusing the file.
+
+## Licensing
+
+`core/licensing.py` is Qt-free and takes its storage directory as an
+argument, so the whole activation lifecycle is testable without touching a
+real profile. Licence keys carry a JSON payload signed with Ed25519; the
+build holds only the public key, so verification needs no network and no
+secret. Trial state is HMAC-bound to the machine, which deters copying it
+between installs or editing the start date.
+
+The UI layer adds an activation dialog and a status-bar indicator. Entitlement
+is advisory to the shell rather than enforced in the engine: expiry prompts
+for a key and never closes over unsaved work.
+
+## Packaging
+
+The release is a PyInstaller onedir freeze wrapped in an Inno Setup installer.
+Qt modules outside PySide6-Essentials, unused matplotlib backends, Python's
+TLS stack, Qt's software OpenGL fallback, and Qt networking are excluded.
+Excluding Qt networking makes the product's offline claim structural.
+
+`duddysheet/selftest.py` runs inside the packaged application and exercises
+formulas, both file formats, the bundled models, charts, PDF export, and
+licensing. The build fails when it does not pass, which catches breakage that
+only exists after freezing.

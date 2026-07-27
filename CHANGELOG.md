@@ -2,6 +2,42 @@
 
 All notable changes follow Keep a Changelog conventions.
 
+## [1.0.0] - 2026-07-27
+
+First commercial release, as Duddy Spreadsheet.
+
+### Added
+
+- Printing, page setup, print preview, and print areas, with repeating title
+  rows and columns, fit-to-page scaling, gridlines, headings, page order, and
+  header/footer tokens. Page setup is saved with the workbook.
+- Worksheet PDF export that works without printer drivers installed.
+- Offline Ed25519 licence keys, a thirty-day trial, and an activation dialog.
+- Commercial LICENSE, EULA, privacy statement, and third-party notices, with
+  an in-application About dialog disclosing Qt's LGPL terms.
+- Windows installer built with PyInstaller and Inno Setup, with code signing
+  hooks and file associations.
+- `--self-test` verification that runs inside the packaged application.
+- `tools/release_check.py`, `tools/collect_licenses.py`, `tools/licence_admin.py`,
+  and `tools/build_release.py`.
+- `PACKAGING.md` release runbook and `GO-TO-MARKET.md` commercial plan.
+
+### Changed
+
+- Renamed from OpenGrid/ExcelClone to Duddy Spreadsheet; the Python package is
+  now `duddysheet` and all product identity comes from `duddysheet/branding.py`.
+- The native extension is now `.dsheet`. Existing `.ogrid` files still open.
+- Native schema raised to 3 to carry page setup, with a migration from 2.
+- Ships PySide6-Essentials instead of PySide6, taking the installed Qt
+  footprint from 636 MB to 202 MB.
+
+### Removed
+
+- The wheelhouse ZIP distribution and its `INSTALL.bat` and `install.ps1`
+  scripts, which required customers to install Python themselves. The signed
+  installer replaces them.
+- Qt's software OpenGL fallback and networking library from the shipped build.
+
 ## [Unreleased]
 
 ### Added
