@@ -4,12 +4,12 @@ from datetime import date
 
 import pytest
 
-from excelclone.commands.base import CommandHistory
-from excelclone.commands.edits import FillRangeCommand, PasteCellsCommand
-from excelclone.core.cell import Cell, CellFormat
-from excelclone.core.engine import FormulaEngine
-from excelclone.core.refs import parse_a1
-from excelclone.core.workbook import Workbook
+from duddysheet.commands.base import CommandHistory
+from duddysheet.commands.edits import FillRangeCommand, PasteCellsCommand
+from duddysheet.core.cell import Cell, CellFormat
+from duddysheet.core.engine import FormulaEngine
+from duddysheet.core.refs import parse_a1
+from duddysheet.core.workbook import Workbook
 
 
 def test_fill_range_extends_numeric_and_date_series_and_undoes() -> None:

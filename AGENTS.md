@@ -1,12 +1,12 @@
-# OpenGrid Standing Context
+# Duddy Spreadsheet Standing Context
 
 Read this file before changing the project.
 
 ## Product
 
-OpenGrid is a personal, offline spreadsheet application for Windows 11. The
-internal package name is `excelclone`; user-visible branding is
-`OpenGrid — Personal Spreadsheet`.
+Duddy Spreadsheet is a personal, offline spreadsheet application for Windows 11. The
+internal package name is `duddysheet`; user-visible branding is
+`Duddy Spreadsheet`.
 
 ## Fixed Constraints
 
@@ -20,12 +20,12 @@ internal package name is `excelclone`; user-visible branding is
 
 ## Module Seams
 
-- `excelclone.core`: cell, sheet, workbook, formulas, recalculation, and formats.
+- `duddysheet.core`: cell, sheet, workbook, formulas, recalculation, and formats.
   Its interface is pure Python values and domain objects.
-- `excelclone.commands`: the only mutation interface used by the UI.
-- `excelclone.io`: adapters between core domain objects and disk formats.
-- `excelclone.ui`: Qt adapter over core and command interfaces.
-- `excelclone.util`: local settings, paths, logging, and autosave support.
+- `duddysheet.commands`: the only mutation interface used by the UI.
+- `duddysheet.io`: adapters between core domain objects and disk formats.
+- `duddysheet.ui`: Qt adapter over core and command interfaces.
+- `duddysheet.util`: local settings, paths, logging, and autosave support.
 
 Tests exercise behavior through these interfaces. They do not reach into private
 implementation details or mock internal collaborators.
@@ -42,7 +42,7 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M12 is complete. OpenGrid includes explainable chart recommendations, Quick
+M12 is complete. Duddy Spreadsheet includes explainable chart recommendations, Quick
 Chart, a live-preview Chart Studio, 17 analytical chart types, five themes,
 labels, trendlines, extrema, secondary axes, interactive navigation,
 PNG/SVG/PDF export, undoable editing, and lossless native chart persistence.

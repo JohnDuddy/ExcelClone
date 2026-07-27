@@ -3,24 +3,24 @@ from __future__ import annotations
 import math
 from datetime import date
 
-from excelclone.commands.base import CommandHistory
-from excelclone.commands.edits import (
+from duddysheet.commands.base import CommandHistory
+from duddysheet.commands.edits import (
     AddChartCommand,
     InsertRowsCommand,
     RemoveChartCommand,
     RenameSheetCommand,
     UpdateChartCommand,
 )
-from excelclone.core.chart import (
+from duddysheet.core.chart import (
     ChartSpec,
     chart_data,
     detect_chart_headers,
     expand_chart_range,
     recommend_charts,
 )
-from excelclone.core.engine import FormulaEngine
-from excelclone.core.refs import parse_a1
-from excelclone.core.workbook import Workbook
+from duddysheet.core.engine import FormulaEngine
+from duddysheet.core.refs import parse_a1
+from duddysheet.core.workbook import Workbook
 
 
 def chart_workbook() -> Workbook:

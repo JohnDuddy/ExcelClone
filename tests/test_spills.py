@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from excelclone.core.depgraph import CellAddress
-from excelclone.core.engine import FormulaEngine, SpillCellReadOnlyError
-from excelclone.core.workbook import Workbook
+from duddysheet.core.depgraph import CellAddress
+from duddysheet.core.engine import FormulaEngine, SpillCellReadOnlyError
+from duddysheet.core.workbook import Workbook
 
 
 def test_dynamic_array_spills_values_and_marks_children_read_only() -> None:
@@ -74,7 +74,7 @@ def test_volatile_function_recalculates_on_unrelated_edit(
 ) -> None:
     values = iter((0.1, 0.8))
     monkeypatch.setattr(
-        "excelclone.core.functions.math_fn.random.random",
+        "duddysheet.core.functions.math_fn.random.random",
         lambda: next(values),
     )
     engine = FormulaEngine(Workbook())

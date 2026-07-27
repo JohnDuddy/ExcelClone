@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import logging
 
-from excelclone.core.workbook import Workbook
-from excelclone.util.autosave import AutosaveManager
-from excelclone.util.logging_setup import configure_logging
+from duddysheet.core.workbook import Workbook
+from duddysheet.util.autosave import AutosaveManager
+from duddysheet.util.logging_setup import configure_logging
 
 
 def test_autosave_round_trip_candidates_and_discard(tmp_path) -> None:
     manager = AutosaveManager(tmp_path / "autosave")
     workbook = Workbook()
     workbook.active_sheet.set_cell(0, 0, "recover me")
-    source = tmp_path / "book.ogrid"
+    source = tmp_path / "book.dsheet"
 
     candidate = manager.save(workbook, source)
     candidates = manager.candidates()
@@ -29,8 +29,8 @@ def test_autosave_round_trip_candidates_and_discard(tmp_path) -> None:
 def test_autosave_clear_for_source_preserves_other_documents(tmp_path) -> None:
     manager = AutosaveManager(tmp_path / "autosave")
     workbook = Workbook()
-    first = tmp_path / "first.ogrid"
-    second = tmp_path / "second.ogrid"
+    first = tmp_path / "first.dsheet"
+    second = tmp_path / "second.dsheet"
     manager.save(workbook, first)
     manager.save(workbook, second)
 

@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 
-from excelclone.core.evaluator import FormulaEvaluator
-from excelclone.core.workbook import Workbook
+from duddysheet.core.evaluator import FormulaEvaluator
+from duddysheet.core.workbook import Workbook
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "golden.xlsx"
 

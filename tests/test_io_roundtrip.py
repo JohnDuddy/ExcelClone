@@ -4,13 +4,13 @@ from openpyxl import Workbook as OpenPyxlWorkbook, load_workbook
 from openpyxl.chart import BarChart, Reference
 from openpyxl.styles import Border, Side
 
-from excelclone.core.cell import BorderStyle, CellFormat
-from excelclone.core.engine import FormulaEngine
-from excelclone.core.data_tools import DataValidation, apply_filter
-from excelclone.core.refs import parse_a1
-from excelclone.core.workbook import Workbook
-from excelclone.io.xlsx_reader import read_xlsx
-from excelclone.io.xlsx_writer import write_xlsx
+from duddysheet.core.cell import BorderStyle, CellFormat
+from duddysheet.core.engine import FormulaEngine
+from duddysheet.core.data_tools import DataValidation, apply_filter
+from duddysheet.core.refs import parse_a1
+from duddysheet.core.workbook import Workbook
+from duddysheet.io.xlsx_reader import read_xlsx
+from duddysheet.io.xlsx_writer import write_xlsx
 
 
 def xlsx_workbook() -> Workbook:

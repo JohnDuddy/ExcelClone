@@ -1,8 +1,8 @@
-"""OpenGrid executable entry point."""
+"""Duddy Spreadsheet executable entry point."""
 
 from __future__ import annotations
 
-from excelclone.app import main
+from duddysheet.app import main
 
 
 if __name__ == "__main__":

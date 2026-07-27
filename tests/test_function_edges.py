@@ -4,15 +4,15 @@ import math
 
 import pytest
 
-from excelclone.core.errors import (
+from duddysheet.core.errors import (
     DIV_ZERO_ERROR,
     NA_ERROR,
     NUM_ERROR,
     REF_ERROR,
     VALUE_ERROR,
 )
-from excelclone.core.evaluator import FormulaEvaluator
-from excelclone.core.workbook import Workbook
+from duddysheet.core.evaluator import FormulaEvaluator
+from duddysheet.core.workbook import Workbook
 
 
 EDGE_CASES = [

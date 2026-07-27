@@ -8,17 +8,17 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QDialog, QToolButton
 
-import excelclone.ui.main_window as main_window_module
-from excelclone.core.financial_analysis import audit_financial_model
-from excelclone.core.financial_models import create_financial_model
-from excelclone.ui.dialogs.financial import (
+import duddysheet.ui.main_window as main_window_module
+from duddysheet.core.financial_analysis import audit_financial_model
+from duddysheet.core.financial_models import create_financial_model
+from duddysheet.ui.dialogs.financial import (
     AuditReportDialog,
     GoalSeekDialog,
     ScenarioDialog,
     SensitivityDialog,
 )
-from excelclone.ui.dialogs.financial_help import FinancialHelpDialog
-from excelclone.ui.main_window import MainWindow
+from duddysheet.ui.dialogs.financial_help import FinancialHelpDialog
+from duddysheet.ui.main_window import MainWindow
 
 
 def application() -> QApplication:

@@ -7,10 +7,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-from excelclone.ui.delegates import CellDelegate
-from excelclone.ui.formula_bar import cycle_absolute_reference
-from excelclone.ui.main_window import MainWindow
-from excelclone.util.settings import SettingsStore
+from duddysheet.ui.delegates import CellDelegate
+from duddysheet.ui.formula_bar import cycle_absolute_reference
+from duddysheet.ui.main_window import MainWindow
+from duddysheet.util.settings import SettingsStore
 
 
 def application() -> QApplication:
@@ -133,7 +133,7 @@ def test_view_actions_toggle_gridlines_formulas_zoom_and_freeze_panes() -> None:
 def test_main_window_saves_and_opens_native_workbook_path(tmp_path) -> None:
     application()
     settings = SettingsStore(tmp_path / "settings.json")
-    path = tmp_path / "workbook.ogrid"
+    path = tmp_path / "workbook.dsheet"
     window = MainWindow(settings_store=settings)
     window.grid_model.setData(window.grid_model.index(0, 0), "42")
 

@@ -4,19 +4,19 @@ import math
 
 import pytest
 
-from excelclone.core.engine import FormulaEngine
-from excelclone.core.chart import chart_data
-from excelclone.core.financial_help import FINANCIAL_HELP_ENTRIES
-from excelclone.core.financial_models import (
+from duddysheet.core.engine import FormulaEngine
+from duddysheet.core.chart import chart_data
+from duddysheet.core.financial_help import FINANCIAL_HELP_ENTRIES
+from duddysheet.core.financial_models import (
     COMMON_FINANCIAL_METRICS,
     FINANCIAL_LAB_FUNCTIONS,
     FINANCIAL_MODEL_CATALOG,
     create_financial_model,
 )
-from excelclone.core.refs import CellReference, parse_a1
-from excelclone.io.native import load_ogrid, save_ogrid
-from excelclone.io.xlsx_reader import read_xlsx
-from excelclone.io.xlsx_writer import write_xlsx
+from duddysheet.core.refs import CellReference, parse_a1
+from duddysheet.io.native import load_native, save_native
+from duddysheet.io.xlsx_reader import read_xlsx
+from duddysheet.io.xlsx_writer import write_xlsx
 
 
 def value_at(workbook: object, reference: str) -> object:
@@ -143,11 +143,11 @@ def test_financial_lab_includes_twelve_working_editable_charts() -> None:
 def test_financial_lab_native_round_trip_preserves_formulas_and_charts(
     tmp_path,
 ) -> None:
-    path = tmp_path / "Financial Calculations Lab.ogrid"
+    path = tmp_path / "Financial Calculations Lab.dsheet"
     source = create_financial_model("financial_lab")
 
-    save_ogrid(source, path)
-    restored = load_ogrid(path)
+    save_native(source, path)
+    restored = load_native(path)
     FormulaEngine(restored).rebuild_index()
 
     assert restored.sheet_names == source.sheet_names

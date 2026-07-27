@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from excelclone.core.parser import collect_references, parse_formula
-from excelclone.core.translation import (
+from duddysheet.core.parser import collect_references, parse_formula
+from duddysheet.core.translation import (
     formula_to_text,
     rename_formula_sheet,
     translate_formula_copy,
     translate_reference_structure,
     translate_formula_structure,
 )
-from excelclone.core.refs import parse_a1
+from duddysheet.core.refs import parse_a1
 
 import pytest
 

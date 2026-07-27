@@ -5,13 +5,13 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
 
-from excelclone.core.cell import BorderStyle, CellFormat
-from excelclone.core.chart import ChartSpec
-from excelclone.core.conditional import ConditionalRule, FormatPatch
-from excelclone.core.data_tools import DataValidation, apply_filter
-from excelclone.core.refs import parse_a1
-from excelclone.core.workbook import Workbook
-from excelclone.io.native import CURRENT_SCHEMA_VERSION, load_ogrid, save_ogrid
+from duddysheet.core.cell import BorderStyle, CellFormat
+from duddysheet.core.chart import ChartSpec
+from duddysheet.core.conditional import ConditionalRule, FormatPatch
+from duddysheet.core.data_tools import DataValidation, apply_filter
+from duddysheet.core.refs import parse_a1
+from duddysheet.core.workbook import Workbook
+from duddysheet.io.native import CURRENT_SCHEMA_VERSION, load_native, save_native
 
 
 def rich_workbook() -> Workbook:
@@ -91,12 +91,12 @@ def rich_workbook() -> Workbook:
     return workbook
 
 
-def test_ogrid_round_trip_is_lossless(tmp_path) -> None:
-    path = tmp_path / "book.ogrid"
+def test_native_round_trip_is_lossless(tmp_path) -> None:
+    path = tmp_path / "book.dsheet"
     original = rich_workbook()
 
-    save_ogrid(original, path)
-    loaded = load_ogrid(path)
+    save_native(original, path)
+    loaded = load_native(path)
 
     assert loaded.sheet_names == ("Sheet1", "Data")
     assert loaded.active_sheet.name == "Data"
@@ -119,9 +119,9 @@ def test_ogrid_round_trip_is_lossless(tmp_path) -> None:
     assert not loaded.get_sheet("Data").visible
 
 
-def test_ogrid_archive_has_versioned_manifest_and_per_sheet_json(tmp_path) -> None:
-    path = tmp_path / "book.ogrid"
-    save_ogrid(rich_workbook(), path)
+def test_native_archive_has_versioned_manifest_and_per_sheet_json(tmp_path) -> None:
+    path = tmp_path / "book.dsheet"
+    save_native(rich_workbook(), path)
 
     with ZipFile(path) as archive:
         manifest = json.loads(archive.read("workbook.json"))
@@ -131,8 +131,8 @@ def test_ogrid_archive_has_versioned_manifest_and_per_sheet_json(tmp_path) -> No
     assert names == {"workbook.json", "sheets/0000.json", "sheets/0001.json"}
 
 
-def test_future_ogrid_schema_is_rejected_clearly(tmp_path) -> None:
-    path = tmp_path / "future.ogrid"
+def test_future_native_schema_is_rejected_clearly(tmp_path) -> None:
+    path = tmp_path / "future.dsheet"
     with ZipFile(path, "w", ZIP_DEFLATED) as archive:
         archive.writestr(
             "workbook.json",
@@ -146,5 +146,5 @@ def test_future_ogrid_schema_is_rejected_clearly(tmp_path) -> None:
             ),
         )
 
-    with pytest.raises(ValueError, match="newer OpenGrid version"):
-        load_ogrid(path)
+    with pytest.raises(ValueError, match="newer Duddy Spreadsheet version"):
+        load_native(path)

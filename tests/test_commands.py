@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from excelclone.commands.base import Command, CommandHistory
-from excelclone.commands.edits import (
+from duddysheet.commands.base import Command, CommandHistory
+from duddysheet.commands.edits import (
     AddSheetCommand,
     AddValidationCommand,
     ApplyFilterCommand,
@@ -29,12 +29,12 @@ from excelclone.commands.edits import (
     SortRangeCommand,
     TextToColumnsCommand,
 )
-from excelclone.core.conditional import FormatPatch
-from excelclone.core.cell import Cell, CellFormat
-from excelclone.core.data_tools import DataValidation, FindOptions, SortKey
-from excelclone.core.engine import FormulaEngine
-from excelclone.core.refs import parse_a1
-from excelclone.core.workbook import Workbook
+from duddysheet.core.conditional import FormatPatch
+from duddysheet.core.cell import Cell, CellFormat
+from duddysheet.core.data_tools import DataValidation, FindOptions, SortKey
+from duddysheet.core.engine import FormulaEngine
+from duddysheet.core.refs import parse_a1
+from duddysheet.core.workbook import Workbook
 
 
 @dataclass

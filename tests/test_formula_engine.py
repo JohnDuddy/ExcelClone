@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from excelclone.core.depgraph import CellAddress
-from excelclone.core.engine import FormulaEngine
-from excelclone.core.tokenizer import FormulaSyntaxError
-from excelclone.core.workbook import Workbook
+from duddysheet.core.depgraph import CellAddress
+from duddysheet.core.engine import FormulaEngine
+from duddysheet.core.tokenizer import FormulaSyntaxError
+from duddysheet.core.workbook import Workbook
 
 
 @pytest.fixture

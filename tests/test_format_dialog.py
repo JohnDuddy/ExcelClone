@@ -6,8 +6,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
-from excelclone.core.cell import BorderStyle, CellFormat
-from excelclone.ui.dialogs.format_cells import FormatCellsDialog
+from duddysheet.core.cell import BorderStyle, CellFormat
+from duddysheet.ui.dialogs.format_cells import FormatCellsDialog
 
 
 def application() -> QApplication:

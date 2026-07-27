@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from excelclone.core.engine import FormulaEngine
-from excelclone.core.financial_analysis import (
+from duddysheet.core.engine import FormulaEngine
+from duddysheet.core.financial_analysis import (
     Scenario,
     audit_financial_model,
     evaluate_scenarios,
@@ -11,7 +11,7 @@ from excelclone.core.financial_analysis import (
     one_variable_sensitivity,
     two_variable_sensitivity,
 )
-from excelclone.core.workbook import Workbook
+from duddysheet.core.workbook import Workbook
 
 
 def model_workbook() -> Workbook:

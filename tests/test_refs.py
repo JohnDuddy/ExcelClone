@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from excelclone.core.refs import (
+from duddysheet.core.refs import (
     MAX_COLUMNS,
     MAX_ROWS,
     CellReference,

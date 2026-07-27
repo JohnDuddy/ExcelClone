@@ -4,9 +4,9 @@ from datetime import date
 
 import pytest
 
-from excelclone.core.cell import Cell, CellFormat
-from excelclone.core.refs import MAX_COLUMNS, MAX_ROWS
-from excelclone.core.sheet import Sheet
+from duddysheet.core.cell import Cell, CellFormat
+from duddysheet.core.refs import MAX_COLUMNS, MAX_ROWS
+from duddysheet.core.sheet import Sheet
 
 
 def test_default_cell_has_no_content_or_format() -> None:

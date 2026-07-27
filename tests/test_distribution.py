@@ -8,7 +8,7 @@ from generate_icon import SIZES, generate_icon
 
 
 def test_generated_icon_contains_all_required_windows_sizes(tmp_path) -> None:
-    icon = generate_icon(tmp_path / "excelclone.ico")
+    icon = generate_icon(tmp_path / "duddysheet.ico")
     data = icon.read_bytes()
     reserved, image_type, count = struct.unpack_from("<HHH", data)
     sizes = []
@@ -29,8 +29,8 @@ def test_distribution_inputs_include_runtime_wheels_and_installers() -> None:
 
     assert "INSTALL.bat" in relative
     assert "install.ps1" in relative
-    assert "assets/excelclone.ico" in relative
-    assert "excelclone/app.py" in relative
+    assert "assets/duddysheet.ico" in relative
+    assert "duddysheet/app.py" in relative
     assert any(path.startswith("wheelhouse/pyside6-") for path in relative)
     assert any(path.startswith("wheelhouse/openpyxl-") for path in relative)
 

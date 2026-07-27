@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from excelclone.core.financial_help import (
+from duddysheet.core.financial_help import (
     FINANCIAL_HELP_CATEGORIES,
     FINANCIAL_HELP_ENTRIES,
 )
-from excelclone.core.functions import FUNCTION_REGISTRY
-from excelclone.core.parser import parse_formula
+from duddysheet.core.functions import FUNCTION_REGISTRY
+from duddysheet.core.parser import parse_formula
 
 
 def test_financial_help_covers_every_registered_financial_function() -> None:

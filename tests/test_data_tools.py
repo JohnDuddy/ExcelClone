@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from excelclone.core.data_tools import (
+from duddysheet.core.data_tools import (
     DataValidation,
     FindOptions,
     SortKey,
@@ -17,9 +17,9 @@ from excelclone.core.data_tools import (
     text_to_columns,
     validate_value,
 )
-from excelclone.core.engine import FormulaEngine
-from excelclone.core.refs import CellReference, parse_a1
-from excelclone.core.workbook import Workbook
+from duddysheet.core.engine import FormulaEngine
+from duddysheet.core.refs import CellReference, parse_a1
+from duddysheet.core.workbook import Workbook
 
 
 def table_workbook() -> Workbook:

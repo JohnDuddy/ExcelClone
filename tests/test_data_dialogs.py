@@ -7,8 +7,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-from excelclone.core.refs import parse_a1
-from excelclone.ui.dialogs.data_tools import (
+from duddysheet.core.refs import parse_a1
+from duddysheet.ui.dialogs.data_tools import (
     FilterDialog,
     FindReplaceDialog,
     PasteSpecialDialog,

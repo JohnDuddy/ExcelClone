@@ -5,8 +5,8 @@ from datetime import date, datetime, time
 
 import pytest
 
-from excelclone.core.cell import BorderStyle, Cell, CellFormat
-from excelclone.core.clipboard import decode_cell_matrix, encode_cell_matrix
+from duddysheet.core.cell import BorderStyle, Cell, CellFormat
+from duddysheet.core.clipboard import decode_cell_matrix, encode_cell_matrix
 
 
 def test_rich_clipboard_round_trip_preserves_typed_values_and_formats() -> None:

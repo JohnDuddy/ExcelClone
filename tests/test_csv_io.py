@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from excelclone.core.workbook import Workbook
-from excelclone.io.csv_io import detect_delimiter, read_delimited, write_delimited
+from duddysheet.core.workbook import Workbook
+from duddysheet.io.csv_io import detect_delimiter, read_delimited, write_delimited
 
 
 def test_detect_delimiter_handles_csv_tsv_and_semicolon_samples() -> None:

@@ -6,10 +6,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
-from excelclone.ui.dialogs.function_help import FunctionHelpDialog
-from excelclone.ui.main_window import MainWindow
-from excelclone.util.autosave import AutosaveManager
-from excelclone.util.settings import SettingsStore
+from duddysheet.ui.dialogs.function_help import FunctionHelpDialog
+from duddysheet.ui.main_window import MainWindow
+from duddysheet.util.autosave import AutosaveManager
+from duddysheet.util.settings import SettingsStore
 
 
 def application() -> QApplication:
@@ -106,6 +106,6 @@ def test_window_autosaves_only_dirty_workbooks_and_normal_save_clears_it(
     assert candidate is not None
     assert manager.candidates() == (candidate,)
 
-    window.save_path(tmp_path / "saved.ogrid")
+    window.save_path(tmp_path / "saved.dsheet")
     assert manager.candidates() == ()
     window.close()

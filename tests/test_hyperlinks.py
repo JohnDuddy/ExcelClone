@@ -10,13 +10,13 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication
 
-from excelclone.core.cell import Cell, Hyperlink
-from excelclone.core.clipboard import decode_cell_matrix, encode_cell_matrix
-from excelclone.core.workbook import Workbook
-from excelclone.io.native import load_ogrid, save_ogrid
-from excelclone.io.xlsx_reader import read_xlsx
-from excelclone.io.xlsx_writer import write_xlsx
-from excelclone.ui.main_window import MainWindow
+from duddysheet.core.cell import Cell, Hyperlink
+from duddysheet.core.clipboard import decode_cell_matrix, encode_cell_matrix
+from duddysheet.core.workbook import Workbook
+from duddysheet.io.native import load_native, save_native
+from duddysheet.io.xlsx_reader import read_xlsx
+from duddysheet.io.xlsx_writer import write_xlsx
+from duddysheet.ui.main_window import MainWindow
 
 
 def linked_xlsx(path) -> None:
@@ -115,10 +115,10 @@ def test_hyperlinks_survive_native_file_and_rich_clipboard(tmp_path) -> None:
     )
     workbook = Workbook()
     workbook.active_sheet.set_cell(0, 0, "Example", hyperlink=hyperlink)
-    path = tmp_path / "links.ogrid"
+    path = tmp_path / "links.dsheet"
 
-    save_ogrid(workbook, path)
-    restored = load_ogrid(path)
+    save_native(workbook, path)
+    restored = load_native(path)
     assert restored.active_sheet.get_cell(0, 0).hyperlink == hyperlink
 
     payload = encode_cell_matrix(

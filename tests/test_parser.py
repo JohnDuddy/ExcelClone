@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from excelclone.core.parser import collect_references, parse_formula, shift_references
-from excelclone.core.refs import CellReference, RangeReference
-from excelclone.core.tokenizer import FormulaSyntaxError
+from duddysheet.core.parser import collect_references, parse_formula, shift_references
+from duddysheet.core.refs import CellReference, RangeReference
+from duddysheet.core.tokenizer import FormulaSyntaxError
 
 
 @pytest.mark.parametrize(

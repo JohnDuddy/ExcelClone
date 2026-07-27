@@ -1,4 +1,4 @@
-"""Build the self-contained offline ExcelClone distribution ZIP."""
+"""Build the self-contained offline DuddySpreadsheet distribution ZIP."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from generate_icon import generate_icon
 
 ROOT = Path(__file__).resolve().parent
 DIST = ROOT / "dist"
-ARCHIVE = DIST / "ExcelClone.zip"
-PREFIX = Path("ExcelClone")
+ARCHIVE = DIST / "DuddySpreadsheet.zip"
+PREFIX = Path("DuddySpreadsheet")
 TOP_LEVEL_FILES = (
     "AGENTS.md",
     "ARCHITECTURE.md",
@@ -35,7 +35,7 @@ def package_files() -> tuple[Path, ...]:
     files = [ROOT / name for name in TOP_LEVEL_FILES]
     files.extend(
         path
-        for directory in ("assets", "excelclone", "wheelhouse")
+        for directory in ("assets", "duddysheet", "wheelhouse")
         for path in (ROOT / directory).rglob("*")
         if path.is_file()
         and "__pycache__" not in path.parts

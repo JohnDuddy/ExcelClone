@@ -1,16 +1,16 @@
-# OpenGrid
+# Duddy Spreadsheet
 
-OpenGrid is a personal, offline spreadsheet application for Windows 11. It
+Duddy Spreadsheet is a personal, offline spreadsheet application for Windows 11. It
 provides an Excel-sized virtual grid, formulas, financial modeling, charts,
-formatting, data tools, and `.xlsx`, `.csv`, `.tsv`, and lossless `.ogrid`
+formatting, data tools, and `.xlsx`, `.csv`, `.tsv`, and lossless `.dsheet`
 files without requiring Microsoft Office or an internet connection.
 
 ## Install
 
-1. Extract `ExcelClone.zip`.
-2. Open the extracted `ExcelClone` folder.
+1. Extract `DuddySpreadsheet.zip`.
+2. Open the extracted `DuddySpreadsheet` folder.
 3. Double-click `INSTALL.bat`.
-4. Launch **ExcelClone** from the Desktop shortcut.
+4. Launch **DuddySpreadsheet** from the Desktop shortcut.
 
 The installer verifies Python 3.13, creates `.venv` inside the extracted
 folder, installs only from the included `wheelhouse`, verifies the application,
@@ -104,7 +104,7 @@ Open the **Financial** ribbon tab or menu for the modeling toolkit:
 
 The financial library includes 46 worksheet functions across loans, cash
 flows, rates, depreciation, coupon securities, discount securities, and
-Treasury bills. OpenGrid remains offline and deterministic: it does not ship
+Treasury bills. Duddy Spreadsheet remains offline and deterministic: it does not ship
 VBA, pivots, Power Query, live market feeds, or a multi-variable optimization
 solver.
 
@@ -112,15 +112,15 @@ The guide is also available from **Help > Financial Functions Guide**.
 
 ## Files And Recovery
 
-- `.ogrid` is the lossless native format.
+- `.dsheet` is the lossless native format.
 - `.xlsx` preserves supported formulas, values, styles, dimensions, names,
   merges, filters, validation, frozen panes, and external/internal hyperlinks.
   Click a linked cell to open its URL or navigate to its workbook destination.
-  OpenGrid reports unsupported features before dropping them.
+  Duddy Spreadsheet reports unsupported features before dropping them.
 - `.csv` and `.tsv` import and export the active sheet.
 - Unsaved workbooks receive a recovery snapshot every five minutes under
-  `%LOCALAPPDATA%\ExcelClone\autosave`.
-- Logs rotate under `%LOCALAPPDATA%\ExcelClone\logs`.
+  `%LOCALAPPDATA%\DuddySpreadsheet\autosave`.
+- Logs rotate under `%LOCALAPPDATA%\DuddySpreadsheet\logs`.
 
 ## Troubleshooting
 
@@ -129,7 +129,7 @@ The guide is also available from **Help > Financial Functions Guide**.
 | Installer cannot find Python | Install 64-bit Python 3.13 from `python.org`, including the Python launcher, then rerun `INSTALL.bat`. |
 | Offline package installation fails | Extract the complete ZIP again; do not remove or rename `wheelhouse`. |
 | Shortcut was moved or removed | Rerun `INSTALL.bat`; it recreates one Desktop shortcut without duplicating it. |
-| An XLSX warning appears | Save as `.ogrid` when the source uses unsupported macros, pivots, embedded objects, or external charts. |
+| An XLSX warning appears | Save as `.dsheet` when the source uses unsupported macros, pivots, embedded objects, or external charts. |
 | The app closed with unsaved work | Relaunch and choose **Recover** in the startup prompt. |
 | A formula shows `#CIRC!` | Remove the circular reference identified in the status bar. |
 
@@ -137,7 +137,7 @@ The guide is also available from **Help > Financial Functions Guide**.
 
 ```powershell
 python -W error -m pytest
-python -W error -m pytest -m "not performance" --cov=excelclone/core
+python -W error -m pytest -m "not performance" --cov=duddysheet/core
 python -m pytest tests/test_performance.py
 ```
 

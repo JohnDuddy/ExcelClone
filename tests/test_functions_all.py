@@ -4,11 +4,11 @@ from datetime import date
 
 import pytest
 
-from excelclone.core.errors import NA_ERROR, SpreadsheetError, VALUE_ERROR
-from excelclone.core.evaluator import FormulaEvaluator
-from excelclone.core.functions import FUNCTION_REGISTRY
-from excelclone.core.tokenizer import FormulaSyntaxError
-from excelclone.core.workbook import Workbook
+from duddysheet.core.errors import NA_ERROR, SpreadsheetError, VALUE_ERROR
+from duddysheet.core.evaluator import FormulaEvaluator
+from duddysheet.core.functions import FUNCTION_REGISTRY
+from duddysheet.core.tokenizer import FormulaSyntaxError
+from duddysheet.core.workbook import Workbook
 
 
 SMOKE_FORMULAS = {

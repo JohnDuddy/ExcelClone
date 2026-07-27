@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 import pytest
 
-from excelclone.core.errors import (
+from duddysheet.core.errors import (
     CIRC_ERROR,
     DIV_ZERO_ERROR,
     NAME_ERROR,
@@ -15,13 +15,13 @@ from excelclone.core.errors import (
     SpreadsheetError,
     error_from_literal,
 )
-from excelclone.core.evaluator import FormulaEvaluator, date_to_serial
-from excelclone.core.evaluator import ReferenceValue
-from excelclone.core.functions import FunctionSpec
-from excelclone.core.parser import LiteralNode, Node, ReferenceOperatorNode
-from excelclone.core.refs import CellReference
-from excelclone.core.cell import Cell
-from excelclone.core.workbook import Workbook
+from duddysheet.core.evaluator import FormulaEvaluator, date_to_serial
+from duddysheet.core.evaluator import ReferenceValue
+from duddysheet.core.functions import FunctionSpec
+from duddysheet.core.parser import LiteralNode, Node, ReferenceOperatorNode
+from duddysheet.core.refs import CellReference
+from duddysheet.core.cell import Cell
+from duddysheet.core.workbook import Workbook
 
 
 @pytest.fixture

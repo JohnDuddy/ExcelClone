@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from excelclone.core.depgraph import (
+from duddysheet.core.depgraph import (
     CellAddress,
     CircularReferenceError,
     DependencyGraph,

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from excelclone.commands.base import CommandHistory
-from excelclone.commands.edits import (
+from duddysheet.commands.base import CommandHistory
+from duddysheet.commands.edits import (
     DeleteColumnsCommand,
     DeleteRowsCommand,
     InsertColumnsCommand,
     InsertRowsCommand,
 )
-from excelclone.core.data_tools import DataValidation, apply_filter
-from excelclone.core.refs import parse_a1
-from excelclone.core.engine import FormulaEngine
-from excelclone.core.workbook import Workbook
+from duddysheet.core.data_tools import DataValidation, apply_filter
+from duddysheet.core.refs import parse_a1
+from duddysheet.core.engine import FormulaEngine
+from duddysheet.core.workbook import Workbook
 
 
 def structural_engine() -> FormulaEngine:

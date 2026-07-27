@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 import pytest
 
-from excelclone.core.formats import format_value
+from duddysheet.core.formats import format_value
 
 
 @pytest.mark.parametrize(

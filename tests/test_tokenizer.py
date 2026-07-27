@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from excelclone.core.tokenizer import FormulaSyntaxError, TokenKind, tokenize
+from duddysheet.core.tokenizer import FormulaSyntaxError, TokenKind, tokenize
 
 
 @pytest.mark.parametrize(

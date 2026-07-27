@@ -8,13 +8,13 @@ import pytest
 from PySide6.QtCore import QItemSelectionModel
 from PySide6.QtWidgets import QApplication
 
-from excelclone.core.chart import CHART_TYPES, ChartSpec
-from excelclone.commands.edits import AddChartCommand
-from excelclone.core.refs import parse_a1
-from excelclone.core.workbook import Workbook
-from excelclone.ui.charting import ChartPanel
-from excelclone.ui.dialogs.chart_wizard import ChartWizard
-from excelclone.ui.main_window import MainWindow
+from duddysheet.core.chart import CHART_TYPES, ChartSpec
+from duddysheet.commands.edits import AddChartCommand
+from duddysheet.core.refs import parse_a1
+from duddysheet.core.workbook import Workbook
+from duddysheet.ui.charting import ChartPanel
+from duddysheet.ui.dialogs.chart_wizard import ChartWizard
+from duddysheet.ui.main_window import MainWindow
 
 
 def application() -> QApplication:

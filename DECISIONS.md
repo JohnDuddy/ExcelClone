@@ -62,7 +62,7 @@ recalculates the anchor.
 `tests/fixtures/golden.xlsx` is generated from 200 formulas with independently
 derived literal expectations, then opened, fully recalculated, and saved by the
 locally installed Microsoft Excel. Tests require both the Excel cache and the
-OpenGrid evaluator to match those literals.
+Duddy Spreadsheet evaluator to match those literals.
 
 ## 2026-07-25 — Virtual grid reads
 
@@ -95,7 +95,7 @@ back by a presentation edit.
 
 ## 2026-07-25 — Native file schema
 
-The native `.ogrid` format is a ZIP with a small `workbook.json` manifest and
+The native `.dsheet` format is a ZIP with a small `workbook.json` manifest and
 one JSON payload per sheet. Schema version 1 preserves core cells, typed
 date/time values, formats, conditional rules, sheet metadata, names, and cached
 results. Loading advances through an explicit migration registry and rejects
@@ -150,7 +150,7 @@ state. Split view similarly shares the model but keeps an independent viewport.
 
 ## 2026-07-25 — Atomic native autosave
 
-Recovery copies use the lossless OGrid adapter and are atomically replaced,
+Recovery copies use the lossless Duddy Spreadsheet adapter and are atomically replaced,
 with a JSON sidecar for source identity and timestamp. This avoids a second
 serialization format and ensures recovery exercises the same migration and
 validation path as user files.
@@ -167,9 +167,9 @@ installation.
 
 Hyperlinks are immutable cell metadata rather than formulas or UI-only state.
 External targets retain their original URL/file text; internal targets retain
-their workbook location and optional tooltip. This lets XLSX, native OGrid,
+their workbook location and optional tooltip. This lets XLSX, native Duddy Spreadsheet,
 clipboard, fill, structural edits, and undo preserve links through the same
-cell value seam. OGrid schema 2 adds the optional hyperlink field, with a
+cell value seam. Duddy Spreadsheet schema 2 adds the optional hyperlink field, with a
 no-op v1 migration treating its absence as an unlinked cell.
 
 ## 2026-07-25 - Clone-based financial what-if analysis

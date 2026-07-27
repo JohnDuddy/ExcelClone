@@ -4,9 +4,9 @@ import math
 
 import pytest
 
-from excelclone.core.errors import DIV_ZERO_ERROR, NUM_ERROR
-from excelclone.core.evaluator import FormulaEvaluator
-from excelclone.core.workbook import Workbook
+from duddysheet.core.errors import DIV_ZERO_ERROR, NUM_ERROR
+from duddysheet.core.evaluator import FormulaEvaluator
+from duddysheet.core.workbook import Workbook
 
 
 def evaluate(formula: str) -> object:

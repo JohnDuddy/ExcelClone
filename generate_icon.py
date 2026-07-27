@@ -1,4 +1,4 @@
-"""Generate the multi-resolution OpenGrid Windows icon using only stdlib."""
+"""Generate the multi-resolution Duddy Spreadsheet Windows icon using only stdlib."""
 
 from __future__ import annotations
 
@@ -131,7 +131,7 @@ def generate_icon(destination: str | Path | None = None) -> Path:
     path = (
         Path(destination)
         if destination is not None
-        else Path(__file__).resolve().parent / "assets" / "excelclone.ico"
+        else Path(__file__).resolve().parent / "assets" / "duddysheet.ico"
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     images = [_render(size) for size in SIZES]

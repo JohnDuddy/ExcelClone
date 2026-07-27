@@ -8,14 +8,14 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication
 
-from excelclone.commands.base import CommandHistory
-from excelclone.core.cell import CellFormat
-from excelclone.core.conditional import ConditionalRule, FormatPatch
-from excelclone.core.data_tools import DataValidation
-from excelclone.core.engine import FormulaEngine
-from excelclone.core.refs import MAX_COLUMNS, MAX_ROWS, parse_a1
-from excelclone.core.workbook import Workbook
-from excelclone.ui.grid_model import DATA_BAR_ROLE, ICON_ROLE, GridModel
+from duddysheet.commands.base import CommandHistory
+from duddysheet.core.cell import CellFormat
+from duddysheet.core.conditional import ConditionalRule, FormatPatch
+from duddysheet.core.data_tools import DataValidation
+from duddysheet.core.engine import FormulaEngine
+from duddysheet.core.refs import MAX_COLUMNS, MAX_ROWS, parse_a1
+from duddysheet.core.workbook import Workbook
+from duddysheet.ui.grid_model import DATA_BAR_ROLE, ICON_ROLE, GridModel
 
 
 def application() -> QApplication:

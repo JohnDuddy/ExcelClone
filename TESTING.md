@@ -8,7 +8,7 @@ Headless engine tests never construct a `QApplication`. UI tests set
 
 ```powershell
 python -W error -m pytest
-python -W error -m pytest -m "not performance" --cov=excelclone.core --cov-report=term-missing
+python -W error -m pytest -m "not performance" --cov=duddysheet.core --cov-report=term-missing
 python -m pytest tests/test_performance.py
 ```
 
@@ -30,7 +30,7 @@ without coverage instrumentation because tracing changes the wall-clock result.
 The M4 fixture `tests/fixtures/golden.xlsx` contains 200 formula cases and cached
 values calculated by Microsoft Excel. Each case records the source formula,
 input cells, expected value, and comparison tolerance. New cases must be
-calculated in Excel rather than derived by the OpenGrid evaluator.
+calculated in Excel rather than derived by the Duddy Spreadsheet evaluator.
 
 ## File Round Trips
 
@@ -41,7 +41,7 @@ with OpenPyXL. `test_csv_io.py` verifies raw bytes where newline or encoding
 behavior matters.
 
 `test_hyperlinks.py` creates only synthetic external and internal links. It
-verifies XLSX and OGrid round trips, rich clipboard preservation, link styling,
+verifies XLSX and Duddy Spreadsheet round trips, rich clipboard preservation, link styling,
 external activation requests, internal navigation, and removal after editing.
 
 ## Structural And Data Operations

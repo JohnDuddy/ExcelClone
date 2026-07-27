@@ -45,7 +45,7 @@ All notable changes follow Keep a Changelog conventions.
   gridline, zoom, and freeze-pane metadata controls.
 - AST-level mixed-reference translation used by range-relative conditional
   formulas.
-- Versioned `.ogrid` ZIP/JSON persistence with per-sheet payloads, typed scalar
+- Versioned `.dsheet` ZIP/JSON persistence with per-sheet payloads, typed scalar
   encoding, conditional formats, and an explicit migration registry.
 - XLSX read/write for formulas, values, formats, merges, dimensions, sheet
   metadata, defined names, active sheet, and frozen panes.
@@ -66,7 +66,7 @@ All notable changes follow Keep a Changelog conventions.
 - Numeric, date, weekday, month, and formula fill with Ctrl+D/Ctrl+R support.
 - Command-driven merges, dimensions, sheet move/rename/duplicate/visibility/tab
   color, and a 50-operation mixed undo regression.
-- XLSX and OGrid persistence for autofilter and data-validation state.
+- XLSX and Duddy Spreadsheet persistence for autofilter and data-validation state.
 - Immutable range-bound chart specifications and headless category/series
   extraction from current formula caches.
 - Movable/resizable analytical chart panels with 17 chart types, including
@@ -78,7 +78,7 @@ All notable changes follow Keep a Changelog conventions.
 - Live chart refresh after edits, command changes, recalculation, sheet
   switches, and workbook loads.
 - Undoable chart add/update/remove, structural range translation, sheet-rename
-  translation, and complete native OGrid chart persistence.
+  translation, and complete native Duddy Spreadsheet chart persistence.
 - Five-minute dirty-workbook autosave, recover/discard startup flow, and
   rotating `%LOCALAPPDATA%` diagnostics.
 - Real frozen-row, frozen-column, and corner overlays plus a synchronized
@@ -90,7 +90,7 @@ All notable changes follow Keep a Changelog conventions.
 - Idempotent PowerShell installer with Python 3.13 discovery, isolated virtual
   environment, offline wheel installation, smoke test, and direct
   `pythonw.exe` Desktop shortcut.
-- Self-contained `dist/ExcelClone.zip` with all Windows runtime wheels.
+- Self-contained `dist/DuddySpreadsheet.zip` with all Windows runtime wheels.
 - External HTTPS/file/mail links and internal workbook-location links as
   immutable cell metadata, including clickable grid presentation, native and
   XLSX round trips, rich clipboard copies, and internal navigation.
@@ -120,7 +120,7 @@ All notable changes follow Keep a Changelog conventions.
   bases, including the distinct Actual/Actual `COUPDAYS` convention.
 - Fractional-period `VDB` calculations now reproduce Excel's switching
   behavior, and XLSX files translate `RRI`/`PDURATION` through the required
-  `_xlfn.` storage prefix without exposing it inside OpenGrid.
+  `_xlfn.` storage prefix without exposing it inside Duddy Spreadsheet.
 - The built-in LBO model now calculates IRR from a normal cash-flow range
   instead of an array constant containing references, so exported LBO
   workbooks open and recalculate in Microsoft Excel.

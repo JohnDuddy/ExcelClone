@@ -1,6 +1,6 @@
 # Roadmap
 
-OpenGrid M12 is complete under the regression contract in `FEATURES.md`. The
+Duddy Spreadsheet M12 is complete under the regression contract in `FEATURES.md`. The
 following capabilities are explicitly outside the current product scope:
 
 - VBA and macros

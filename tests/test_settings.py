@@ -2,20 +2,20 @@ from __future__ import annotations
 
 import json
 
-from excelclone.util.settings import SettingsStore
+from duddysheet.util.settings import SettingsStore
 
 
 def test_settings_store_persists_ten_deduplicated_recent_files(tmp_path) -> None:
     path = tmp_path / "settings.json"
     settings = SettingsStore(path)
     for index in range(12):
-        settings.add_recent_file(tmp_path / f"book-{index}.ogrid")
-    settings.add_recent_file(tmp_path / "book-5.ogrid")
+        settings.add_recent_file(tmp_path / f"book-{index}.dsheet")
+    settings.add_recent_file(tmp_path / "book-5.dsheet")
 
     restored = SettingsStore(path)
 
     assert len(restored.recent_files) == 10
-    assert restored.recent_files[0].endswith("book-5.ogrid")
+    assert restored.recent_files[0].endswith("book-5.dsheet")
     assert len(set(restored.recent_files)) == 10
     assert json.loads(path.read_text(encoding="utf-8"))["recent_files"] == list(
         restored.recent_files

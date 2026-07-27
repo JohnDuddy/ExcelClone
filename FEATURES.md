@@ -8,7 +8,7 @@ complete.
 
 - [x] Application package imports without creating a GUI (`test_app_smoke.py`)
 - [x] Application factory returns a reusable `QApplication` (`test_app_smoke.py`)
-- [x] Main window uses the OpenGrid product title (`test_app_smoke.py`)
+- [x] Main window uses the Duddy Spreadsheet product title (`test_app_smoke.py`)
 - [x] Main window provides a usable minimum desktop size (`test_app_smoke.py`)
 
 ## M2 Core Model
@@ -47,7 +47,7 @@ complete.
 
 ## M7-M9 Data And Visualization
 
-- [x] Lossless versioned OGrid ZIP/JSON round trips (`test_native_io.py`)
+- [x] Lossless versioned Duddy Spreadsheet ZIP/JSON round trips (`test_native_io.py`)
 - [x] XLSX values, formulas, styles, merges, dimensions, sheets, names, and frozen-pane round trips (`test_io_roundtrip.py`)
 - [x] External and internal XLSX hyperlinks, clickable grid styling, navigation, native persistence, and rich clipboard preservation (`test_hyperlinks.py`)
 - [x] Explicit XLSX dropped-feature warnings (`test_io_roundtrip.py`)
@@ -64,13 +64,13 @@ complete.
 - [x] Range-bound chart data live-updates after recalculation/edit (`test_charts.py`, `test_chart_ui.py`)
 - [x] Ranked chart recommendations, contiguous-range expansion, Quick Chart, and live-preview Chart Studio (`test_charts.py`, `test_chart_ui.py`)
 - [x] Professional themes, labels, trendlines, extrema, secondary axes, zoom/pan, clipboard copy, and PNG/SVG/PDF export (`test_chart_ui.py`)
-- [x] Undoable chart add/update/remove and complete OGrid persistence (`test_charts.py`, `test_native_io.py`)
+- [x] Undoable chart add/update/remove and complete Duddy Spreadsheet persistence (`test_charts.py`, `test_native_io.py`)
 
 ## M10 Distribution
 
 - [x] Autosave, crash recovery, rotating logs, and performance targets (`test_autosave.py`, `test_performance.py`, `test_polish_ui.py`)
 - [x] Idempotent offline Windows installer and desktop shortcut (`test_distribution.py`)
-- [x] Self-contained `dist/ExcelClone.zip` (`test_distribution.py`, clean-install acceptance)
+- [x] Self-contained `dist/DuddySpreadsheet.zip` (`test_distribution.py`, clean-install acceptance)
 
 ## M11 Financial Modeling
 

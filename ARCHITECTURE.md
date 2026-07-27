@@ -1,6 +1,6 @@
 # Architecture
 
-OpenGrid separates spreadsheet behavior from its desktop presentation. The core
+Duddy Spreadsheet separates spreadsheet behavior from its desktop presentation. The core
 is a deep module: callers learn a small workbook interface while parsing,
 dependency tracking, recalculation, spill management, and formatting remain
 local to its implementation.
@@ -23,7 +23,7 @@ Qt types stop at the UI seam. File-format types stop at the I/O seam. Core
 objects never import either.
 
 I/O adapters translate at the boundary: OpenPyXL types are converted to domain
-cells and formats, delimited text produces one sparse sheet, and native OGrid
+cells and formats, delimited text produces one sparse sheet, and native Duddy Spreadsheet
 stores versioned JSON inside a ZIP. Loaders return domain workbooks; XLSX also
 returns an immutable warning list for content that cannot be represented.
 
@@ -91,7 +91,7 @@ the same `FillRangeCommand` used by keyboard filling.
 
 ## Recovery And Distribution
 
-Dirty workbooks are serialized atomically through the native OGrid adapter
+Dirty workbooks are serialized atomically through the native Duddy Spreadsheet adapter
 every five minutes. A small JSON sidecar identifies the source path and UTC
 timestamp; recovery loads through the normal versioned file boundary. Normal
 save removes the matching snapshot. Diagnostics use a bounded rotating log.

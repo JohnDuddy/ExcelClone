@@ -9,12 +9,12 @@ import pytest
 from openpyxl import Workbook as OpenPyxlWorkbook
 from PySide6.QtWidgets import QApplication
 
-from excelclone.commands.base import CommandHistory
-from excelclone.commands.edits import SetRangeCommand
-from excelclone.core.engine import FormulaEngine
-from excelclone.core.workbook import Workbook
-from excelclone.io.xlsx_reader import read_xlsx
-from excelclone.ui.grid_model import GridModel
+from duddysheet.commands.base import CommandHistory
+from duddysheet.commands.edits import SetRangeCommand
+from duddysheet.core.engine import FormulaEngine
+from duddysheet.core.workbook import Workbook
+from duddysheet.io.xlsx_reader import read_xlsx
+from duddysheet.ui.grid_model import GridModel
 
 
 @pytest.mark.performance
@@ -27,7 +27,7 @@ def test_cold_application_launch_is_under_three_seconds() -> None:
             sys.executable,
             "-c",
             (
-                "from excelclone.app import create_application;"
+                "from duddysheet.app import create_application;"
                 "app,window=create_application([]);"
                 "window.close()"
             ),

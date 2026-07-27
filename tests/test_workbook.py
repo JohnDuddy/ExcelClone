@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from excelclone.core.refs import CellReference, RangeReference
-from excelclone.core.workbook import Workbook
+from duddysheet.core.refs import CellReference, RangeReference
+from duddysheet.core.workbook import Workbook
 
 
 def test_new_workbook_contains_one_active_sheet() -> None:

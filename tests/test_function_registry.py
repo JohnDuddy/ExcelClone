@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from excelclone.core.functions import FUNCTION_REGISTRY, register
+from duddysheet.core.functions import FUNCTION_REGISTRY, register
 
 
 def test_register_retains_function_help_and_execution_metadata() -> None:

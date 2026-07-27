@@ -1,4 +1,4 @@
-"""Differential backtest of OpenGrid financial calculations against Excel."""
+"""Differential backtest of Duddy Spreadsheet financial calculations against Excel."""
 
 from __future__ import annotations
 
@@ -15,22 +15,22 @@ from typing import Any
 from openpyxl import Workbook as XlsxWorkbook
 from openpyxl import load_workbook
 
-from excelclone.core.errors import SpreadsheetError
-from excelclone.core.evaluator import FormulaEvaluator
-from excelclone.core.financial_models import (
+from duddysheet.core.errors import SpreadsheetError
+from duddysheet.core.evaluator import FormulaEvaluator
+from duddysheet.core.financial_models import (
     FINANCIAL_MODEL_CATALOG,
     create_financial_model,
 )
-from excelclone.core.functions import FUNCTION_REGISTRY
-from excelclone.core.refs import CellReference, parse_a1
-from excelclone.core.workbook import Workbook
-from excelclone.io.xlsx_writer import write_xlsx
-from excelclone.io.formula_compat import to_xlsx_formula
+from duddysheet.core.functions import FUNCTION_REGISTRY
+from duddysheet.core.refs import CellReference, parse_a1
+from duddysheet.core.workbook import Workbook
+from duddysheet.io.xlsx_writer import write_xlsx
+from duddysheet.io.formula_compat import to_xlsx_formula
 
 
 @dataclass(frozen=True, slots=True)
 class FormulaCase:
-    """One Excel/OpenGrid differential formula."""
+    """One Excel/Duddy Spreadsheet differential formula."""
 
     case_id: str
     formula: str
@@ -39,7 +39,7 @@ class FormulaCase:
 
 @dataclass(frozen=True, slots=True)
 class Mismatch:
-    """One differing Excel and OpenGrid result."""
+    """One differing Excel and Duddy Spreadsheet result."""
 
     scope: str
     item: str
@@ -430,7 +430,7 @@ def _render_report(
 ) -> str:
     status = "PASS" if not mismatches else "FAIL"
     lines = [
-        "# OpenGrid Financial Backtest",
+        "# Duddy Spreadsheet Financial Backtest",
         "",
         f"- Status: **{status}**",
         f"- Microsoft Excel version: `{excel_version}`",
@@ -447,7 +447,7 @@ def _render_report(
     else:
         lines.extend(
             (
-                "| Scope | Item | Formula | OpenGrid | Excel | Difference |",
+                "| Scope | Item | Formula | Duddy Spreadsheet | Excel | Difference |",
                 "|---|---|---|---:|---:|---:|",
             )
         )

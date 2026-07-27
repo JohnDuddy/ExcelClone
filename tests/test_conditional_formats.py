@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import pytest
 
-from excelclone.core.cell import CellFormat
-from excelclone.core.conditional import (
+from duddysheet.core.cell import CellFormat
+from duddysheet.core.conditional import (
     ConditionalFormatEngine,
     ConditionalRule,
     FormatPatch,
 )
-from excelclone.core.refs import parse_a1
-from excelclone.core.workbook import Workbook
+from duddysheet.core.refs import parse_a1
+from duddysheet.core.workbook import Workbook
 
 
 def workbook_with_values() -> Workbook:
