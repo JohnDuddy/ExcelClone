@@ -88,6 +88,7 @@ from duddysheet.io.xlsx_reader import read_xlsx
 from duddysheet.io.xlsx_writer import write_xlsx
 from duddysheet.ui.delegates import CellDelegate
 from duddysheet.ui.charting import ChartPanel
+from duddysheet.ui.dialogs.about import AboutDialog
 from duddysheet.ui.dialogs.chart_wizard import ChartWizard
 from duddysheet.ui.dialogs.format_cells import FormatCellsDialog
 from duddysheet.ui.dialogs.function_help import FunctionHelpDialog
@@ -221,6 +222,8 @@ class MainWindow(QMainWindow):
             self,
         )
         self.all_functions_help_action.triggered.connect(self.insert_function)
+        self.about_action = QAction(f"About {PRODUCT_NAME}...", self)
+        self.about_action.triggered.connect(self.show_about)
         self.add_sheet_action = QAction("New Sheet", self)
         self.add_sheet_action.triggered.connect(self.add_sheet)
         self.rename_sheet_action = QAction("Rename Sheet", self)
@@ -265,6 +268,8 @@ class MainWindow(QMainWindow):
         help_menu = self.menuBar().addMenu("&Help")
         help_menu.addAction(self.financial_help_action)
         help_menu.addAction(self.all_functions_help_action)
+        help_menu.addSeparator()
+        help_menu.addAction(self.about_action)
         self.addActions(
             [
                 self.undo_action,
@@ -1005,6 +1010,10 @@ class MainWindow(QMainWindow):
     def show_financial_help(self) -> None:
         """Open the comprehensive offline financial modeling guide."""
         FinancialHelpDialog(self).exec()
+
+    def show_about(self) -> None:
+        """Open product identity, licence, and third-party attribution."""
+        AboutDialog(self).exec()
 
     def _current_reference(self) -> str:
         current = self.grid.currentIndex()
