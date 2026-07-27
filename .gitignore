@@ -20,3 +20,7 @@ licenses/*
 
 # PyInstaller build artefacts
 packaging/version_info.txt
+
+# Offline wheel cache: build artefacts, reproducible with pip. Individual
+# wheels exceed GitHub's 100 MB file limit and blocked every push.
+wheelhouse/
