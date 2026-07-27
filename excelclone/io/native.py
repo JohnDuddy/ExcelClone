@@ -385,6 +385,13 @@ def _chart_to_data(chart: ChartSpec) -> dict[str, Any]:
             if chart.series_columns is not None
             else None
         ),
+        "theme": chart.theme,
+        "show_data_labels": chart.show_data_labels,
+        "show_trendline": chart.show_trendline,
+        "highlight_extrema": chart.highlight_extrema,
+        "show_grid": chart.show_grid,
+        "secondary_axis": chart.secondary_axis,
+        "number_format": chart.number_format,
     }
 
 
@@ -402,6 +409,13 @@ def _chart_from_data(data: dict[str, Any]) -> ChartSpec:
         bool(data.get("has_headers", True)),
         data.get("category_column"),
         tuple(columns) if columns is not None else None,
+        data.get("theme", "executive"),
+        bool(data.get("show_data_labels", False)),
+        bool(data.get("show_trendline", False)),
+        bool(data.get("highlight_extrema", False)),
+        bool(data.get("show_grid", True)),
+        bool(data.get("secondary_axis", False)),
+        data.get("number_format", "auto"),
     )
 
 

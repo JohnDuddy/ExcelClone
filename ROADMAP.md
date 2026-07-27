@@ -1,11 +1,13 @@
 # Roadmap
 
-OpenGrid v1 is complete under the regression contract in `FEATURES.md`. The
-following capabilities are explicitly outside v1:
+OpenGrid M12 is complete under the regression contract in `FEATURES.md`. The
+following capabilities are explicitly outside the current product scope:
 
 - VBA and macros
 - Pivot tables
 - Power Query
+- Live market-data feeds
+- Multi-variable optimization solver
 - Real-time collaboration
 - Embedded Office objects
 

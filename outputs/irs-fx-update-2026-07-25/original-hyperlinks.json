@@ -1,0 +1,188 @@
+﻿[
+    {
+        "sheet":  "INDEX",
+        "cell":  "A6",
+        "target":  "#\u0027Property 1\u0027!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "A7",
+        "target":  "#\u0027Property 2\u0027!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "A8",
+        "target":  "#\u0027Property 3\u0027!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "A11",
+        "target":  "#\u0027Rates 2025\u0027!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "A12",
+        "target":  "#\u0027Rates 2026\u0027!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "A13",
+        "target":  "#\u0027FBAR 2025\u0027!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "A14",
+        "target":  "#\u0027FBAR 2026\u0027!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "A15",
+        "target":  "#\u0027FTC 2025\u0027!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "A16",
+        "target":  "#\u0027FTC 2026\u0027!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "A17",
+        "target":  "#\u0027Sched E 2025\u0027!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "A18",
+        "target":  "#\u0027Sched E 2026\u0027!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "B21",
+        "target":  "https://www.irs.gov/individuals/international-taxpayers/yearly-average-currency-exchange-rates",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "B22",
+        "target":  "https://www.x-rates.com/average/?from=USD\u0026to=BRL\u0026amount=1\u0026year=2026",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "B23",
+        "target":  "https://www.x-rates.com/average/?from=USD\u0026to=BRL\u0026amount=1\u0026year=2025",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "B24",
+        "target":  "https://fiscaldata.treasury.gov/datasets/treasury-reporting-rates-exchange/",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "B25",
+        "target":  "https://bsaefiling.fincen.treas.gov/",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "B26",
+        "target":  "https://www.irs.gov/forms-pubs/about-form-1116",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "B27",
+        "target":  "https://www.irs.gov/forms-pubs/about-schedule-e-form-1040",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "INDEX",
+        "cell":  "B28",
+        "target":  "https://www.irs.gov/forms-pubs/about-form-8938",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "Property 1",
+        "cell":  "A4",
+        "target":  "#INDEX!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "Property 2",
+        "cell":  "A4",
+        "target":  "#INDEX!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "Property 3",
+        "cell":  "A4",
+        "target":  "#INDEX!A1",
+        "kind":  "internal"
+    },
+    {
+        "sheet":  "Rates 2025",
+        "cell":  "A22",
+        "target":  "https://www.x-rates.com/average/?from=USD\u0026to=BRL\u0026amount=1\u0026year=2025",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "Rates 2025",
+        "cell":  "A23",
+        "target":  "https://www.irs.gov/individuals/international-taxpayers/yearly-average-currency-exchange-rates",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "Rates 2025",
+        "cell":  "A24",
+        "target":  "https://fiscaldata.treasury.gov/datasets/treasury-reporting-rates-exchange/",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "Rates 2026",
+        "cell":  "B25",
+        "target":  "https://www.irs.gov/individuals/international-taxpayers/yearly-average-currency-exchange-rates",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "Rates 2026",
+        "cell":  "B26",
+        "target":  "https://www.x-rates.com/average/?from=USD\u0026to=BRL\u0026amount=1\u0026year=2026",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "Rates 2026",
+        "cell":  "B27",
+        "target":  "https://fiscaldata.treasury.gov/datasets/treasury-reporting-rates-exchange/",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "Rates 2026",
+        "cell":  "B28",
+        "target":  "https://bsaefiling.fincen.treas.gov/",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "FBAR 2025",
+        "cell":  "A35",
+        "target":  "https://bsaefiling.fincen.treas.gov/",
+        "kind":  "external"
+    },
+    {
+        "sheet":  "FBAR 2026",
+        "cell":  "B36",
+        "target":  "https://bsaefiling.fincen.treas.gov/",
+        "kind":  "external"
+    }
+]

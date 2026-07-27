@@ -39,7 +39,7 @@ class Ribbon(QTabWidget):
                 "Find",
                 "Format Cells",
             ),
-            "Insert": ("Chart", "Rows", "Columns"),
+            "Insert": ("Quick Chart", "Chart Studio", "Rows", "Columns"),
             "Data": (
                 "Sort",
                 "Filter",
@@ -49,6 +49,14 @@ class Ribbon(QTabWidget):
                 "Text to Columns",
             ),
             "Formulas": ("Insert Function", "Recalculate", "Sheet Recalculate"),
+            "Financial": (
+                "Model Templates",
+                "Goal Seek",
+                "Sensitivity",
+                "Scenarios",
+                "Model Audit",
+                "Financial Help",
+            ),
             "View": (
                 "Freeze Panes",
                 "Split View",

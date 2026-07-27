@@ -42,12 +42,16 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M10 is complete. OpenGrid includes measured performance coverage, five-minute
-autosave and startup recovery, rotating local logs, frozen-pane overlays, split
-views, a mouse fill handle, searchable function help, generated Windows icon,
-offline wheelhouse, idempotent installer, and self-contained release ZIP.
+M12 is complete. OpenGrid includes explainable chart recommendations, Quick
+Chart, a live-preview Chart Studio, 17 analytical chart types, five themes,
+labels, trendlines, extrema, secondary axes, interactive navigation,
+PNG/SVG/PDF export, undoable editing, and lossless native chart persistence.
+The prior M11 financial modeling, the 76-calculation/12-chart Financial
+Calculations Lab, and comprehensive F1 help remain covered by the release
+regression contract.
 
 ## Known Issues
 
-No shipped v1 behavior is known to be broken. VBA, pivots, Power Query,
-collaboration, and embedded Office objects remain intentionally outside v1.
+No shipped behavior is known to be broken. VBA, pivots, Power Query, live
+market feeds, multi-variable optimization, collaboration, and embedded Office
+objects remain intentionally outside scope.

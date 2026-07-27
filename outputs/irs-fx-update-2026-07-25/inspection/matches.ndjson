@@ -1,0 +1,164 @@
+{"kind":"match","sheet":"INDEX","address":"A2","value":"Multi-Year Tax Workbook — Owner: Simone Oliveira Duddy","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"A5","value":"PROPERTIES (click to open — organized by tax year)","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"A11","value":"Rates 2025","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B11","value":"BRL/USD monthly exchange rates — 2025","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"A12","value":"Rates 2026","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B12","value":"BRL/USD monthly exchange rates — 2026","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B15","value":"Foreign Tax Credit tracker (Form 1116) — 2025","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B16","value":"Foreign Tax Credit tracker — 2026","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"A20","value":"IRS-ACCEPTED EXCHANGE RATE & FORM SOURCES","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"A21","value":"IRS Yearly Average Rates","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B21","value":"https://www.irs.gov/individuals/international-taxpayers/yearly-average-currency-exchange-rates","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"A22","value":"X-Rates Monthly Averages (2026)","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B22","value":"https://www.x-rates.com/average/?from=USD&to=BRL&amount=1&year=2026","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"A23","value":"X-Rates Monthly Averages (2025)","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B23","value":"https://www.x-rates.com/average/?from=USD&to=BRL&amount=1&year=2025","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"A24","value":"Treasury Reporting Rates (FBAR)","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B24","value":"https://fiscaldata.treasury.gov/datasets/treasury-reporting-rates-exchange/","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"A26","value":"IRS Form 1116 (Foreign Tax Credit)","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B26","value":"https://www.irs.gov/forms-pubs/about-form-1116","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"A27","value":"IRS Schedule E (Rental Income)","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B27","value":"https://www.irs.gov/forms-pubs/about-schedule-e-form-1040","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"A28","value":"IRS Form 8938 (FATCA)","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B28","value":"https://www.irs.gov/forms-pubs/about-form-8938","formula":null,"match":"value"}
+{"kind":"match","sheet":"INDEX","address":"B33","value":"Cross-sheet links (pulls from Rates tabs)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"A11","value":"Acquisition Cost (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"A13","value":"Land Value (BRL) [1%]:","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"A14","value":"Building Value (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"B17","value":"Rent BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"C17","value":"Rate","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"D17","value":"Rent USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"I17","value":"Rent BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"J17","value":"Rate","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"K17","value":"Rent USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"P17","value":"Rent BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"Q17","value":"Rate","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"R17","value":"Rent USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"A32","value":"RENTAL EXPENSES (Annual BRL)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"B33","value":"Total BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"C33","value":"Rate(Avg)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"D33","value":"Total USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"I33","value":"Total BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"J33","value":"Rate(Avg)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"K33","value":"Total USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"P33","value":"Total BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"Q33","value":"Rate(Avg)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"R33","value":"Total USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"A35","value":"IPTU (Property Tax)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"A37","value":"Repairs & Maintenance","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"A47","value":"Net Income (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"A48","value":"Net Income (USD):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"A49","value":"Annual Depreciation (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"A50","value":"Annual Depreciation (USD):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 1","address":"A51","value":"Net After Depreciation (USD):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"A11","value":"Acquisition Cost (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"A13","value":"Land Value (BRL) [1%]:","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"A14","value":"Building Value (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"B17","value":"Rent BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"C17","value":"Rate","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"D17","value":"Rent USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"I17","value":"Rent BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"J17","value":"Rate","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"K17","value":"Rent USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"P17","value":"Rent BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"Q17","value":"Rate","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"R17","value":"Rent USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"A32","value":"RENTAL EXPENSES (Annual BRL)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"B33","value":"Total BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"C33","value":"Rate(Avg)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"D33","value":"Total USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"I33","value":"Total BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"J33","value":"Rate(Avg)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"K33","value":"Total USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"P33","value":"Total BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"Q33","value":"Rate(Avg)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"R33","value":"Total USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"A35","value":"IPTU (Property Tax)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"A37","value":"Repairs & Maintenance","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"A47","value":"Net Income (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"A48","value":"Net Income (USD):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"A49","value":"Annual Depreciation (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"A50","value":"Annual Depreciation (USD):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 2","address":"A51","value":"Net After Depreciation (USD):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"A11","value":"Acquisition Cost (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"A13","value":"Land Value (BRL) [1%]:","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"A14","value":"Building Value (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"B17","value":"Rent BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"C17","value":"Rate","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"D17","value":"Rent USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"I17","value":"Rent BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"J17","value":"Rate","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"K17","value":"Rent USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"P17","value":"Rent BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"Q17","value":"Rate","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"R17","value":"Rent USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"A32","value":"RENTAL EXPENSES (Annual BRL)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"B33","value":"Total BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"C33","value":"Rate(Avg)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"D33","value":"Total USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"I33","value":"Total BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"J33","value":"Rate(Avg)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"K33","value":"Total USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"P33","value":"Total BRL","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"Q33","value":"Rate(Avg)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"R33","value":"Total USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"A35","value":"IPTU (Property Tax)","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"A37","value":"Repairs & Maintenance","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"A47","value":"Net Income (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"A48","value":"Net Income (USD):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"A49","value":"Annual Depreciation (BRL):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"A50","value":"Annual Depreciation (USD):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Property 3","address":"A51","value":"Net After Depreciation (USD):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2025","address":"A1","value":"BRL/USD Exchange Rates — 2025","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2025","address":"A2","value":"Source: X-Rates monthly averages (BRL per 1 USD). IRS allows annual average or monthly rates.","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2025","address":"C4","value":"BRL per 1 USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2025","address":"D4","value":"1 BRL in USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2025","address":"A21","value":"• For FBAR: Use Treasury rate as of 12/31/2025. For Schedule E: annual average or monthly rate acceptable.","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2025","address":"A22","value":"• WEBSITE: X-Rates https://www.x-rates.com/average/?from=USD&to=BRL&amount=1&year=2025","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2025","address":"A23","value":"• WEBSITE: IRS Exchange Rates https://www.irs.gov/individuals/international-taxpayers/yearly-average-currency-exchange-rates","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2025","address":"A24","value":"• WEBSITE: Treasury Rates https://fiscaldata.treasury.gov/datasets/treasury-reporting-rates-exchange/","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"A1","value":"BRL/USD Exchange Rates — 2026","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"A2","value":"Source: X-Rates monthly averages (BRL per 1 USD), inverted from BRL->USD page. Jan-May 2026 actuals as of 06/01/2026; Jun-Dec pending month-end. IRS allows annual average or monthly rates.","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"C4","value":"BRL per 1 USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"D4","value":"1 BRL in USD","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"A21","value":"• For FBAR: Use Treasury rate as of 12/31 of the tax year.","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"A22","value":"• For Schedule E: annual average or monthly rate acceptable.","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"A24","value":"IRS-ACCEPTED EXCHANGE RATE SOURCES:","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"A25","value":"• IRS Yearly Average Rates:","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"B25","value":"https://www.irs.gov/individuals/international-taxpayers/yearly-average-currency-exchange-rates","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"A26","value":"• X-Rates Monthly Averages:","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"B26","value":"https://www.x-rates.com/average/?from=USD&to=BRL&amount=1&year=2026","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"A27","value":"• Treasury Reporting Rates (FBAR):","formula":null,"match":"value"}
+{"kind":"match","sheet":"Rates 2026","address":"B27","value":"https://fiscaldata.treasury.gov/datasets/treasury-reporting-rates-exchange/","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2025","address":"B14","value":"Acct 1 Max (BRL)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2025","address":"C14","value":"Acct 2 Max (BRL)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2025","address":"D14","value":"Total Max (BRL)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2025","address":"E14","value":"Exchange Rate","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2025","address":"F14","value":"Acct 1 Max (USD)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2025","address":"G14","value":"Acct 2 Max (USD)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2025","address":"H14","value":"Total Max (USD)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2025","address":"A34","value":"• For FBAR: use Treasury exchange rate as of 12/31/2025","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2026","address":"B14","value":"Acct 1 Max (BRL)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2026","address":"C14","value":"Acct 2 Max (BRL)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2026","address":"D14","value":"Total Max (BRL)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2026","address":"E14","value":"Exchange Rate","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2026","address":"F14","value":"Acct 1 Max (USD)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2026","address":"G14","value":"Acct 2 Max (USD)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2026","address":"H14","value":"Total Max (USD)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FBAR 2026","address":"A34","value":"• For FBAR: use Treasury exchange rate as of 12/31/2026","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A1","value":"Foreign Tax Credit Tracker — Form 1116 (2025)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A2","value":"Track Brazilian taxes paid to offset U.S. tax liability","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A4","value":"Tax Type","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"C4","value":"Amount Paid (BRL)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"D4","value":"Exchange Rate (Avg)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"E4","value":"Amount Paid (USD)","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A11","value":"Municipal Taxes","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A12","value":"Municipal Taxes","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A13","value":"Municipal Taxes","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A14","value":"Other Brazilian Tax","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A15","value":"Other Brazilian Tax","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A16","value":"TOTAL FOREIGN TAXES PAID","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A19","value":"• File Form 1116 to claim Foreign Tax Credit","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A20","value":"• FTC is almost always more beneficial than deducting foreign taxes on Schedule A","formula":null,"match":"value"}
+{"kind":"match","sheet":"FTC 2025","address":"A21","value":"• Cannot claim both FTC and Schedule A deduction for same taxes","formula":null,"match":"value"}
+{"kind":"notice","message":"Truncated: omitted 41 lines. Increase maxChars, narrow range, or use tableMaxRows/tableMaxCols/tableMaxCellChars."}

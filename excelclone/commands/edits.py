@@ -400,6 +400,30 @@ class AddChartCommand(_WorkbookSnapshotCommand):
 
 
 @dataclass
+class UpdateChartCommand(_WorkbookSnapshotCommand):
+    """Replace an existing chart specification by ID."""
+
+    sheet_name: str
+    chart: ChartSpec
+
+    @property
+    def description(self) -> str:
+        return "Update chart"
+
+    def do(self) -> None:
+        self._capture()
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        for index, item in enumerate(sheet.charts):
+            if (
+                isinstance(item, ChartSpec)
+                and item.chart_id == self.chart.chart_id
+            ):
+                sheet.charts[index] = self.chart
+                return
+        raise KeyError(f"Unknown chart ID: {self.chart.chart_id}")
+
+
+@dataclass
 class RemoveChartCommand(_WorkbookSnapshotCommand):
     """Remove a sheet chart by ID."""
 

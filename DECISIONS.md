@@ -132,6 +132,15 @@ caches to categories and series each time a panel refreshes. Rendering and PNG
 export share one Qt/matplotlib path, while core chart behavior remains usable
 in file and structural tests without a `QApplication`.
 
+## 2026-07-26 - Explainable chart intelligence
+
+Chart recommendations remain deterministic core rules rather than opaque UI
+heuristics or a network service. They inspect category type, series count,
+observation count, sign pattern, and range shape, then return ranked chart keys
+with a plain-language reason. Quick Chart and Chart Studio consume the same
+recommendations and immutable `ChartSpec`; preview, panel rendering, export,
+undo, and persistence therefore cannot drift into separate chart dialects.
+
 ## 2026-07-25 — Frozen panes as shared virtual views
 
 Frozen panes use three clipped table overlays that share the primary
@@ -162,3 +171,18 @@ their workbook location and optional tooltip. This lets XLSX, native OGrid,
 clipboard, fill, structural edits, and undo preserve links through the same
 cell value seam. OGrid schema 2 adds the optional hyperlink field, with a
 no-op v1 migration treating its absence as an unlinked cell.
+
+## 2026-07-25 - Clone-based financial what-if analysis
+
+Goal Seek, scenarios, and sensitivity tables run against `Workbook.copy()`
+rather than temporarily editing and restoring the live workbook. This prevents
+intermediate guesses from polluting undo history, volatile caches, chart
+refreshes, or dirty state. Only a confirmed scalar result or completed table
+crosses the command seam.
+
+## 2026-07-25 - Built-in models as workbook factories
+
+Financial models are Python factories that produce ordinary sparse workbooks,
+not opaque binary templates or a second persistence schema. Their assumptions,
+formulas, formats, and checks therefore use the same engine and file adapters
+as user-created content, and each factory is recalculated and audited in tests.

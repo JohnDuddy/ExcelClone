@@ -69,6 +69,12 @@ def rich_workbook() -> Workbook:
             parse_a1("A1:B2"),
             "line",
             title="Sales",
+            theme="editorial",
+            show_data_labels=True,
+            show_trendline=True,
+            highlight_extrema=True,
+            secondary_axis=True,
+            number_format="currency",
         )
     )
     apply_filter(

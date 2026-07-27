@@ -54,10 +54,36 @@ deletes, ranges, and rich pastes.
 
 ## Charts
 
-Headless tests prove category/series extraction and live value changes. Qt
-tests render every supported chart type offscreen, export PNGs, validate wizard
-output, and inspect a bar height before and after a grid edit to prove panel
-refresh behavior.
+Headless tests prove category/series extraction, missing-value gaps,
+contiguous-range expansion, header detection, explainable recommendation
+ranking, live value changes, and undoable chart updates. Qt tests render all 17
+chart types offscreen under warnings-as-errors, export PNG/SVG/PDF, validate
+Chart Studio controls and preview, exercise one-click Quick Chart, and inspect a
+bar height before and after a grid edit to prove panel refresh behavior.
+
+## Financial Modeling
+
+`test_financial_functions.py` checks known results and cross-function identities
+such as price/yield round trips and cumulative payment decomposition.
+`test_financial_analysis.py` verifies Goal Seek, scenarios, sensitivity tables,
+audit ordering, and source-workbook immutability. `test_financial_models.py`
+recalculates every built-in model, rejects formula errors, validates integrity
+checks, confirms primary outputs, and verifies the Financial Calculations Lab's
+76 calculations, 12 chart datasets, and native round trip. Qt tests cover
+dialog parsing, Financial ribbon exposure, model installation, and undoable
+table output.
+`test_financial_help.py` requires every registered financial function to have
+detailed curated help and a parseable example; UI tests cover search, category
+filters, tutorials, quick-reference content, model guidance, clipboard copying,
+F1, and Help/ribbon discoverability.
+
+`backtest_financial.py` exports representative formulas and all seven generated
+models, recalculates them through desktop Microsoft Excel, and compares cached
+results cell by cell:
+
+```powershell
+python backtest_financial.py --output outputs\financial-backtest-final.md
+```
 
 ## Distribution Acceptance
 

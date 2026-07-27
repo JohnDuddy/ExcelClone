@@ -52,10 +52,31 @@ workbook without stale graph edges.
 ## Charts
 
 `ChartSpec` is immutable workbook metadata; `chart_data` reads current cached
-values and emits renderer-neutral categories and numeric series. The Qt chart
-panel owns matplotlib figures and refreshes from those values after commands or
-recalculation. This keeps matplotlib and Qt out of core and makes live binding
-observable without pixel tests.
+values and emits renderer-neutral categories and numeric series.
+`recommend_charts` scores that shape using deterministic, explainable rules;
+`expand_chart_range` discovers the connected sparse data island around a single
+selection. Neither service depends on Qt or matplotlib.
+
+The Qt Chart Studio owns live preview and editing, while `ChartPanel` owns the
+interactive matplotlib figure, navigation, clipboard, and PNG/SVG/PDF export.
+Both call the same renderer. Commands add, replace, or remove complete immutable
+specifications, preserving undo, native persistence, structural translation,
+and live refresh without duplicating source data.
+
+## Financial Analysis
+
+Financial formulas remain ordinary registry functions with shared day-count
+and coupon-schedule helpers. Goal Seek, scenarios, and sensitivity tables are
+headless services that probe a copied `Workbook` through a private
+`FormulaEngine`; exploratory values therefore never enter the live dependency
+graph. The UI applies only a confirmed Goal Seek result or completed output
+matrix through `SetCellCommand` or `SetRangeCommand`.
+
+Built-in models are factories that return normal workbooks containing values,
+formulas, and formats. They do not introduce a separate template file format or
+runtime dependency. A final dependency-index rebuild recalculates every model
+before it reaches the UI. Model audit consumes only public workbook cells and
+parser reference metadata, keeping Qt out of diagnostics.
 
 ## Performance Shape
 

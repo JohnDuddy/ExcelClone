@@ -24,7 +24,7 @@ complete.
 - [x] AST evaluator with coercion, references, arrays, and Excel date serials (`test_evaluator.py`)
 - [x] Incremental bidirectional dependency graph (`test_depgraph.py`, `test_formula_engine.py`)
 - [x] Circular-reference and formula-error behavior (`test_formula_engine.py`, `test_evaluator.py`)
-- [x] Registered 162-function library with help metadata and per-function tests (`test_functions_all.py`, `test_function_edges.py`)
+- [x] Registered 196-function library with help metadata and per-function tests (`test_functions_all.py`, `test_function_edges.py`, `test_financial_functions.py`)
 - [x] Dynamic-array spill ownership, blocking, and recovery (`test_spills.py`)
 - [x] Volatile function recalculation (`test_spills.py`)
 - [x] 200-case Microsoft Excel cached-value cross-check (`test_golden_workbook.py`)
@@ -60,13 +60,25 @@ complete.
 - [x] Remove duplicates and text-to-columns (`test_data_tools.py`, `test_commands.py`)
 - [x] Sheet rename/move/duplicate/hide/tab-color commands (`test_commands.py`)
 - [x] Undo restores exact state across 50 mixed operations (`test_commands.py`)
-- [x] Column, bar, line, pie, scatter, area, and combo charts (`test_chart_ui.py`)
+- [x] Seventeen chart types including stacked, histogram, box, waterfall, heatmap, radar, donut, and combo charts (`test_chart_ui.py`)
 - [x] Range-bound chart data live-updates after recalculation/edit (`test_charts.py`, `test_chart_ui.py`)
-- [x] Chart wizard, movable panels, and PNG export (`test_chart_ui.py`)
-- [x] Undoable chart add/remove and OGrid persistence (`test_charts.py`, `test_native_io.py`)
+- [x] Ranked chart recommendations, contiguous-range expansion, Quick Chart, and live-preview Chart Studio (`test_charts.py`, `test_chart_ui.py`)
+- [x] Professional themes, labels, trendlines, extrema, secondary axes, zoom/pan, clipboard copy, and PNG/SVG/PDF export (`test_chart_ui.py`)
+- [x] Undoable chart add/update/remove and complete OGrid persistence (`test_charts.py`, `test_native_io.py`)
 
 ## M10 Distribution
 
 - [x] Autosave, crash recovery, rotating logs, and performance targets (`test_autosave.py`, `test_performance.py`, `test_polish_ui.py`)
 - [x] Idempotent offline Windows installer and desktop shortcut (`test_distribution.py`)
 - [x] Self-contained `dist/ExcelClone.zip` (`test_distribution.py`, clean-install acceptance)
+
+## M11 Financial Modeling
+
+- [x] 46-function financial library covering loans, cash flows, rates, depreciation, coupon securities, discount securities, and Treasury bills (`test_functions_all.py`, `test_financial_functions.py`)
+- [x] Non-mutating Goal Seek with optional bracketed solve and confirmed undoable application (`test_financial_analysis.py`, `test_financial_ui.py`)
+- [x] Named scenario analysis and one-/two-variable sensitivity tables calculated on workbook clones (`test_financial_analysis.py`)
+- [x] Formula-error, circular, blank-precedent, stale-cache, and embedded-constant model audit (`test_financial_analysis.py`, `test_financial_ui.py`)
+- [x] Editable DCF, three-statement, LBO, loan, rental-property, and budget/forecast models with live outputs and checks (`test_financial_models.py`)
+- [x] Eight-sheet Financial Calculations Lab with all 46 financial functions, 30 common metrics, synthetic inputs, and 12 editable charts (`test_financial_models.py`)
+- [x] Financial ribbon/menu, validated dialogs, undoable output tables, and dirty-workbook template replacement warning (`test_financial_ui.py`)
+- [x] F1 offline financial help with complete 46-function coverage, searchable categories, copyable examples, nine tutorials, quick reference, model instructions, and Help/ribbon access (`test_financial_help.py`, `test_financial_ui.py`)

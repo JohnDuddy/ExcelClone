@@ -1,9 +1,9 @@
 # OpenGrid
 
 OpenGrid is a personal, offline spreadsheet application for Windows 11. It
-provides an Excel-sized virtual grid, formulas, charts, formatting, data tools,
-and `.xlsx`, `.csv`, `.tsv`, and lossless `.ogrid` files without requiring
-Microsoft Office or an internet connection.
+provides an Excel-sized virtual grid, formulas, financial modeling, charts,
+formatting, data tools, and `.xlsx`, `.csv`, `.tsv`, and lossless `.ogrid`
+files without requiring Microsoft Office or an internet connection.
 
 ## Install
 
@@ -43,7 +43,7 @@ python run.py
 ## Formula Reference
 
 Open **Formulas > Insert Function** for searchable signatures and descriptions
-for all 162 registered functions.
+for all 196 registered functions.
 
 | Category | Functions |
 |---|---|
@@ -53,12 +53,62 @@ for all 162 registered functions.
 | Text | `CONCAT`, `TEXTJOIN`, `LEFT`, `RIGHT`, `MID`, `FIND`, `SEARCH`, `SUBSTITUTE`, `TEXT`, `VALUE`, `TEXTBEFORE`, `TEXTAFTER` |
 | Lookup and arrays | `VLOOKUP`, `HLOOKUP`, `XLOOKUP`, `INDEX`, `MATCH`, `XMATCH`, `OFFSET`, `INDIRECT`, `UNIQUE`, `SORT`, `FILTER`, `TRANSPOSE` |
 | Date and time | `TODAY`, `NOW`, `DATE`, `TIME`, `YEAR`, `MONTH`, `DAY`, `WEEKDAY`, `EOMONTH`, `DATEDIF`, `NETWORKDAYS`, `WORKDAY`, `YEARFRAC` |
-| Financial | `PMT`, `PPMT`, `IPMT`, `PV`, `FV`, `NPV`, `IRR`, `XNPV`, `XIRR`, `RATE`, `NPER`, `SLN` |
+| Financial | Annuities and loans; periodic and irregular cash-flow returns; effective/nominal rates; cumulative interest and principal; fixed, declining, and sum-of-years depreciation; bond price, yield, duration, accrued interest, coupon dates, discount securities, Treasury bills, and fractional-dollar quotations |
 | Information | `ISBLANK`, `ISNUMBER`, `ISTEXT`, `ISERROR`, `ISERR`, `ISNA`, `ISLOGICAL`, `TYPE`, `ERROR.TYPE` |
 
 Dynamic-array results spill into adjacent cells and report `#SPILL!` if a
 target is occupied. Formula errors propagate as spreadsheet values rather than
 crashing the application.
+
+## Charts And Visual Analysis
+
+The **Insert** ribbon offers two chart paths:
+
+- **Quick Chart** expands a single selected cell to its contiguous data table,
+  detects headers, ranks suitable visualizations, and creates the best match in
+  one click.
+- **Chart Studio** shows five explained recommendations beside a live preview,
+  then exposes data, design, theme, label, trendline, extrema, grid, legend,
+  number-format, and secondary-axis controls.
+
+Seventeen live chart types are available: clustered and stacked columns/bars,
+line, step, area, stacked area, pie, donut, scatter, histogram, box-and-whisker,
+waterfall, heatmap, radar, and column/line combo. Charts update after edits or
+recalculation, remain bound through row/column changes and sheet renames, and
+can be edited with undo/redo. Panels include zoom/pan, clipboard copying, and
+print-quality PNG, SVG, or PDF export.
+
+## Financial Modeling
+
+Open the **Financial** ribbon tab or menu for the modeling toolkit:
+
+- **Financial Help** (or `F1`) opens the complete offline guide with searchable
+  reference pages for all 46 financial functions, copyable examples, nine
+  modeling tutorials, sign/rate/day-count quick-reference tables,
+  troubleshooting, and instructions for each built-in model.
+- **Model Templates** creates an editable DCF, three-statement forecast, LBO,
+  loan amortization, rental property, budget/forecast, or Financial
+  Calculations Lab workbook. The lab provides synthetic inputs, 76 live
+  calculations, and 12 editable charts across four galleries. Templates use
+  conventional blue/yellow assumptions, green cross-sheet links, complete
+  schedules, output summaries, and model checks.
+- **Goal Seek** solves one numeric input for a target formula on a cloned
+  workbook. The live input changes only after confirmation and can be undone.
+- **Sensitivity** calculates one- or two-variable data tables and writes the
+  result as one undoable range edit.
+- **Scenarios** evaluates named assumption sets against selected output cells
+  without changing source assumptions, then writes a comparison table.
+- **Model Audit** recalculates the workbook and prioritizes formula errors,
+  circulars, blank direct precedents, uncalculated formulas, and embedded
+  constants that merit review.
+
+The financial library includes 46 worksheet functions across loans, cash
+flows, rates, depreciation, coupon securities, discount securities, and
+Treasury bills. OpenGrid remains offline and deterministic: it does not ship
+VBA, pivots, Power Query, live market feeds, or a multi-variable optimization
+solver.
+
+The guide is also available from **Help > Financial Functions Guide**.
 
 ## Files And Recovery
 

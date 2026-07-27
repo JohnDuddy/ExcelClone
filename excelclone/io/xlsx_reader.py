@@ -17,6 +17,7 @@ from excelclone.core.engine import FormulaEngine
 from excelclone.core.refs import CellReference, parse_a1
 from excelclone.core.tokenizer import FormulaSyntaxError
 from excelclone.core.workbook import Workbook
+from excelclone.io.formula_compat import from_xlsx_formula
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,10 +73,13 @@ def _read_worksheet(worksheet: Any, sheet: Any, warnings: list[str]) -> None:
         hyperlink = _read_hyperlink(cell)
         if cell.value is None and cell_format.is_default and hyperlink is None:
             continue
+        value = cell.value
+        if isinstance(value, str) and value.startswith("="):
+            value = from_xlsx_formula(value)
         sheet.set_cell(
             cell.row - 1,
             cell.column - 1,
-            cell.value,
+            value,
             cell_format=cell_format,
             hyperlink=hyperlink,
         )
@@ -182,6 +186,8 @@ def _read_cell_format(cell: Any) -> CellFormat:
 
 
 def _read_border(side: Any) -> BorderStyle:
+    if side is None:
+        return BorderStyle()
     return BorderStyle(
         side.style or "none",
         _read_color(side.color, "#000000") or "#000000",

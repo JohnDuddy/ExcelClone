@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from openpyxl import load_workbook
+from openpyxl import Workbook as OpenPyxlWorkbook, load_workbook
 from openpyxl.chart import BarChart, Reference
+from openpyxl.styles import Border, Side
 
 from excelclone.core.cell import BorderStyle, CellFormat
 from excelclone.core.engine import FormulaEngine
@@ -124,6 +125,28 @@ def test_written_xlsx_reopens_with_openpyxl_and_requests_recalculation(tmp_path)
     package.close()
 
 
+def test_xlsx_translates_future_function_prefixes_without_changing_text(tmp_path) -> None:
+    path = tmp_path / "future-functions.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active_sheet
+    sheet.set_cell(0, 0, '=RRI(10,100,200)&" RRI(""text"")"')
+    sheet.set_cell(1, 0, "=PDURATION(0.08,100,200)")
+
+    write_xlsx(workbook, path)
+    package = load_workbook(path, data_only=False)
+
+    assert package.active["A1"].value == (
+        '=_xlfn.RRI(10,100,200)&" RRI(""text"")"'
+    )
+    assert package.active["A2"].value == "=_xlfn.PDURATION(0.08,100,200)"
+    package.close()
+
+    loaded = read_xlsx(path).workbook.active_sheet
+    assert loaded.get_cell(0, 0).raw_input == '=RRI(10,100,200)&" RRI(""text"")"'
+    assert loaded.get_cell(1, 0).raw_input == "=PDURATION(0.08,100,200)"
+    assert loaded.get_cell(1, 0).display_value > 0
+
+
 def test_xlsx_reader_returns_warnings_for_dropped_chart_content(tmp_path) -> None:
     path = tmp_path / "chart.xlsx"
     write_xlsx(xlsx_workbook(), path)
@@ -137,3 +160,19 @@ def test_xlsx_reader_returns_warnings_for_dropped_chart_content(tmp_path) -> Non
     result = read_xlsx(path)
 
     assert any("chart" in warning.lower() for warning in result.warnings)
+
+
+def test_xlsx_reader_accepts_missing_individual_border_sides(tmp_path) -> None:
+    path = tmp_path / "missing-border-side.xlsx"
+    package = OpenPyxlWorkbook()
+    cell = package.active["A1"]
+    cell.value = "partial border"
+    cell.border = Border(right=Side(style="thin", color="FF123456"))
+    package.save(path)
+    package.close()
+
+    result = read_xlsx(path)
+    cell_format = result.workbook.active_sheet.get_cell(0, 0).format
+
+    assert cell_format.left_border == BorderStyle()
+    assert cell_format.right_border == BorderStyle("thin", "#123456")

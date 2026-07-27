@@ -1,13 +1,23 @@
 from __future__ import annotations
 
+import math
+from datetime import date
+
 from excelclone.commands.base import CommandHistory
 from excelclone.commands.edits import (
     AddChartCommand,
     InsertRowsCommand,
     RemoveChartCommand,
     RenameSheetCommand,
+    UpdateChartCommand,
 )
-from excelclone.core.chart import ChartSpec, chart_data
+from excelclone.core.chart import (
+    ChartSpec,
+    chart_data,
+    detect_chart_headers,
+    expand_chart_range,
+    recommend_charts,
+)
 from excelclone.core.engine import FormulaEngine
 from excelclone.core.refs import parse_a1
 from excelclone.core.workbook import Workbook
@@ -104,3 +114,119 @@ def test_chart_binding_translates_with_structural_edit_and_sheet_rename() -> Non
     assert workbook.active_sheet.charts[0].source_range.to_a1() == "A1:C5"
     RenameSheetCommand(engine, "Sheet1", "Data").do()
     assert workbook.active_sheet.charts[0].sheet_name == "Data"
+
+
+def test_single_cell_chart_selection_expands_to_contiguous_data_only() -> None:
+    workbook = chart_workbook()
+    workbook.active_sheet.set_cell(10, 10, "unrelated")
+
+    expanded = expand_chart_range(
+        workbook,
+        "Sheet1",
+        parse_a1("B2:B2"),
+    )
+
+    assert expanded.to_a1() == "A1:C4"
+
+
+def test_chart_recommendations_are_ranked_by_data_shape() -> None:
+    numeric = Workbook()
+    for row, values in enumerate(((1, 2, 4), (2, 4, 8), (3, 6, 12))):
+        for column, value in enumerate(values):
+            numeric.active_sheet.set_cell(row, column, value)
+    numeric_types = [
+        item.chart_type
+        for item in recommend_charts(
+            numeric,
+            "Sheet1",
+            parse_a1("A1:C3"),
+            has_headers=False,
+        )
+    ]
+
+    dated = Workbook()
+    for row, values in enumerate(
+        (
+            ("Date", "Revenue"),
+            (date(2026, 1, 1), 10),
+            (date(2026, 2, 1), 12),
+            (date(2026, 3, 1), 15),
+        )
+    ):
+        for column, value in enumerate(values):
+            dated.active_sheet.set_cell(row, column, value)
+    dated_types = [
+        item.chart_type
+        for item in recommend_charts(
+            dated,
+            "Sheet1",
+            parse_a1("A1:B4"),
+        )
+    ]
+
+    assert numeric_types[0] == "scatter"
+    assert dated_types[0] == "line"
+    assert detect_chart_headers(dated, "Sheet1", parse_a1("A1:B4"))
+    assert not detect_chart_headers(numeric, "Sheet1", parse_a1("A1:C3"))
+
+
+def test_waterfall_and_heatmap_recommendations_cover_analytical_shapes() -> None:
+    bridge = Workbook()
+    for row, values in enumerate(
+        (("Stage", "Change"), ("Start", 100), ("Cost", -35), ("Growth", 20))
+    ):
+        for column, value in enumerate(values):
+            bridge.active_sheet.set_cell(row, column, value)
+    dense = Workbook()
+    for row in range(6):
+        for column in range(6):
+            dense.active_sheet.set_cell(
+                row,
+                column,
+                f"H{column}" if row == 0 else row * (column + 1),
+            )
+
+    bridge_choice = recommend_charts(
+        bridge,
+        "Sheet1",
+        parse_a1("A1:B4"),
+    )[0]
+    dense_choice = recommend_charts(
+        dense,
+        "Sheet1",
+        parse_a1("A1:F6"),
+    )[0]
+
+    assert bridge_choice.chart_type == "waterfall"
+    assert dense_choice.chart_type == "heatmap"
+
+
+def test_chart_missing_values_remain_gaps_instead_of_becoming_zero() -> None:
+    workbook = chart_workbook()
+    workbook.active_sheet.set_cell(2, 1, "not available")
+    spec = ChartSpec("gaps", "Sheet1", parse_a1("A1:B4"), "line")
+
+    data = chart_data(workbook, spec)
+
+    assert math.isnan(data.series[0].values[1])
+
+
+def test_chart_updates_are_undoable() -> None:
+    workbook = chart_workbook()
+    engine = FormulaEngine(workbook)
+    history = CommandHistory()
+    original = ChartSpec("sales", "Sheet1", parse_a1("A1:C4"), "column")
+    updated = ChartSpec(
+        "sales",
+        "Sheet1",
+        parse_a1("A1:C4"),
+        "heatmap",
+        theme="editorial",
+        show_data_labels=True,
+    )
+
+    history.execute(AddChartCommand(engine, "Sheet1", original))
+    history.execute(UpdateChartCommand(engine, "Sheet1", updated))
+    assert workbook.active_sheet.charts == [updated]
+    history.undo()
+    assert workbook.active_sheet.charts == [original]

@@ -1,0 +1,340 @@
+{"kind":"formula","sheet":"Property 1","address":"B13","formula":"=IF(ISNUMBER(B11),0.01*B11,\"\")"}
+{"kind":"formula","sheet":"Property 1","address":"I13","formula":"=IF(ISNUMBER(I11),0.01*I11,\"\")"}
+{"kind":"formula","sheet":"Property 1","address":"P13","formula":"=IF(ISNUMBER(P11),0.01*P11,\"\")"}
+{"kind":"formula","sheet":"Property 1","address":"B14","formula":"=IF(ISNUMBER(B11),B11-B13,\"\")"}
+{"kind":"formula","sheet":"Property 1","address":"I14","formula":"=IF(ISNUMBER(I11),I11-I13,\"\")"}
+{"kind":"formula","sheet":"Property 1","address":"P14","formula":"=IF(ISNUMBER(P11),P11-P13,\"\")"}
+{"kind":"formula","sheet":"Property 1","address":"C18","formula":"='Rates 2025'!C5"}
+{"kind":"formula","sheet":"Property 1","address":"D18","formula":"=IF(OR(B18=\"\",C18=\"\"),\"\",B18/C18)"}
+{"kind":"formula","sheet":"Property 1","address":"J18","formula":"='Rates 2026'!C5"}
+{"kind":"formula","sheet":"Property 1","address":"K18","formula":"=IF(OR(I18=\"\",J18=\"\"),\"\",I18/J18)"}
+{"kind":"formula","sheet":"Property 1","address":"R18","formula":"=IF(OR(P18=\"\",Q18=\"\"),\"\",P18/Q18)"}
+{"kind":"formula","sheet":"Property 1","address":"C19","formula":"='Rates 2025'!C6"}
+{"kind":"formula","sheet":"Property 1","address":"J19","formula":"='Rates 2026'!C6"}
+{"kind":"formula","sheet":"Property 1","address":"C20","formula":"='Rates 2025'!C7"}
+{"kind":"formula","sheet":"Property 1","address":"J20","formula":"='Rates 2026'!C7"}
+{"kind":"formula","sheet":"Property 1","address":"C21","formula":"='Rates 2025'!C8"}
+{"kind":"formula","sheet":"Property 1","address":"J21","formula":"='Rates 2026'!C8"}
+{"kind":"formula","sheet":"Property 1","address":"C22","formula":"='Rates 2025'!C9"}
+{"kind":"formula","sheet":"Property 1","address":"J22","formula":"='Rates 2026'!C9"}
+{"kind":"formula","sheet":"Property 1","address":"C23","formula":"='Rates 2025'!C10"}
+{"kind":"formula","sheet":"Property 1","address":"J23","formula":"='Rates 2026'!C10"}
+{"kind":"formula","sheet":"Property 1","address":"C24","formula":"='Rates 2025'!C11"}
+{"kind":"formula","sheet":"Property 1","address":"J24","formula":"='Rates 2026'!C11"}
+{"kind":"formula","sheet":"Property 1","address":"C25","formula":"='Rates 2025'!C12"}
+{"kind":"formula","sheet":"Property 1","address":"J25","formula":"='Rates 2026'!C12"}
+{"kind":"formula","sheet":"Property 1","address":"C26","formula":"='Rates 2025'!C13"}
+{"kind":"formula","sheet":"Property 1","address":"J26","formula":"='Rates 2026'!C13"}
+{"kind":"formula","sheet":"Property 1","address":"C27","formula":"='Rates 2025'!C14"}
+{"kind":"formula","sheet":"Property 1","address":"J27","formula":"='Rates 2026'!C14"}
+{"kind":"formula","sheet":"Property 1","address":"C28","formula":"='Rates 2025'!C15"}
+{"kind":"formula","sheet":"Property 1","address":"J28","formula":"='Rates 2026'!C15"}
+{"kind":"formula","sheet":"Property 1","address":"C29","formula":"='Rates 2025'!C16"}
+{"kind":"formula","sheet":"Property 1","address":"J29","formula":"='Rates 2026'!C16"}
+{"kind":"formula","sheet":"Property 1","address":"B30","formula":"=SUM(B18:B29)"}
+{"kind":"formula","sheet":"Property 1","address":"D30","formula":"=SUM(D18:D29)"}
+{"kind":"formula","sheet":"Property 1","address":"E30","formula":"=SUM(E18:E29)"}
+{"kind":"formula","sheet":"Property 1","address":"I30","formula":"=SUM(I18:I29)"}
+{"kind":"formula","sheet":"Property 1","address":"K30","formula":"=SUM(K18:K29)"}
+{"kind":"formula","sheet":"Property 1","address":"L30","formula":"=SUM(L18:L29)"}
+{"kind":"formula","sheet":"Property 1","address":"P30","formula":"=SUM(P18:P29)"}
+{"kind":"formula","sheet":"Property 1","address":"R30","formula":"=SUM(R18:R29)"}
+{"kind":"formula","sheet":"Property 1","address":"S30","formula":"=SUM(S18:S29)"}
+{"kind":"formula","sheet":"Property 1","address":"C34","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"D34","formula":"=IF(OR(B34=\"\",C34=\"\"),\"\",B34/C34)"}
+{"kind":"formula","sheet":"Property 1","address":"J34","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"K34","formula":"=IF(OR(I34=\"\",J34=\"\"),\"\",I34/J34)"}
+{"kind":"formula","sheet":"Property 1","address":"R34","formula":"=IF(OR(P34=\"\",Q34=\"\"),\"\",P34/Q34)"}
+{"kind":"formula","sheet":"Property 1","address":"C35","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"J35","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"C36","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"J36","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"C37","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"J37","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"C38","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"J38","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"C39","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"J39","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"C40","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"J40","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"C41","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"J41","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"C42","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"J42","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"C43","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"J43","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 1","address":"B44","formula":"=SUM(B34:B43)"}
+{"kind":"formula","sheet":"Property 1","address":"D44","formula":"=SUM(D34:D43)"}
+{"kind":"formula","sheet":"Property 1","address":"I44","formula":"=SUM(I34:I43)"}
+{"kind":"formula","sheet":"Property 1","address":"K44","formula":"=SUM(K34:K43)"}
+{"kind":"formula","sheet":"Property 1","address":"P44","formula":"=SUM(P34:P43)"}
+{"kind":"formula","sheet":"Property 1","address":"R44","formula":"=SUM(R34:R43)"}
+{"kind":"formula","sheet":"Property 1","address":"B47","formula":"=B30-B44"}
+{"kind":"formula","sheet":"Property 1","address":"I47","formula":"=I30-I44"}
+{"kind":"formula","sheet":"Property 1","address":"P47","formula":"=P30-P44"}
+{"kind":"formula","sheet":"Property 1","address":"B48","formula":"=D30-D44"}
+{"kind":"formula","sheet":"Property 1","address":"I48","formula":"=K30-K44"}
+{"kind":"formula","sheet":"Property 1","address":"P48","formula":"=R30-R44"}
+{"kind":"formula","sheet":"Property 1","address":"B49","formula":"=IF(B14=\"\",\"\",B14/B12)"}
+{"kind":"formula","sheet":"Property 1","address":"I49","formula":"=IF(I14=\"\",\"\",I14/I12)"}
+{"kind":"formula","sheet":"Property 1","address":"P49","formula":"=IF(P14=\"\",\"\",P14/P12)"}
+{"kind":"formula","sheet":"Property 1","address":"B50","formula":"=IF(B49=\"\",\"\",B49/'Rates 2025'!C17)"}
+{"kind":"formula","sheet":"Property 1","address":"I50","formula":"=IF(I49=\"\",\"\",I49/'Rates 2026'!C17)"}
+{"kind":"formula","sheet":"Property 1","address":"B51","formula":"=IF(B50=\"\",D48,D48-B50)"}
+{"kind":"formula","sheet":"Property 1","address":"I51","formula":"=IF(I50=\"\",K48,K48-I50)"}
+{"kind":"formula","sheet":"Property 1","address":"P51","formula":"=IF(P50=\"\",R48,R48-P50)"}
+{"kind":"formula","sheet":"Property 2","address":"B13","formula":"=IF(ISNUMBER(B11),0.01*B11,\"\")"}
+{"kind":"formula","sheet":"Property 2","address":"I13","formula":"=IF(ISNUMBER(I11),0.01*I11,\"\")"}
+{"kind":"formula","sheet":"Property 2","address":"P13","formula":"=IF(ISNUMBER(P11),0.01*P11,\"\")"}
+{"kind":"formula","sheet":"Property 2","address":"B14","formula":"=IF(ISNUMBER(B11),B11-B13,\"\")"}
+{"kind":"formula","sheet":"Property 2","address":"I14","formula":"=IF(ISNUMBER(I11),I11-I13,\"\")"}
+{"kind":"formula","sheet":"Property 2","address":"P14","formula":"=IF(ISNUMBER(P11),P11-P13,\"\")"}
+{"kind":"formula","sheet":"Property 2","address":"C18","formula":"='Rates 2025'!C5"}
+{"kind":"formula","sheet":"Property 2","address":"D18","formula":"=IF(OR(B18=\"\",C18=\"\"),\"\",B18/C18)"}
+{"kind":"formula","sheet":"Property 2","address":"J18","formula":"='Rates 2026'!C5"}
+{"kind":"formula","sheet":"Property 2","address":"K18","formula":"=IF(OR(I18=\"\",J18=\"\"),\"\",I18/J18)"}
+{"kind":"formula","sheet":"Property 2","address":"R18","formula":"=IF(OR(P18=\"\",Q18=\"\"),\"\",P18/Q18)"}
+{"kind":"formula","sheet":"Property 2","address":"C19","formula":"='Rates 2025'!C6"}
+{"kind":"formula","sheet":"Property 2","address":"J19","formula":"='Rates 2026'!C6"}
+{"kind":"formula","sheet":"Property 2","address":"C20","formula":"='Rates 2025'!C7"}
+{"kind":"formula","sheet":"Property 2","address":"J20","formula":"='Rates 2026'!C7"}
+{"kind":"formula","sheet":"Property 2","address":"C21","formula":"='Rates 2025'!C8"}
+{"kind":"formula","sheet":"Property 2","address":"J21","formula":"='Rates 2026'!C8"}
+{"kind":"formula","sheet":"Property 2","address":"C22","formula":"='Rates 2025'!C9"}
+{"kind":"formula","sheet":"Property 2","address":"J22","formula":"='Rates 2026'!C9"}
+{"kind":"formula","sheet":"Property 2","address":"C23","formula":"='Rates 2025'!C10"}
+{"kind":"formula","sheet":"Property 2","address":"J23","formula":"='Rates 2026'!C10"}
+{"kind":"formula","sheet":"Property 2","address":"C24","formula":"='Rates 2025'!C11"}
+{"kind":"formula","sheet":"Property 2","address":"J24","formula":"='Rates 2026'!C11"}
+{"kind":"formula","sheet":"Property 2","address":"C25","formula":"='Rates 2025'!C12"}
+{"kind":"formula","sheet":"Property 2","address":"J25","formula":"='Rates 2026'!C12"}
+{"kind":"formula","sheet":"Property 2","address":"C26","formula":"='Rates 2025'!C13"}
+{"kind":"formula","sheet":"Property 2","address":"J26","formula":"='Rates 2026'!C13"}
+{"kind":"formula","sheet":"Property 2","address":"C27","formula":"='Rates 2025'!C14"}
+{"kind":"formula","sheet":"Property 2","address":"J27","formula":"='Rates 2026'!C14"}
+{"kind":"formula","sheet":"Property 2","address":"C28","formula":"='Rates 2025'!C15"}
+{"kind":"formula","sheet":"Property 2","address":"J28","formula":"='Rates 2026'!C15"}
+{"kind":"formula","sheet":"Property 2","address":"C29","formula":"='Rates 2025'!C16"}
+{"kind":"formula","sheet":"Property 2","address":"J29","formula":"='Rates 2026'!C16"}
+{"kind":"formula","sheet":"Property 2","address":"B30","formula":"=SUM(B18:B29)"}
+{"kind":"formula","sheet":"Property 2","address":"D30","formula":"=SUM(D18:D29)"}
+{"kind":"formula","sheet":"Property 2","address":"E30","formula":"=SUM(E18:E29)"}
+{"kind":"formula","sheet":"Property 2","address":"I30","formula":"=SUM(I18:I29)"}
+{"kind":"formula","sheet":"Property 2","address":"K30","formula":"=SUM(K18:K29)"}
+{"kind":"formula","sheet":"Property 2","address":"L30","formula":"=SUM(L18:L29)"}
+{"kind":"formula","sheet":"Property 2","address":"P30","formula":"=SUM(P18:P29)"}
+{"kind":"formula","sheet":"Property 2","address":"R30","formula":"=SUM(R18:R29)"}
+{"kind":"formula","sheet":"Property 2","address":"S30","formula":"=SUM(S18:S29)"}
+{"kind":"formula","sheet":"Property 2","address":"C34","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"D34","formula":"=IF(OR(B34=\"\",C34=\"\"),\"\",B34/C34)"}
+{"kind":"formula","sheet":"Property 2","address":"J34","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"K34","formula":"=IF(OR(I34=\"\",J34=\"\"),\"\",I34/J34)"}
+{"kind":"formula","sheet":"Property 2","address":"R34","formula":"=IF(OR(P34=\"\",Q34=\"\"),\"\",P34/Q34)"}
+{"kind":"formula","sheet":"Property 2","address":"C35","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"J35","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"C36","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"J36","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"C37","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"J37","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"C38","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"J38","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"C39","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"J39","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"C40","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"J40","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"C41","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"J41","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"C42","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"J42","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"C43","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"J43","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 2","address":"B44","formula":"=SUM(B34:B43)"}
+{"kind":"formula","sheet":"Property 2","address":"D44","formula":"=SUM(D34:D43)"}
+{"kind":"formula","sheet":"Property 2","address":"I44","formula":"=SUM(I34:I43)"}
+{"kind":"formula","sheet":"Property 2","address":"K44","formula":"=SUM(K34:K43)"}
+{"kind":"formula","sheet":"Property 2","address":"P44","formula":"=SUM(P34:P43)"}
+{"kind":"formula","sheet":"Property 2","address":"R44","formula":"=SUM(R34:R43)"}
+{"kind":"formula","sheet":"Property 2","address":"B47","formula":"=B30-B44"}
+{"kind":"formula","sheet":"Property 2","address":"I47","formula":"=I30-I44"}
+{"kind":"formula","sheet":"Property 2","address":"P47","formula":"=P30-P44"}
+{"kind":"formula","sheet":"Property 2","address":"B48","formula":"=D30-D44"}
+{"kind":"formula","sheet":"Property 2","address":"I48","formula":"=K30-K44"}
+{"kind":"formula","sheet":"Property 2","address":"P48","formula":"=R30-R44"}
+{"kind":"formula","sheet":"Property 2","address":"B49","formula":"=IF(B14=\"\",\"\",B14/B12)"}
+{"kind":"formula","sheet":"Property 2","address":"I49","formula":"=IF(I14=\"\",\"\",I14/I12)"}
+{"kind":"formula","sheet":"Property 2","address":"P49","formula":"=IF(P14=\"\",\"\",P14/P12)"}
+{"kind":"formula","sheet":"Property 2","address":"B50","formula":"=IF(B49=\"\",\"\",B49/'Rates 2025'!C17)"}
+{"kind":"formula","sheet":"Property 2","address":"I50","formula":"=IF(I49=\"\",\"\",I49/'Rates 2026'!C17)"}
+{"kind":"formula","sheet":"Property 2","address":"B51","formula":"=IF(B50=\"\",D48,D48-B50)"}
+{"kind":"formula","sheet":"Property 2","address":"I51","formula":"=IF(I50=\"\",K48,K48-I50)"}
+{"kind":"formula","sheet":"Property 2","address":"P51","formula":"=IF(P50=\"\",R48,R48-P50)"}
+{"kind":"formula","sheet":"Property 3","address":"B13","formula":"=IF(ISNUMBER(B11),0.01*B11,\"\")"}
+{"kind":"formula","sheet":"Property 3","address":"I13","formula":"=IF(ISNUMBER(I11),0.01*I11,\"\")"}
+{"kind":"formula","sheet":"Property 3","address":"P13","formula":"=IF(ISNUMBER(P11),0.01*P11,\"\")"}
+{"kind":"formula","sheet":"Property 3","address":"B14","formula":"=IF(ISNUMBER(B11),B11-B13,\"\")"}
+{"kind":"formula","sheet":"Property 3","address":"I14","formula":"=IF(ISNUMBER(I11),I11-I13,\"\")"}
+{"kind":"formula","sheet":"Property 3","address":"P14","formula":"=IF(ISNUMBER(P11),P11-P13,\"\")"}
+{"kind":"formula","sheet":"Property 3","address":"C18","formula":"='Rates 2025'!C5"}
+{"kind":"formula","sheet":"Property 3","address":"D18","formula":"=IF(OR(B18=\"\",C18=\"\"),\"\",B18/C18)"}
+{"kind":"formula","sheet":"Property 3","address":"J18","formula":"='Rates 2026'!C5"}
+{"kind":"formula","sheet":"Property 3","address":"K18","formula":"=IF(OR(I18=\"\",J18=\"\"),\"\",I18/J18)"}
+{"kind":"formula","sheet":"Property 3","address":"R18","formula":"=IF(OR(P18=\"\",Q18=\"\"),\"\",P18/Q18)"}
+{"kind":"formula","sheet":"Property 3","address":"C19","formula":"='Rates 2025'!C6"}
+{"kind":"formula","sheet":"Property 3","address":"J19","formula":"='Rates 2026'!C6"}
+{"kind":"formula","sheet":"Property 3","address":"C20","formula":"='Rates 2025'!C7"}
+{"kind":"formula","sheet":"Property 3","address":"J20","formula":"='Rates 2026'!C7"}
+{"kind":"formula","sheet":"Property 3","address":"C21","formula":"='Rates 2025'!C8"}
+{"kind":"formula","sheet":"Property 3","address":"J21","formula":"='Rates 2026'!C8"}
+{"kind":"formula","sheet":"Property 3","address":"C22","formula":"='Rates 2025'!C9"}
+{"kind":"formula","sheet":"Property 3","address":"J22","formula":"='Rates 2026'!C9"}
+{"kind":"formula","sheet":"Property 3","address":"C23","formula":"='Rates 2025'!C10"}
+{"kind":"formula","sheet":"Property 3","address":"J23","formula":"='Rates 2026'!C10"}
+{"kind":"formula","sheet":"Property 3","address":"C24","formula":"='Rates 2025'!C11"}
+{"kind":"formula","sheet":"Property 3","address":"J24","formula":"='Rates 2026'!C11"}
+{"kind":"formula","sheet":"Property 3","address":"C25","formula":"='Rates 2025'!C12"}
+{"kind":"formula","sheet":"Property 3","address":"J25","formula":"='Rates 2026'!C12"}
+{"kind":"formula","sheet":"Property 3","address":"C26","formula":"='Rates 2025'!C13"}
+{"kind":"formula","sheet":"Property 3","address":"J26","formula":"='Rates 2026'!C13"}
+{"kind":"formula","sheet":"Property 3","address":"C27","formula":"='Rates 2025'!C14"}
+{"kind":"formula","sheet":"Property 3","address":"J27","formula":"='Rates 2026'!C14"}
+{"kind":"formula","sheet":"Property 3","address":"C28","formula":"='Rates 2025'!C15"}
+{"kind":"formula","sheet":"Property 3","address":"J28","formula":"='Rates 2026'!C15"}
+{"kind":"formula","sheet":"Property 3","address":"C29","formula":"='Rates 2025'!C16"}
+{"kind":"formula","sheet":"Property 3","address":"J29","formula":"='Rates 2026'!C16"}
+{"kind":"formula","sheet":"Property 3","address":"B30","formula":"=SUM(B18:B29)"}
+{"kind":"formula","sheet":"Property 3","address":"D30","formula":"=SUM(D18:D29)"}
+{"kind":"formula","sheet":"Property 3","address":"E30","formula":"=SUM(E18:E29)"}
+{"kind":"formula","sheet":"Property 3","address":"I30","formula":"=SUM(I18:I29)"}
+{"kind":"formula","sheet":"Property 3","address":"K30","formula":"=SUM(K18:K29)"}
+{"kind":"formula","sheet":"Property 3","address":"L30","formula":"=SUM(L18:L29)"}
+{"kind":"formula","sheet":"Property 3","address":"P30","formula":"=SUM(P18:P29)"}
+{"kind":"formula","sheet":"Property 3","address":"R30","formula":"=SUM(R18:R29)"}
+{"kind":"formula","sheet":"Property 3","address":"S30","formula":"=SUM(S18:S29)"}
+{"kind":"formula","sheet":"Property 3","address":"C34","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"D34","formula":"=IF(OR(B34=\"\",C34=\"\"),\"\",B34/C34)"}
+{"kind":"formula","sheet":"Property 3","address":"J34","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"K34","formula":"=IF(OR(I34=\"\",J34=\"\"),\"\",I34/J34)"}
+{"kind":"formula","sheet":"Property 3","address":"R34","formula":"=IF(OR(P34=\"\",Q34=\"\"),\"\",P34/Q34)"}
+{"kind":"formula","sheet":"Property 3","address":"C35","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"J35","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"C36","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"J36","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"C37","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"J37","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"C38","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"J38","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"C39","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"J39","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"C40","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"J40","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"C41","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"J41","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"C42","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"J42","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"C43","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"J43","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"Property 3","address":"B44","formula":"=SUM(B34:B43)"}
+{"kind":"formula","sheet":"Property 3","address":"D44","formula":"=SUM(D34:D43)"}
+{"kind":"formula","sheet":"Property 3","address":"I44","formula":"=SUM(I34:I43)"}
+{"kind":"formula","sheet":"Property 3","address":"K44","formula":"=SUM(K34:K43)"}
+{"kind":"formula","sheet":"Property 3","address":"P44","formula":"=SUM(P34:P43)"}
+{"kind":"formula","sheet":"Property 3","address":"R44","formula":"=SUM(R34:R43)"}
+{"kind":"formula","sheet":"Property 3","address":"B47","formula":"=B30-B44"}
+{"kind":"formula","sheet":"Property 3","address":"I47","formula":"=I30-I44"}
+{"kind":"formula","sheet":"Property 3","address":"P47","formula":"=P30-P44"}
+{"kind":"formula","sheet":"Property 3","address":"B48","formula":"=D30-D44"}
+{"kind":"formula","sheet":"Property 3","address":"I48","formula":"=K30-K44"}
+{"kind":"formula","sheet":"Property 3","address":"P48","formula":"=R30-R44"}
+{"kind":"formula","sheet":"Property 3","address":"B49","formula":"=IF(B14=\"\",\"\",B14/B12)"}
+{"kind":"formula","sheet":"Property 3","address":"I49","formula":"=IF(I14=\"\",\"\",I14/I12)"}
+{"kind":"formula","sheet":"Property 3","address":"P49","formula":"=IF(P14=\"\",\"\",P14/P12)"}
+{"kind":"formula","sheet":"Property 3","address":"B50","formula":"=IF(B49=\"\",\"\",B49/'Rates 2025'!C17)"}
+{"kind":"formula","sheet":"Property 3","address":"I50","formula":"=IF(I49=\"\",\"\",I49/'Rates 2026'!C17)"}
+{"kind":"formula","sheet":"Property 3","address":"B51","formula":"=IF(B50=\"\",D48,D48-B50)"}
+{"kind":"formula","sheet":"Property 3","address":"I51","formula":"=IF(I50=\"\",K48,K48-I50)"}
+{"kind":"formula","sheet":"Property 3","address":"P51","formula":"=IF(P50=\"\",R48,R48-P50)"}
+{"kind":"formula","sheet":"Rates 2025","address":"D5","formula":"=1/C5"}
+{"kind":"formula","sheet":"Rates 2025","address":"C17","formula":"=AVERAGE(C5:C16)"}
+{"kind":"formula","sheet":"Rates 2026","address":"D5","formula":"=IF(C5=\"\",\"\",1/C5)"}
+{"kind":"formula","sheet":"Rates 2026","address":"C17","formula":"=IFERROR(AVERAGE(C5:C16),\"\")"}
+{"kind":"formula","sheet":"FBAR 2025","address":"D15","formula":"=B15+C15"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E15","formula":"='Rates 2025'!C5"}
+{"kind":"formula","sheet":"FBAR 2025","address":"F15","formula":"=IF(B15=\"\",0,B15/E15)"}
+{"kind":"formula","sheet":"FBAR 2025","address":"G15","formula":"=IF(C15=\"\",0,C15/E15)"}
+{"kind":"formula","sheet":"FBAR 2025","address":"H15","formula":"=IF(AND(B15=\"\",C15=\"\"),0,IF(B15=\"\",G15,IF(C15=\"\",F15,F15+G15)))"}
+{"kind":"formula","sheet":"FBAR 2025","address":"I15","formula":"=IF(H15=\"\",\"\",IF(H15>10000,\"⚠ YES - FILE FBAR\",\"No\"))"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E16","formula":"='Rates 2025'!C6"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E17","formula":"='Rates 2025'!C7"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E18","formula":"='Rates 2025'!C8"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E19","formula":"='Rates 2025'!C9"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E20","formula":"='Rates 2025'!C10"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E21","formula":"='Rates 2025'!C11"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E22","formula":"='Rates 2025'!C12"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E23","formula":"='Rates 2025'!C13"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E24","formula":"='Rates 2025'!C14"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E25","formula":"='Rates 2025'!C15"}
+{"kind":"formula","sheet":"FBAR 2025","address":"E26","formula":"='Rates 2025'!C16"}
+{"kind":"formula","sheet":"FBAR 2025","address":"B27","formula":"=MAX(B15:B26)"}
+{"kind":"formula","sheet":"FBAR 2025","address":"C27","formula":"=MAX(C15:C26)"}
+{"kind":"formula","sheet":"FBAR 2025","address":"D27","formula":"=MAX(D15:D26)"}
+{"kind":"formula","sheet":"FBAR 2025","address":"F27","formula":"=MAX(F15:F26)"}
+{"kind":"formula","sheet":"FBAR 2025","address":"G27","formula":"=MAX(G15:G26)"}
+{"kind":"formula","sheet":"FBAR 2025","address":"H27","formula":"=MAX(H15:H26)"}
+{"kind":"formula","sheet":"FBAR 2025","address":"I27","formula":"=IF(H27>10000,\"⚠ FBAR REQUIRED\",\"FBAR Not Required\")"}
+{"kind":"formula","sheet":"FBAR 2026","address":"D15","formula":"=IF(AND(B15=\"\",C15=\"\"),0,IFERROR(B15,0)+IFERROR(C15,0))"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E15","formula":"='Rates 2026'!C5"}
+{"kind":"formula","sheet":"FBAR 2026","address":"F15","formula":"=IF(B15=\"\",0,B15/E15)"}
+{"kind":"formula","sheet":"FBAR 2026","address":"G15","formula":"=IF(C15=\"\",0,C15/E15)"}
+{"kind":"formula","sheet":"FBAR 2026","address":"H15","formula":"=F15+G15"}
+{"kind":"formula","sheet":"FBAR 2026","address":"I15","formula":"=IF(H15>10000,\"⚠ YES - FILE FBAR\",\"No\")"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E16","formula":"='Rates 2026'!C6"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E17","formula":"='Rates 2026'!C7"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E18","formula":"='Rates 2026'!C8"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E19","formula":"='Rates 2026'!C9"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E20","formula":"='Rates 2026'!C10"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E21","formula":"='Rates 2026'!C11"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E22","formula":"='Rates 2026'!C12"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E23","formula":"='Rates 2026'!C13"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E24","formula":"='Rates 2026'!C14"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E25","formula":"='Rates 2026'!C15"}
+{"kind":"formula","sheet":"FBAR 2026","address":"E26","formula":"='Rates 2026'!C16"}
+{"kind":"formula","sheet":"FBAR 2026","address":"B27","formula":"=MAX(B15:B26)"}
+{"kind":"formula","sheet":"FBAR 2026","address":"C27","formula":"=MAX(C15:C26)"}
+{"kind":"formula","sheet":"FBAR 2026","address":"D27","formula":"=MAX(D15:D26)"}
+{"kind":"formula","sheet":"FBAR 2026","address":"F27","formula":"=MAX(F15:F26)"}
+{"kind":"formula","sheet":"FBAR 2026","address":"G27","formula":"=MAX(G15:G26)"}
+{"kind":"formula","sheet":"FBAR 2026","address":"H27","formula":"=MAX(H15:H26)"}
+{"kind":"formula","sheet":"FBAR 2026","address":"I27","formula":"=IF(H27>10000,\"⚠ FBAR REQUIRED\",\"No FBAR Required\")"}
+{"kind":"formula","sheet":"FTC 2025","address":"D5","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"FTC 2025","address":"E5","formula":"=IF(C5=\"\",\"\",C5/D5)"}
+{"kind":"formula","sheet":"FTC 2025","address":"D6","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"FTC 2025","address":"D7","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"FTC 2025","address":"D8","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"FTC 2025","address":"D9","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"FTC 2025","address":"D10","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"FTC 2025","address":"D11","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"FTC 2025","address":"D12","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"FTC 2025","address":"D13","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"FTC 2025","address":"D14","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"FTC 2025","address":"D15","formula":"='Rates 2025'!C17"}
+{"kind":"formula","sheet":"FTC 2025","address":"C16","formula":"=SUM(C5:C15)"}
+{"kind":"formula","sheet":"FTC 2025","address":"E16","formula":"=SUM(E5:E15)"}
+{"kind":"formula","sheet":"FTC 2026","address":"D5","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"FTC 2026","address":"E5","formula":"=IF(C5=\"\",\"\",C5/D5)"}
+{"kind":"formula","sheet":"FTC 2026","address":"D6","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"FTC 2026","address":"D7","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"FTC 2026","address":"D8","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"FTC 2026","address":"D9","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"FTC 2026","address":"D10","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"FTC 2026","address":"D11","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"FTC 2026","address":"D12","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"FTC 2026","address":"D13","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"FTC 2026","address":"D14","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"FTC 2026","address":"D15","formula":"='Rates 2026'!C17"}
+{"kind":"formula","sheet":"FTC 2026","address":"C16","formula":"=SUM(C5:C15)"}
+{"kind":"formula","sheet":"FTC 2026","address":"E16","formula":"=SUM(E5:E15)"}
+{"kind":"formula","sheet":"Sched E 2025","address":"B5","formula":"='Property 1'!D30"}
+{"kind":"formula","sheet":"Sched E 2025","address":"C5","formula":"='Property 2'!D30"}
+{"kind":"formula","sheet":"Sched E 2025","address":"D5","formula":"='Property 3'!D30"}
+{"kind":"formula","sheet":"Sched E 2025","address":"E5","formula":"=SUM(B5:D5)"}
+{"kind":"notice","message":"Truncated: omitted 92 lines. Increase maxChars, narrow range, or use tableMaxRows/tableMaxCols/tableMaxCellChars."}

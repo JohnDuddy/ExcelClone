@@ -15,6 +15,7 @@ from openpyxl.worksheet.hyperlink import Hyperlink as OpenPyxlHyperlink
 from excelclone.core.cell import BorderStyle, CellFormat
 from excelclone.core.data_tools import AutoFilter, DataValidation
 from excelclone.core.workbook import Workbook
+from excelclone.io.formula_compat import to_xlsx_formula
 
 
 def write_xlsx(workbook: Workbook, path: str | Path) -> Path:
@@ -40,7 +41,7 @@ def _write_worksheet(source: Any, worksheet: Any) -> None:
     for (row, column), source_cell in source.iter_populated():
         target = worksheet.cell(row=row + 1, column=column + 1)
         target.value = (
-            source_cell.raw_input
+            to_xlsx_formula(source_cell.raw_input)
             if source_cell.is_formula
             else source_cell.display_value
         )

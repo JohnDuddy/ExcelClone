@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from PySide6.QtCore import QModelIndex, QTimer, QUrl, Qt
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
@@ -41,19 +42,38 @@ from excelclone.commands.edits import (
     RemoveChartCommand,
     RenameSheetCommand,
     ReplaceAllCommand,
+    SetCellCommand,
     SetColumnWidthCommand,
     SetFormatCommand,
     SetFreezePanesCommand,
+    SetRangeCommand,
     SetRowHeightCommand,
     SetSheetTabColorCommand,
     SetSheetVisibilityCommand,
     SortRangeCommand,
     TextToColumnsCommand,
+    UpdateChartCommand,
+)
+from excelclone.core.chart import (
+    ChartSpec,
+    chart_data,
+    detect_chart_headers,
+    expand_chart_range,
+    infer_chart_title,
+    recommend_charts,
 )
 from excelclone.core.clipboard import RICH_CELL_MIME, decode_cell_matrix
 from excelclone.core.conditional import FormatPatch
 from excelclone.core.data_tools import find_cells
 from excelclone.core.engine import FormulaEngine
+from excelclone.core.financial_analysis import (
+    audit_financial_model,
+    evaluate_scenarios,
+    goal_seek,
+    one_variable_sensitivity,
+    two_variable_sensitivity,
+)
+from excelclone.core.financial_models import create_financial_model
 from excelclone.core.refs import CellReference, RangeReference, parse_a1
 from excelclone.core.workbook import Workbook
 from excelclone.io.csv_io import read_delimited, write_delimited
@@ -65,6 +85,14 @@ from excelclone.ui.charting import ChartPanel
 from excelclone.ui.dialogs.chart_wizard import ChartWizard
 from excelclone.ui.dialogs.format_cells import FormatCellsDialog
 from excelclone.ui.dialogs.function_help import FunctionHelpDialog
+from excelclone.ui.dialogs.financial import (
+    AuditReportDialog,
+    FinancialModelDialog,
+    GoalSeekDialog,
+    ScenarioDialog,
+    SensitivityDialog,
+)
+from excelclone.ui.dialogs.financial_help import FinancialHelpDialog
 from excelclone.ui.dialogs.data_tools import (
     FilterDialog,
     FindReplaceDialog,
@@ -166,6 +194,27 @@ class MainWindow(QMainWindow):
         self.recalculate_action = QAction("Recalculate", self)
         self.recalculate_action.setShortcut(Qt.Key.Key_F9)
         self.recalculate_action.triggered.connect(self.recalculate)
+        self.financial_model_action = QAction("New Financial Model...", self)
+        self.financial_model_action.triggered.connect(self.new_financial_model)
+        self.goal_seek_action = QAction("Goal Seek...", self)
+        self.goal_seek_action.triggered.connect(self.show_goal_seek)
+        self.sensitivity_action = QAction("Sensitivity Table...", self)
+        self.sensitivity_action.triggered.connect(self.show_sensitivity)
+        self.scenarios_action = QAction("Scenario Analysis...", self)
+        self.scenarios_action.triggered.connect(self.show_scenarios)
+        self.model_audit_action = QAction("Model Audit...", self)
+        self.model_audit_action.triggered.connect(self.show_model_audit)
+        self.financial_help_action = QAction(
+            "Financial Functions Guide...",
+            self,
+        )
+        self.financial_help_action.setShortcut(Qt.Key.Key_F1)
+        self.financial_help_action.triggered.connect(self.show_financial_help)
+        self.all_functions_help_action = QAction(
+            "All Functions / Insert Function...",
+            self,
+        )
+        self.all_functions_help_action.triggered.connect(self.insert_function)
         self.add_sheet_action = QAction("New Sheet", self)
         self.add_sheet_action.triggered.connect(self.add_sheet)
         self.rename_sheet_action = QAction("Rename Sheet", self)
@@ -198,6 +247,18 @@ class MainWindow(QMainWindow):
         sheet_menu.addAction(self.tab_color_action)
         formulas_menu = self.menuBar().addMenu("&Formulas")
         formulas_menu.addAction(self.recalculate_action)
+        financial_menu = self.menuBar().addMenu("&Financial")
+        financial_menu.addAction(self.financial_model_action)
+        financial_menu.addSeparator()
+        financial_menu.addAction(self.goal_seek_action)
+        financial_menu.addAction(self.sensitivity_action)
+        financial_menu.addAction(self.scenarios_action)
+        financial_menu.addSeparator()
+        financial_menu.addAction(self.model_audit_action)
+        financial_menu.addAction(self.financial_help_action)
+        help_menu = self.menuBar().addMenu("&Help")
+        help_menu.addAction(self.financial_help_action)
+        help_menu.addAction(self.all_functions_help_action)
         self.addActions(
             [
                 self.undo_action,
@@ -213,6 +274,13 @@ class MainWindow(QMainWindow):
                 self.hide_sheet_action,
                 self.unhide_sheet_action,
                 self.tab_color_action,
+                self.financial_model_action,
+                self.goal_seek_action,
+                self.sensitivity_action,
+                self.scenarios_action,
+                self.model_audit_action,
+                self.financial_help_action,
+                self.all_functions_help_action,
             ]
         )
         self._update_history_actions(self.history)
@@ -707,6 +775,12 @@ class MainWindow(QMainWindow):
             "Sheet Recalculate": lambda: self.engine.recalculate(
                 sheet_name=self.grid_model.active_sheet_name
             ),
+            "Model Templates": self.new_financial_model,
+            "Goal Seek": self.show_goal_seek,
+            "Sensitivity": self.show_sensitivity,
+            "Scenarios": self.show_scenarios,
+            "Model Audit": self.show_model_audit,
+            "Financial Help": self.show_financial_help,
             "Bold": lambda: self._toggle_format("bold"),
             "Italic": lambda: self._toggle_format("italic"),
             "Underline": lambda: self._toggle_format("underline"),
@@ -733,6 +807,8 @@ class MainWindow(QMainWindow):
             "Remove Duplicates": self.remove_duplicates,
             "Text to Columns": self.text_to_columns,
             "Chart": self.insert_chart,
+            "Chart Studio": self.insert_chart,
+            "Quick Chart": self.insert_quick_chart,
         }
         action = actions.get(name)
         if action is not None:
@@ -751,6 +827,211 @@ class MainWindow(QMainWindow):
         self.formula_bar.editor.setText(template)
         self.formula_bar.editor.setFocus()
         self.formula_bar.editor.setCursorPosition(len(template) - 1)
+
+    def new_financial_model(self) -> None:
+        """Replace the document with a selected built-in financial model."""
+        dialog = FinancialModelDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        if self.dirty:
+            choice = QMessageBox.question(
+                self,
+                "Replace Unsaved Workbook",
+                "The current workbook has unsaved changes. Replace it with the model?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if choice != QMessageBox.StandardButton.Yes:
+                return
+        try:
+            workbook = create_financial_model(dialog.template_key())
+        except ValueError as error:
+            QMessageBox.critical(self, "Model Creation Failed", str(error))
+            return
+        self._install_workbook(workbook, path=None)
+        self.dirty = True
+        self._update_title()
+        self.statusBar().showMessage(
+            f"Created {dialog.models.currentText()} model",
+            5000,
+        )
+
+    def show_goal_seek(self) -> None:
+        """Solve a one-input target and optionally apply the result."""
+        dialog = GoalSeekDialog(self._current_reference(), self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            request = dialog.request()
+            result = goal_seek(
+                self.engine.workbook,
+                request.formula_cell,
+                request.input_cell,
+                request.target,
+                default_sheet=self.grid_model.active_sheet_name,
+                tolerance=request.tolerance,
+                minimum=request.minimum,
+                maximum=request.maximum,
+            )
+        except (ValueError, OverflowError) as error:
+            QMessageBox.warning(self, "Goal Seek Failed", str(error))
+            return
+        if not result.converged:
+            QMessageBox.warning(
+                self,
+                "Goal Seek Did Not Converge",
+                (
+                    f"Best input: {result.input_value:.12g}\n"
+                    f"Result: {result.result_value:.12g}\n"
+                    f"Residual: {result.residual:.6g}"
+                ),
+            )
+            return
+        choice = QMessageBox.question(
+            self,
+            "Apply Goal Seek Result",
+            (
+                f"Set {request.input_cell} to {result.input_value:.12g}?\n"
+                f"{request.formula_cell} = {result.result_value:.12g}\n"
+                f"Iterations: {result.iterations}"
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if choice != QMessageBox.StandardButton.Yes:
+            return
+        reference = self._analysis_cell_reference(request.input_cell)
+        self.history.execute(
+            SetCellCommand(
+                self.engine,
+                reference.sheet,
+                reference.row,
+                reference.column,
+                result.input_value,
+            )
+        )
+        self.statusBar().showMessage("Goal Seek result applied", 4000)
+
+    def show_sensitivity(self) -> None:
+        """Calculate and write a one- or two-variable sensitivity table."""
+        dialog = SensitivityDialog(self._current_reference(), self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            request = dialog.request()
+            if request.column_input_cell is None:
+                table = one_variable_sensitivity(
+                    self.engine.workbook,
+                    request.formula_cell,
+                    request.row_input_cell,
+                    request.row_values,
+                    default_sheet=self.grid_model.active_sheet_name,
+                )
+                values = (
+                    ("Input", *table.row_values),
+                    ("Result", *table.values[0]),
+                )
+            else:
+                table = two_variable_sensitivity(
+                    self.engine.workbook,
+                    request.formula_cell,
+                    request.row_input_cell,
+                    request.row_values,
+                    request.column_input_cell,
+                    request.column_values,
+                    default_sheet=self.grid_model.active_sheet_name,
+                )
+                values = (
+                    (request.formula_cell, *table.row_values),
+                    *tuple(
+                        (column_value, *row_values)
+                        for column_value, row_values in zip(
+                            table.column_values,
+                            table.values,
+                        )
+                    ),
+                )
+            self._write_analysis_table(
+                request.output_cell,
+                tuple(tuple(row) for row in values),
+            )
+        except (ValueError, OverflowError) as error:
+            QMessageBox.warning(self, "Sensitivity Failed", str(error))
+            return
+        self.statusBar().showMessage("Sensitivity table written", 4000)
+
+    def show_scenarios(self) -> None:
+        """Calculate named scenarios and write their output table."""
+        dialog = ScenarioDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            request = dialog.request()
+            results = evaluate_scenarios(
+                self.engine.workbook,
+                request.scenarios,
+                request.output_cells,
+                default_sheet=self.grid_model.active_sheet_name,
+            )
+            values = (
+                ("Scenario", *request.output_cells),
+                *tuple(
+                    (result.name, *(value for _, value in result.values))
+                    for result in results
+                ),
+            )
+            self._write_analysis_table(
+                request.destination_cell,
+                tuple(tuple(row) for row in values),
+            )
+        except (ValueError, OverflowError) as error:
+            QMessageBox.warning(self, "Scenario Analysis Failed", str(error))
+            return
+        self.statusBar().showMessage("Scenario analysis written", 4000)
+
+    def show_model_audit(self) -> None:
+        """Recalculate and display prioritized financial-model findings."""
+        self.engine.recalculate()
+        report = audit_financial_model(self.engine.workbook)
+        AuditReportDialog(report, self).exec()
+
+    def show_financial_help(self) -> None:
+        """Open the comprehensive offline financial modeling guide."""
+        FinancialHelpDialog(self).exec()
+
+    def _current_reference(self) -> str:
+        current = self.grid.currentIndex()
+        if not current.isValid():
+            return "A1"
+        return CellReference(current.row(), current.column()).to_a1()
+
+    def _analysis_cell_reference(self, text: str) -> CellReference:
+        parsed = parse_a1(
+            text.strip(),
+            default_sheet=self.grid_model.active_sheet_name,
+        )
+        if not isinstance(parsed, CellReference):
+            raise ValueError(f"Expected one cell reference: {text!r}")
+        sheet_name = self.engine.workbook.get_sheet(
+            parsed.sheet or self.grid_model.active_sheet_name
+        ).name
+        return CellReference(parsed.row, parsed.column, sheet=sheet_name)
+
+    def _write_analysis_table(
+        self,
+        destination: str,
+        values: tuple[tuple[Any, ...], ...],
+    ) -> None:
+        reference = self._analysis_cell_reference(destination)
+        self.history.execute(
+            SetRangeCommand(
+                self.engine,
+                reference.sheet,
+                reference.row,
+                reference.column,
+                values,
+            )
+        )
 
     def paste_special(self) -> None:
         """Paste rich clipboard cells using a selected content mode."""
@@ -786,12 +1067,23 @@ class MainWindow(QMainWindow):
         )
 
     def insert_chart(self) -> None:
-        """Create a range-bound chart through the chart wizard."""
-        target = self._selected_range()
+        """Create a range-bound chart through the live-preview Chart Studio."""
+        target = expand_chart_range(
+            self.engine.workbook,
+            self.grid_model.active_sheet_name,
+            self._selected_range(),
+        )
+        if len(target) < 2:
+            self.statusBar().showMessage(
+                "Select a data range or a cell inside a contiguous data table",
+                4000,
+            )
+            return
         wizard = ChartWizard(
             self.grid_model.active_sheet_name,
             target.to_a1(),
             self,
+            workbook=self.engine.workbook,
         )
         if wizard.exec() != QDialog.DialogCode.Accepted:
             return
@@ -806,6 +1098,70 @@ class MainWindow(QMainWindow):
             )
         except ValueError as error:
             self.statusBar().showMessage(str(error), 3000)
+
+    def insert_quick_chart(self) -> None:
+        """Create the highest-ranked chart from the current data selection."""
+        sheet_name = self.grid_model.active_sheet_name
+        target = expand_chart_range(
+            self.engine.workbook,
+            sheet_name,
+            self._selected_range(),
+        )
+        if len(target) < 2:
+            self.statusBar().showMessage(
+                "Quick Chart needs a data range or a cell inside a data table",
+                4000,
+            )
+            return
+        recommendations = recommend_charts(
+            self.engine.workbook,
+            sheet_name,
+            target,
+            has_headers=detect_chart_headers(
+                self.engine.workbook,
+                sheet_name,
+                target,
+            ),
+        )
+        if not recommendations:
+            self.statusBar().showMessage(
+                "No chart recommendation is available for this selection",
+                4000,
+            )
+            return
+        recommendation = recommendations[0]
+        probe = ChartSpec(
+            "quick-preview",
+            sheet_name,
+            target,
+            recommendation.chart_type,
+            has_headers=detect_chart_headers(
+                self.engine.workbook,
+                sheet_name,
+                target,
+            ),
+        )
+        title = recommendation.title or infer_chart_title(
+            chart_data(self.engine.workbook, probe)
+        )
+        spec = ChartSpec(
+            uuid4().hex,
+            sheet_name,
+            target,
+            recommendation.chart_type,
+            title=title,
+            has_headers=probe.has_headers,
+            show_grid=True,
+            highlight_extrema=recommendation.chart_type in {"line", "scatter"},
+        )
+        self.history.execute(
+            AddChartCommand(self.engine, sheet_name, spec)
+        )
+        self.statusBar().showMessage(
+            f"Created {recommendation.chart_type.replace('_', ' ')}: "
+            f"{recommendation.reason}",
+            5000,
+        )
 
     def _sync_charts(self) -> None:
         active_specs = {
@@ -824,6 +1180,7 @@ class MainWindow(QMainWindow):
             if panel is None:
                 panel = ChartPanel(self.engine.workbook, spec, self)
                 panel.closeRequested.connect(self._remove_chart)
+                panel.editRequested.connect(self._edit_chart)
                 self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, panel)
                 panel.setFloating(True)
                 panel.show()
@@ -848,6 +1205,37 @@ class MainWindow(QMainWindow):
                     chart_id,
                 )
             )
+
+    def _edit_chart(self, chart_id: str) -> None:
+        spec = next(
+            (
+                chart
+                for chart in self.engine.workbook.active_sheet.charts
+                if isinstance(chart, ChartSpec) and chart.chart_id == chart_id
+            ),
+            None,
+        )
+        if spec is None:
+            return
+        wizard = ChartWizard(
+            spec.sheet_name,
+            spec.source_range.to_a1(),
+            self,
+            workbook=self.engine.workbook,
+            existing=spec,
+        )
+        if wizard.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            self.history.execute(
+                UpdateChartCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    wizard.chart_spec(),
+                )
+            )
+        except ValueError as error:
+            self.statusBar().showMessage(str(error), 3000)
 
     def _dispose_chart_panels(self) -> None:
         for panel in self._chart_panels.values():
