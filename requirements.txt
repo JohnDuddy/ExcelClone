@@ -1,6 +1,11 @@
-PySide6==6.11.0
+# Duddy Spreadsheet pinned runtime dependencies.
+#
+# PySide6-Essentials is deliberate: the application imports only QtCore,
+# QtGui, and QtWidgets. The full PySide6 distribution additionally pulls
+# PySide6-Addons (Qt3D, WebEngine, Multimedia, Charts), which nothing here
+# references and which triples the installed Qt footprint.
+PySide6-Essentials==6.11.0
 openpyxl==3.1.5
 matplotlib==3.10.9
 numpy==2.4.4
 python-dateutil==2.9.0.post0
-
