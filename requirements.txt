@@ -9,3 +9,6 @@ openpyxl==3.1.5
 matplotlib==3.10.9
 numpy==2.4.4
 python-dateutil==2.9.0.post0
+# Ed25519 verification for offline licence keys. Security-sensitive code is
+# not hand-rolled here.
+cryptography==49.0.0

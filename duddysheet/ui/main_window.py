@@ -81,6 +81,7 @@ from duddysheet.core.financial_analysis import (
     two_variable_sensitivity,
 )
 from duddysheet.core.financial_models import create_financial_model
+from duddysheet.core.licensing import LicenseManager, LicenseStatus
 from duddysheet.core.printing import (
     PageSetup,
     selection_to_area,
@@ -95,6 +96,7 @@ from duddysheet.io.xlsx_writer import write_xlsx
 from duddysheet.ui.delegates import CellDelegate
 from duddysheet.ui.charting import ChartPanel
 from duddysheet.ui.dialogs.about import AboutDialog
+from duddysheet.ui.dialogs.activation import ActivationDialog, prompt_when_trial_expired
 from duddysheet.ui.dialogs.chart_wizard import ChartWizard
 from duddysheet.ui.dialogs.format_cells import FormatCellsDialog
 from duddysheet.ui.dialogs.function_help import FunctionHelpDialog
@@ -120,6 +122,7 @@ from duddysheet.ui.grid_model import GridModel
 from duddysheet.ui.grid_view import GridView
 from duddysheet.ui.ribbon import Ribbon
 from duddysheet.ui.sheet_tabs import SheetTabs
+from duddysheet.util.paths import app_data_dir
 from duddysheet.util.settings import SettingsStore
 from duddysheet.util.autosave import AutosaveManager, RecoveryCandidate
 from duddysheet.util.logging_setup import configure_logging
@@ -135,6 +138,7 @@ class MainWindow(QMainWindow):
         settings_store: SettingsStore | None = None,
         autosave_manager: AutosaveManager | None = None,
         hyperlink_opener: Callable[[QUrl], bool] | None = None,
+        license_manager: LicenseManager | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Duddy Spreadsheet")
@@ -142,6 +146,7 @@ class MainWindow(QMainWindow):
         self.resize(1280, 800)
         self.settings = settings_store or SettingsStore()
         self.autosave_manager = autosave_manager or AutosaveManager()
+        self.license_manager = license_manager or LicenseManager(app_data_dir())
         self.logger = configure_logging()
         self._hyperlink_opener = hyperlink_opener or QDesktopServices.openUrl
         self.current_path: Path | None = None
@@ -175,6 +180,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
 
         self.selection_label = QLabel("Count: 0")
+        self.entitlement_label = QLabel("")
+        self.statusBar().addPermanentWidget(self.entitlement_label)
         self.statusBar().addPermanentWidget(self.selection_label)
         self.statusBar().showMessage("Ready")
 
@@ -186,6 +193,7 @@ class MainWindow(QMainWindow):
         self.autosave_timer.start()
         self.on_current_cell_changed(self.grid_model.index(0, 0))
         self._update_title()
+        self.refresh_entitlement()
 
     def _create_actions(self) -> None:
         self.new_action = QAction("New", self)
@@ -246,6 +254,8 @@ class MainWindow(QMainWindow):
         self.all_functions_help_action.triggered.connect(self.insert_function)
         self.about_action = QAction(f"About {PRODUCT_NAME}...", self)
         self.about_action.triggered.connect(self.show_about)
+        self.activation_action = QAction("Licence and Activation...", self)
+        self.activation_action.triggered.connect(self.show_activation)
         self.add_sheet_action = QAction("New Sheet", self)
         self.add_sheet_action.triggered.connect(self.add_sheet)
         self.rename_sheet_action = QAction("Rename Sheet", self)
@@ -299,6 +309,7 @@ class MainWindow(QMainWindow):
         help_menu.addAction(self.financial_help_action)
         help_menu.addAction(self.all_functions_help_action)
         help_menu.addSeparator()
+        help_menu.addAction(self.activation_action)
         help_menu.addAction(self.about_action)
         self.addActions(
             [
@@ -1051,6 +1062,35 @@ class MainWindow(QMainWindow):
     def show_about(self) -> None:
         """Open product identity, licence, and third-party attribution."""
         AboutDialog(self).exec()
+
+    def show_activation(self) -> None:
+        """Open licence activation and refresh the status indicator."""
+        ActivationDialog(self.license_manager, self).exec()
+        self.refresh_entitlement()
+
+    def refresh_entitlement(self) -> None:
+        """Update the status-bar entitlement label."""
+        entitlement = self.license_manager.entitlement()
+        self.entitlement_label.setText(entitlement.summary)
+        expiring_soon = (
+            entitlement.status is LicenseStatus.TRIAL
+            and entitlement.trial_days_remaining <= 5
+        )
+        self.entitlement_label.setStyleSheet(
+            "color: #b00020;" if not entitlement.allows_use or expiring_soon else ""
+        )
+
+    def check_entitlement_on_start(self) -> bool:
+        """Prompt for activation when the trial has lapsed.
+
+        The application stays open when the trial ends. Refusing to launch
+        would strand a user's own files behind a paywall, and a recovery
+        snapshot may still be pending.
+        """
+        entitlement = self.license_manager.entitlement()
+        allowed = prompt_when_trial_expired(entitlement, self.license_manager, self)
+        self.refresh_entitlement()
+        return allowed
 
     def active_page_setup(self) -> PageSetup:
         """Return the active sheet's print layout, or the default."""

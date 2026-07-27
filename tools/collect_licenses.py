@@ -40,6 +40,7 @@ REQUIRED_DISTRIBUTIONS = (
     "kiwisolver",
     "packaging",
     "pyparsing",
+    "cryptography",
 )
 
 #: Copyleft texts that no wheel ships and that must be vendored by hand.

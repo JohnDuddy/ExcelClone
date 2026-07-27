@@ -58,6 +58,7 @@ notices, which is satisfied by shipping `licenses/` and this file.
 | Pillow | 12.3.0 | MIT-CMU |
 | python-dateutil | 2.9.0.post0 | Apache-2.0 AND BSD-3-Clause |
 | six | 1.17.0 | MIT |
+| cryptography | 49.0.0 | Apache-2.0 OR BSD-3-Clause |
 | contourpy | 1.3.3 | BSD-3-Clause |
 | cycler | 0.12.1 | BSD-3-Clause |
 | fonttools | 4.63.0 | MIT |
