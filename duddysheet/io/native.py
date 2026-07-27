@@ -13,10 +13,11 @@ from duddysheet.core.cell import BorderStyle, Cell, CellFormat, Hyperlink
 from duddysheet.core.chart import ChartSpec
 from duddysheet.core.conditional import ConditionalRule, FormatPatch
 from duddysheet.core.data_tools import AutoFilter, DataValidation
+from duddysheet.core.printing import setup_from_dict, setup_to_dict
 from duddysheet.core.refs import parse_a1
 from duddysheet.core.workbook import Workbook
 
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
 Migration = Callable[[dict[str, Any], dict[str, dict[str, Any]]], None]
 
 
@@ -28,7 +29,18 @@ def _migrate_v1_to_v2(
     del manifest, sheet_data
 
 
-MIGRATIONS: dict[int, Migration] = {1: _migrate_v1_to_v2}
+def _migrate_v2_to_v3(
+    manifest: dict[str, Any],
+    sheet_data: dict[str, dict[str, Any]],
+) -> None:
+    """Accept v2 sheets, whose missing page setup means the print default."""
+    del manifest, sheet_data
+
+
+MIGRATIONS: dict[int, Migration] = {
+    1: _migrate_v1_to_v2,
+    2: _migrate_v2_to_v3,
+}
 
 
 def save_native(workbook: Workbook, path: str | Path) -> Path:
@@ -162,6 +174,9 @@ def _sheet_to_data(sheet: Any) -> dict[str, Any]:
         "freeze_panes": list(sheet.freeze_panes) if sheet.freeze_panes else None,
         "tab_color": sheet.tab_color,
         "visible": sheet.visible,
+        "page_setup": (
+            setup_to_dict(sheet.page_setup) if sheet.page_setup is not None else None
+        ),
     }
 
 
@@ -225,6 +240,10 @@ def _restore_sheet(sheet: Any, data: dict[str, Any]) -> None:
     sheet.freeze_panes = tuple(panes) if panes is not None else None
     sheet.tab_color = data.get("tab_color")
     sheet.visible = bool(data.get("visible", True))
+    page_setup = data.get("page_setup")
+    sheet.page_setup = (
+        setup_from_dict(page_setup) if isinstance(page_setup, dict) else None
+    )
 
 
 def _format_to_data(cell_format: CellFormat) -> dict[str, Any]:

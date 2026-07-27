@@ -31,6 +31,7 @@ class Sheet:
         "freeze_panes",
         "tab_color",
         "visible",
+        "page_setup",
     )
 
     def __init__(self, name: str) -> None:
@@ -51,6 +52,8 @@ class Sheet:
         self.freeze_panes: tuple[int, int] | None = None
         self.tab_color: str | None = None
         self.visible = True
+        #: Optional print layout; ``None`` means the application default.
+        self.page_setup: Any = None
 
     @property
     def populated_count(self) -> int:
@@ -155,6 +158,7 @@ class Sheet:
         duplicate.freeze_panes = self.freeze_panes
         duplicate.tab_color = self.tab_color
         duplicate.visible = self.visible
+        duplicate.page_setup = self.page_setup
         return duplicate
 
     def restore_from(self, snapshot: Sheet) -> None:
@@ -174,6 +178,7 @@ class Sheet:
         self.freeze_panes = restored.freeze_panes
         self.tab_color = restored.tab_color
         self.visible = restored.visible
+        self.page_setup = restored.page_setup
 
     @staticmethod
     def _validate_coordinate(row: int, column: int) -> None:

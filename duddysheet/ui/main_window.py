@@ -10,6 +10,7 @@ from uuid import uuid4
 from PySide6.QtCore import QModelIndex, QTimer, QUrl, Qt
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
 from PySide6.QtGui import QColor
+from PySide6.QtPrintSupport import QPrintDialog, QPrintPreviewDialog, QPrinter
 from PySide6.QtWidgets import (
     QApplication,
     QColorDialog,
@@ -80,6 +81,11 @@ from duddysheet.core.financial_analysis import (
     two_variable_sensitivity,
 )
 from duddysheet.core.financial_models import create_financial_model
+from duddysheet.core.printing import (
+    PageSetup,
+    selection_to_area,
+    with_print_area,
+)
 from duddysheet.core.refs import CellReference, RangeReference, parse_a1
 from duddysheet.core.workbook import Workbook
 from duddysheet.io.csv_io import read_delimited, write_delimited
@@ -92,6 +98,8 @@ from duddysheet.ui.dialogs.about import AboutDialog
 from duddysheet.ui.dialogs.chart_wizard import ChartWizard
 from duddysheet.ui.dialogs.format_cells import FormatCellsDialog
 from duddysheet.ui.dialogs.function_help import FunctionHelpDialog
+from duddysheet.ui.dialogs.page_setup import PageSetupDialog
+from duddysheet.ui.printing import WorksheetRenderer, apply_setup_to_printer
 from duddysheet.ui.dialogs.financial import (
     AuditReportDialog,
     FinancialModelDialog,
@@ -192,6 +200,20 @@ class MainWindow(QMainWindow):
         self.save_as_action = QAction("Save As...", self)
         self.save_as_action.setShortcut(QKeySequence("Ctrl+Shift+S"))
         self.save_as_action.triggered.connect(self.save_as)
+        self.page_setup_action = QAction("Page Setup...", self)
+        self.page_setup_action.triggered.connect(self.show_page_setup)
+        self.print_preview_action = QAction("Print Preview...", self)
+        self.print_preview_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        self.print_preview_action.triggered.connect(self.show_print_preview)
+        self.print_action = QAction("Print...", self)
+        self.print_action.setShortcut(QKeySequence.StandardKey.Print)
+        self.print_action.triggered.connect(self.print_sheet)
+        self.export_pdf_action = QAction("Export to PDF...", self)
+        self.export_pdf_action.triggered.connect(self.export_pdf)
+        self.set_print_area_action = QAction("Set Print Area", self)
+        self.set_print_area_action.triggered.connect(self.set_print_area)
+        self.clear_print_area_action = QAction("Clear Print Area", self)
+        self.clear_print_area_action.triggered.connect(self.clear_print_area)
         self.undo_action = QAction("Undo", self)
         self.undo_action.setShortcut(QKeySequence.StandardKey.Undo)
         self.undo_action.triggered.connect(self.history.undo)
@@ -244,6 +266,14 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.save_as_action)
         self._recent_menu = file_menu.addMenu("Recent Files")
         self._refresh_recent_menu()
+        file_menu.addSeparator()
+        print_area_menu = file_menu.addMenu("Print Area")
+        print_area_menu.addAction(self.set_print_area_action)
+        print_area_menu.addAction(self.clear_print_area_action)
+        file_menu.addAction(self.page_setup_action)
+        file_menu.addAction(self.print_preview_action)
+        file_menu.addAction(self.print_action)
+        file_menu.addAction(self.export_pdf_action)
         edit_menu = self.menuBar().addMenu("&Edit")
         edit_menu.addAction(self.undo_action)
         edit_menu.addAction(self.redo_action)
@@ -513,7 +543,14 @@ class MainWindow(QMainWindow):
         self._refresh_recent_menu()
         self._update_title()
 
-    def _mark_dirty(self, history: CommandHistory) -> None:
+    def _mark_dirty(self, history: CommandHistory | None = None) -> None:
+        """Flag unsaved changes.
+
+        Accepts an optional history so it can serve both as a command-history
+        listener and as a direct call for edits that are not commands, such as
+        changing the page setup.
+        """
+        del history
         if not self._suppress_dirty:
             self.dirty = True
             self._update_title()
@@ -1014,6 +1051,137 @@ class MainWindow(QMainWindow):
     def show_about(self) -> None:
         """Open product identity, licence, and third-party attribution."""
         AboutDialog(self).exec()
+
+    def active_page_setup(self) -> PageSetup:
+        """Return the active sheet's print layout, or the default."""
+        stored = getattr(self.engine.workbook.active_sheet, "page_setup", None)
+        return stored if isinstance(stored, PageSetup) else PageSetup()
+
+    def _renderer(self) -> WorksheetRenderer:
+        """Build a renderer bound to the active sheet and its print layout."""
+        return WorksheetRenderer(
+            self.engine.workbook.active_sheet,
+            self.active_page_setup(),
+            workbook=self.engine.workbook,
+            document_name=(
+                self.current_path.name if self.current_path else "Untitled"
+            ),
+            document_path=str(self.current_path) if self.current_path else "",
+        )
+
+    def show_page_setup(self) -> None:
+        """Edit and store the active sheet's print layout."""
+        sheet = self.engine.workbook.active_sheet
+        dialog = PageSetupDialog(
+            self.active_page_setup(), self, sheet_name=sheet.name
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        sheet.page_setup = dialog.page_setup()
+        self._mark_dirty()
+
+    def set_print_area(self) -> None:
+        """Restrict printing to the current selection."""
+        selection = self.grid.selectionModel().selection()
+        if not selection:
+            QMessageBox.information(
+                self, "Set Print Area", "Select the cells to print first."
+            )
+            return
+        bounds = selection.first()
+        sheet = self.engine.workbook.active_sheet
+        sheet.page_setup = with_print_area(
+            self.active_page_setup(),
+            selection_to_area(
+                bounds.top(),
+                bounds.left(),
+                bounds.bottom(),
+                bounds.right(),
+                sheet.name,
+            ),
+        )
+        self._mark_dirty()
+        self.statusBar().showMessage("Print area set", 3000)
+
+    def clear_print_area(self) -> None:
+        """Print the whole used range again."""
+        sheet = self.engine.workbook.active_sheet
+        sheet.page_setup = with_print_area(self.active_page_setup(), None)
+        self._mark_dirty()
+        self.statusBar().showMessage("Print area cleared", 3000)
+
+    def _warn_if_nothing_to_print(self, renderer: WorksheetRenderer) -> bool:
+        """Report an empty print job and return whether it was empty."""
+        if renderer.page_count:
+            return False
+        QMessageBox.information(
+            self,
+            "Nothing to Print",
+            "This sheet has no content in the selected print area.",
+        )
+        return True
+
+    def show_print_preview(self) -> None:
+        """Preview the active sheet exactly as it will print."""
+        renderer = self._renderer()
+        if self._warn_if_nothing_to_print(renderer):
+            return
+
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        apply_setup_to_printer(printer, renderer.setup)
+        preview = QPrintPreviewDialog(printer, self)
+        preview.setWindowTitle(f"Print Preview - {self.engine.workbook.active_sheet.name}")
+        preview.paintRequested.connect(
+            lambda target: self._paint_preview(renderer, target)
+        )
+        preview.exec()
+
+    @staticmethod
+    def _paint_preview(renderer: WorksheetRenderer, printer: QPrinter) -> None:
+        """Render every page onto the preview's printer device."""
+        renderer.print_to(printer)
+
+    def print_sheet(self) -> None:
+        """Send the active sheet to a printer the user chooses."""
+        renderer = self._renderer()
+        if self._warn_if_nothing_to_print(renderer):
+            return
+
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        apply_setup_to_printer(printer, renderer.setup)
+        dialog = QPrintDialog(printer, self)
+        dialog.setWindowTitle("Print")
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            pages = renderer.print_to(printer)
+        except (OSError, RuntimeError) as error:
+            QMessageBox.critical(self, "Print Failed", str(error))
+            return
+        self.statusBar().showMessage(f"Sent {pages} page(s) to the printer", 4000)
+
+    def export_pdf(self) -> None:
+        """Write the active sheet to a PDF file."""
+        renderer = self._renderer()
+        if self._warn_if_nothing_to_print(renderer):
+            return
+
+        default = self.current_path.with_suffix(".pdf") if self.current_path else (
+            Path.home() / f"{self.engine.workbook.active_sheet.name}.pdf"
+        )
+        selected, _ = QFileDialog.getSaveFileName(
+            self, "Export to PDF", str(default), "PDF Document (*.pdf)"
+        )
+        if not selected:
+            return
+        try:
+            written = renderer.export_pdf(selected)
+        except (OSError, RuntimeError) as error:
+            QMessageBox.critical(self, "Export Failed", str(error))
+            return
+        self.statusBar().showMessage(
+            f"Exported {renderer.page_count} page(s) to {written.name}", 4000
+        )
 
     def _current_reference(self) -> str:
         current = self.grid.currentIndex()
