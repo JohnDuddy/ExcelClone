@@ -36,6 +36,8 @@ complete.
 - [x] Movable sheet-tab model with command-driven add/delete (`test_ui_workflow.py`, `test_commands.py`)
 - [x] Command-based 200-level undo and redo (`test_commands.py`)
 - [x] F4 absolute-reference cycling (`test_ui_workflow.py`)
+- [x] Function-name autocomplete while typing a formula, in the grid and the formula bar (`test_function_autocomplete.py`)
+- [x] Step-wise argument guide that emphasizes the field being typed and follows nested calls (`test_function_autocomplete.py`)
 - [x] Number formats, including four-section custom codes and Excel's 1900 leap-day behavior (`test_formats.py`)
 - [x] Undoable fonts, fills, alignment, wrapping, and eight border styles (`test_commands.py`, `test_format_dialog.py`)
 - [x] Conditional value, ranking, average, duplicate, formula, color-scale, data-bar, and icon rules (`test_conditional_formats.py`)

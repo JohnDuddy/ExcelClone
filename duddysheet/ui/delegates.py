@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPen, QPolygonF
-from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt
+from PySide6.QtGui import QColor, QKeyEvent, QPainter, QPen, QPolygonF
+from PySide6.QtWidgets import QLineEdit, QStyledItemDelegate, QStyleOptionViewItem, QWidget
 
 from duddysheet.core.cell import BorderStyle, CellFormat
+from duddysheet.ui.completer import FunctionCompleter
 from duddysheet.ui.grid_model import DATA_BAR_ROLE, EFFECTIVE_FORMAT_ROLE, ICON_ROLE
 
 _PEN_STYLES = {
@@ -22,8 +23,43 @@ _PEN_STYLES = {
 }
 
 
+def _completer_for(editor: Any) -> FunctionCompleter | None:
+    """Return the suggestion controller owned by a cell editor, if present."""
+    if not isinstance(editor, QLineEdit):
+        return None
+    return editor.findChild(FunctionCompleter)
+
+
 class CellDelegate(QStyledItemDelegate):
     """Paint standard Qt cells plus bars, icons, and Excel-like borders."""
+
+    def createEditor(
+        self,
+        parent: QWidget,
+        option: QStyleOptionViewItem,
+        index: Any,
+    ) -> QWidget:
+        """Return a line editor that suggests function names while typing."""
+        del option, index
+        editor = QLineEdit(parent)
+        editor.setObjectName("cellEditor")
+        FunctionCompleter(editor, editor)
+        return editor
+
+    def eventFilter(self, editor: Any, event: QEvent) -> bool:
+        """Let an open suggestion list claim navigation keys before the view."""
+        if event.type() == QEvent.Type.KeyPress and isinstance(event, QKeyEvent):
+            completer = _completer_for(editor)
+            if completer is not None and completer.handle_key(event):
+                return True
+        return super().eventFilter(editor, event)
+
+    def destroyEditor(self, editor: QWidget, index: Any) -> None:
+        """Dismiss any open guidance before the editor is torn down."""
+        completer = _completer_for(editor)
+        if completer is not None:
+            completer.dismiss()
+        super().destroyEditor(editor, index)
 
     def paint(
         self,

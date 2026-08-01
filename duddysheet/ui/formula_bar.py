@@ -9,6 +9,8 @@ from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QWidget
 
+from duddysheet.ui.completer import FunctionCompleter
+
 _REFERENCE_RE = re.compile(r"\$?[A-Za-z]{1,3}\$?[1-9][0-9]*")
 
 
@@ -40,6 +42,7 @@ class FormulaBar(QWidget):
         self.editor = QLineEdit()
         self.editor.setObjectName("formulaEditor")
         self.editor.returnPressed.connect(self.commitRequested.emit)
+        self.completer = FunctionCompleter(self.editor, self)
         self.editor.installEventFilter(self)
 
         layout.addWidget(self.name_box)
@@ -50,21 +53,24 @@ class FormulaBar(QWidget):
         """Display a cell reference and its raw input."""
         self.name_box.setText(reference)
         self.editor.setText("" if raw_input is None else str(raw_input))
+        self.completer.dismiss()
 
     def eventFilter(self, watched: Any, event: QEvent) -> bool:
         if (
             watched is self.editor
             and event.type() == QEvent.Type.KeyPress
             and isinstance(event, QKeyEvent)
-            and event.key() == Qt.Key.Key_F4
         ):
-            updated, position = cycle_absolute_reference(
-                self.editor.text(),
-                self.editor.cursorPosition(),
-            )
-            self.editor.setText(updated)
-            self.editor.setCursorPosition(position)
-            return True
+            if self.completer.handle_key(event):
+                return True
+            if event.key() == Qt.Key.Key_F4:
+                updated, position = cycle_absolute_reference(
+                    self.editor.text(),
+                    self.editor.cursorPosition(),
+                )
+                self.editor.setText(updated)
+                self.editor.setCursorPosition(position)
+                return True
         return super().eventFilter(watched, event)
 
 

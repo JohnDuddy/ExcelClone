@@ -2,6 +2,20 @@
 
 All notable changes follow Keep a Changelog conventions.
 
+## [Unreleased]
+
+### Added
+
+- Function-name autocomplete. Typing a partial name in a formula, such as `=S`,
+  opens a scrollable list of matching functions with their signature and
+  description. Up and Down scroll, Enter or Tab accepts, and Escape dismisses.
+  It works both in the grid's in-cell editor and in the formula bar.
+- An argument guide that takes over once a call is open. Accepting a suggestion
+  completes to `=VLOOKUP(`, and a tip below the editor lists every field of the
+  signature with the one being typed emphasized, advancing as each comma is
+  entered. It follows the innermost call when functions are nested and closes
+  with the call. Functions that take no arguments complete to `=TODAY()`.
+
 ## [1.0.0] - 2026-07-27
 
 First commercial release, as Duddy Spreadsheet.
