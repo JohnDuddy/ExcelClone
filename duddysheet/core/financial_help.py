@@ -576,6 +576,7 @@ class FinancialToolHelp:
     key: str
     title: str
     summary: str
+    scenario: str
     example_title: str
     example_lines: tuple[str, ...]
     example_result: str
@@ -589,6 +590,9 @@ FINANCIAL_TOOL_HELP: tuple[FinancialToolHelp, ...] = (
         "new_model",
         "New Financial Model",
         "Build a complete, editable workbook from one of seven templates.",
+        "A client asks for a mortgage schedule by Friday. Rather than building "
+        "one from an empty sheet and debugging your own formulas, start from "
+        "the Loan Amortization model and change four inputs.",
         "Example: Loan Amortization",
         (
             "Summary!B3   350,000 principal",
@@ -604,6 +608,9 @@ FINANCIAL_TOOL_HELP: tuple[FinancialToolHelp, ...] = (
         "goal_seek",
         "Goal Seek",
         "Change one input until a formula reaches the value you want.",
+        "A buyer has been pre-approved at 2,000 a month and wants to know how "
+        "much loan that actually buys. You know the payment you want and need "
+        "the principal behind it, which is the arithmetic run backwards.",
         "Example: what principal fits a 2,000 payment?",
         (
             "Set formula cell    Summary!B9",
@@ -618,6 +625,9 @@ FINANCIAL_TOOL_HELP: tuple[FinancialToolHelp, ...] = (
         "sensitivity",
         "Sensitivity Table",
         "Recalculate one formula across a range of input values.",
+        "The investment committee does not believe your 10% discount rate. "
+        "Rather than defend one number, show what the business is worth across "
+        "every rate they might argue for, and let them read their own answer.",
         "Example: DCF value per share by WACC and terminal growth",
         (
             "Formula cell        Valuation!B15",
@@ -632,6 +642,9 @@ FINANCIAL_TOOL_HELP: tuple[FinancialToolHelp, ...] = (
         "scenarios",
         "Scenario Analysis",
         "Compare named sets of assumptions side by side.",
+        "The board will not approve the deal without a downside case. Growth "
+        "and margin move together in a recession, so testing them one at a "
+        "time understates the damage; each case has to move both at once.",
         "Example: growth and margin cases in the DCF model",
         (
             "Base: Inputs!B5=8%, Inputs!B6=22%",
@@ -646,6 +659,9 @@ FINANCIAL_TOOL_HELP: tuple[FinancialToolHelp, ...] = (
         "audit",
         "Model Audit",
         "Recalculate the workbook, then rank everything worth checking.",
+        "You have inherited a model from someone who has left the firm, and "
+        "your name goes on the output. Before you send it, find out what is "
+        "broken and which assumptions are buried inside formulas.",
         "Example: the Loan Amortization model",
         (
             "2,527 formulas, 384 inputs, no errors",
@@ -660,6 +676,9 @@ FINANCIAL_TOOL_HELP: tuple[FinancialToolHelp, ...] = (
         "Financial Functions Guide",
         "The full offline reference, and where these examples are worked "
         "through step by step.",
+        "You need XIRR for a fund with irregular drawdowns, cannot remember "
+        "whether values or dates come first, and this machine has no internet "
+        "connection. The whole reference ships inside the application.",
         "Contains",
         (
             "All 46 financial functions, searchable",

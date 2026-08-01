@@ -72,6 +72,7 @@ def test_every_financial_menu_command_has_a_bubble(
     # The bubble is rich text, so compare against the escaped copy.
     assert escape(entry.title) in tooltip
     assert escape(entry.summary) in tooltip
+    assert escape(entry.scenario) in tooltip
     assert escape(entry.example_result) in tooltip
     assert status == f"{entry.title}: {entry.summary}"
 
@@ -128,9 +129,28 @@ def test_every_bubble_is_complete(entry: object) -> None:
     assert entry.detail
 
 
+@pytest.mark.parametrize("entry", FINANCIAL_TOOL_HELP, ids=lambda e: e.key)
+def test_every_bubble_grounds_the_command_in_a_real_situation(
+    entry: object,
+) -> None:
+    # A scenario has to describe a situation, not restate the mechanics, so it
+    # needs room to do so and must read as prose.
+    assert len(entry.scenario) >= 120
+    assert entry.scenario.endswith(".")
+    assert entry.scenario[0].isupper()
+
+
 def test_bubble_markup_preserves_example_alignment() -> None:
     html = tool_tip_html(FINANCIAL_TOOL_HELP_BY_KEY["goal_seek"])
 
     # Rich text collapses plain runs of spaces, which would break the columns.
     assert "&nbsp;&nbsp;" in html
     assert "<code>" in html
+
+
+def test_bubble_markup_constrains_its_width() -> None:
+    html = tool_tip_html(FINANCIAL_TOOL_HELP_BY_KEY["sensitivity"])
+
+    # Without the fixed-width table the scenario paragraph will not wrap and
+    # the bubble stretches to roughly three times the screen-friendly width.
+    assert "<table width='380'" in html
