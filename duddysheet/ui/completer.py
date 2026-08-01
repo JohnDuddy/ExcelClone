@@ -25,7 +25,6 @@ from duddysheet.core.completion import (
     find_functions,
     function_prefix_at,
 )
-from duddysheet.core.functions import FUNCTION_REGISTRY
 
 NAME_ROLE = Qt.ItemDataRole.UserRole
 DETAIL_ROLE = Qt.ItemDataRole.UserRole + 1
@@ -270,29 +269,25 @@ class FunctionCompleter(QObject):
         self._popup.hide()
 
     def accept_current(self) -> None:
-        """Complete the typed prefix into a call and guide its arguments."""
+        """Replace the typed prefix with the highlighted function name."""
         item = self._popup.currentItem()
         if item is None:
             self.hide_popup()
             return
         name = str(item.data(NAME_ROLE))
-        spec = FUNCTION_REGISTRY.get(name)
-        # Open the call for functions that take arguments so the argument guide
-        # can take over; argument-less functions get a complete, closed call.
-        suffix = "()" if spec is not None and spec.max_args == 0 else "("
         text = self._editor.text()
         start = min(self._prefix_start, len(text))
         end = min(self._prefix_end, len(text))
         # The completed name is itself a valid prefix, so suppress the refresh
         # these edits trigger or the list would reopen on the word just chosen.
+        # The argument guide appears once the caller types the opening paren.
         self._accepting = True
         try:
-            self._editor.setText(text[:start] + name + suffix + text[end:])
-            self._editor.setCursorPosition(start + len(name) + len(suffix))
+            self._editor.setText(text[:start] + name + text[end:])
+            self._editor.setCursorPosition(start + len(name))
         finally:
             self._accepting = False
         self.hide_popup()
-        self.refresh()
 
     def handle_key(self, event: QKeyEvent) -> bool:
         """Consume a navigation or acceptance key while suggestions are shown."""

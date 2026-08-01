@@ -158,7 +158,7 @@ def test_formula_bar_accepts_a_suggestion_with_return() -> None:
     press(bar.editor, Qt.Key.Key_Return)
 
     assert bar.completer.suggestions()[:2] == ("SUBSTITUTE", "SUM")
-    assert bar.editor.text() == "=SUM("
+    assert bar.editor.text() == "=SUM"
     assert not bar.completer.is_active()
 
     bar.close()
@@ -172,14 +172,14 @@ def test_formula_bar_accepts_the_first_suggestion_with_tab() -> None:
 
     press(bar.editor, Qt.Key.Key_Tab)
 
-    assert bar.editor.text() == "=SUM("
-    assert bar.editor.cursorPosition() == 5
+    assert bar.editor.text() == "=SUM"
+    assert bar.editor.cursorPosition() == 4
     assert not bar.completer.is_active()
 
     bar.close()
 
 
-def test_accepting_a_function_opens_the_argument_guide() -> None:
+def test_accepting_a_function_inserts_the_bare_name() -> None:
     application()
     bar = FormulaBar()
     bar.show()
@@ -187,7 +187,22 @@ def test_accepting_a_function_opens_the_argument_guide() -> None:
 
     press(bar.editor, Qt.Key.Key_Return)
 
-    assert bar.editor.text() == "=VLOOKUP("
+    assert bar.editor.text() == "=VLOOKUP"
+    assert not bar.completer.is_active()
+    assert not bar.completer.is_tip_active()
+
+    bar.close()
+
+
+def test_typing_the_open_paren_starts_the_argument_guide() -> None:
+    application()
+    bar = FormulaBar()
+    bar.show()
+    type_formula(bar.editor, "=VLOO")
+    press(bar.editor, Qt.Key.Key_Return)
+
+    type_formula(bar.editor, "=VLOOKUP(")
+
     assert bar.completer.is_tip_active()
     assert bar.completer.argument_tip() == (
         "VLOOKUP(lookup_value, table_array, col_index_num, [range_lookup])"
@@ -264,15 +279,17 @@ def test_argument_guide_closes_with_the_call() -> None:
     bar.close()
 
 
-def test_argument_less_function_completes_to_a_closed_call() -> None:
+def test_argument_less_function_shows_no_guide() -> None:
     application()
     bar = FormulaBar()
     bar.show()
     type_formula(bar.editor, "=TODA")
-
     press(bar.editor, Qt.Key.Key_Return)
 
-    assert bar.editor.text() == "=TODAY()"
+    assert bar.editor.text() == "=TODAY"
+
+    type_formula(bar.editor, "=TODAY(")
+
     assert not bar.completer.is_tip_active()
 
     bar.close()
@@ -372,10 +389,13 @@ def test_cell_editor_suggests_functions_and_keeps_model_commits() -> None:
     # The open list claims Return, so the key completes the name instead of
     # committing the half-typed cell.
     press(editor, Qt.Key.Key_Return)
-    assert editor.text() == "=SUBSTITUTE("
+    assert editor.text() == "=SUBSTITUTE"
     assert not completer.is_active()
-    assert completer.active_argument() == "text"
     assert window.grid_model.sheet.get_cell(0, 0).raw_input is None
+
+    # The guide takes over once the call is opened, inside the cell too.
+    type_formula(editor, "=SUBSTITUTE(A1,")
+    assert completer.active_argument() == "old_text"
 
     editor.setText("=SUM(2,3)")
     delegate.setModelData(editor, window.grid_model, index)
