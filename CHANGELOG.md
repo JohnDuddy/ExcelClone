@@ -6,6 +6,11 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Added
 
+- Hover bubbles on every Financial menu command, and on the matching Financial
+  ribbon buttons. Each names the command, says in one line what it does, shows
+  a worked example with real cell references and the number it produces, and
+  notes the one thing most likely to trip you up. The same one-liner appears in
+  the status bar while an item is highlighted.
 - A dedicated tutorial for each Financial menu command — New Financial Model,
   Goal Seek, Sensitivity Table, Scenario Analysis, and Model Audit — in the
   Tutorials tab of the financial guide. Each explains every dialog field and

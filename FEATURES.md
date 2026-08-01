@@ -85,6 +85,7 @@ complete.
 - [x] Financial ribbon/menu, validated dialogs, undoable output tables, and dirty-workbook template replacement warning (`test_financial_ui.py`)
 - [x] F1 offline financial help with complete 46-function coverage, searchable categories, copyable examples, twelve tutorials, quick reference, model instructions, and Help/ribbon access (`test_financial_help.py`, `test_financial_ui.py`)
 - [x] Step-by-step tutorial for every Financial menu command, each with a worked example verified against a built-in model (`test_financial_tutorials.py`)
+- [x] Hover bubbles and status-bar text on every Financial menu command and ribbon button, with worked examples (`test_financial_tool_help.py`)
 
 ## M12 Commercial Readiness
 

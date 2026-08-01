@@ -8,6 +8,18 @@ from typing import Any
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QTabWidget, QToolButton, QWidget
 
+from duddysheet.ui.tool_help import apply_tool_help
+
+# Ribbon labels are abbreviated; map them onto the shared Financial help copy.
+FINANCIAL_RIBBON_HELP_KEYS = {
+    "Model Templates": "new_model",
+    "Goal Seek": "goal_seek",
+    "Sensitivity": "sensitivity",
+    "Scenarios": "scenarios",
+    "Model Audit": "audit",
+    "Financial Help": "guide",
+}
+
 
 class Ribbon(QTabWidget):
     """Tabbed command surface with deliberately small action groups."""
@@ -77,6 +89,9 @@ class Ribbon(QTabWidget):
                     + action_name.replace(" ", "")[1:]
                     + "Button"
                 )
+                help_key = FINANCIAL_RIBBON_HELP_KEYS.get(action_name)
+                if help_key is not None:
+                    apply_tool_help(button, help_key)
                 button.clicked.connect(
                     lambda checked=False, name=action_name: self.actionRequested.emit(name)
                 )

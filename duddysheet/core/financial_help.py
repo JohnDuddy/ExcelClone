@@ -567,3 +567,108 @@ FINANCIAL_HELP_ENTRIES = financial_help_entries()
 FINANCIAL_HELP_CATEGORIES = tuple(
     dict.fromkeys(entry.category for entry in FINANCIAL_HELP_ENTRIES)
 )
+
+
+@dataclass(frozen=True, slots=True)
+class FinancialToolHelp:
+    """Hover help for one command on the Financial menu."""
+
+    key: str
+    title: str
+    summary: str
+    example_title: str
+    example_lines: tuple[str, ...]
+    example_result: str
+    detail: str
+
+
+# Every example below is calculated by the built-in models named in it, and is
+# pinned by tests so the wording cannot drift from what the tools produce.
+FINANCIAL_TOOL_HELP: tuple[FinancialToolHelp, ...] = (
+    FinancialToolHelp(
+        "new_model",
+        "New Financial Model",
+        "Build a complete, editable workbook from one of seven templates.",
+        "Example: Loan Amortization",
+        (
+            "Summary!B3   350,000 principal",
+            "Summary!B4   6.5% annual rate",
+            "Summary!B5   30 year term",
+            "Summary!B9   =-PMT(B4/B6,B5*B6,B3)",
+        ),
+        "Monthly payment 2,212.24, plus a full 360-month schedule.",
+        "Replaces the current document, so save your work first. "
+        "Everything it builds is ordinary and editable.",
+    ),
+    FinancialToolHelp(
+        "goal_seek",
+        "Goal Seek",
+        "Change one input until a formula reaches the value you want.",
+        "Example: what principal fits a 2,000 payment?",
+        (
+            "Set formula cell    Summary!B9",
+            "To value            2000",
+            "By changing cell    Summary!B3",
+        ),
+        "Solves to a principal of 316,421.64.",
+        "Runs on a copy, so nothing changes until you accept. "
+        "The changing cell must hold a number, not a formula.",
+    ),
+    FinancialToolHelp(
+        "sensitivity",
+        "Sensitivity Table",
+        "Recalculate one formula across a range of input values.",
+        "Example: DCF value per share by WACC and terminal growth",
+        (
+            "Formula cell        Valuation!B15",
+            "Row input cell      Inputs!B11   9%, 10%, 11%",
+            "Column input cell   Inputs!B12   2%, 2.5%, 3%",
+        ),
+        "Writes a 3x3 grid from 13.30 to 20.91, centred on the model's 16.35.",
+        "Row values run across the top, not down the side. "
+        "Leave the column input blank for a one-variable table.",
+    ),
+    FinancialToolHelp(
+        "scenarios",
+        "Scenario Analysis",
+        "Compare named sets of assumptions side by side.",
+        "Example: growth and margin cases in the DCF model",
+        (
+            "Base: Inputs!B5=8%, Inputs!B6=22%",
+            "Downside: Inputs!B5=3%, Inputs!B6=18%",
+            "Upside: Inputs!B5=12%, Inputs!B6=26%",
+        ),
+        "Value per share of 16.35, 8.52, and 25.83.",
+        "One scenario per line. Every case is calculated on a copy, so your "
+        "live assumptions are never overwritten.",
+    ),
+    FinancialToolHelp(
+        "audit",
+        "Model Audit",
+        "Recalculate the workbook, then rank everything worth checking.",
+        "Example: the Loan Amortization model",
+        (
+            "2,527 formulas, 384 inputs, no errors",
+            "info  EMBEDDED_CONSTANT  Summary!B7",
+        ),
+        "That finding is =DATE(2026,8,1); a start date belongs in the model.",
+        "Errors first, then warnings, then information. A finding is a prompt "
+        "to look, not proof of a mistake.",
+    ),
+    FinancialToolHelp(
+        "guide",
+        "Financial Functions Guide",
+        "The full offline reference, and where these examples are worked "
+        "through step by step.",
+        "Contains",
+        (
+            "All 46 financial functions, searchable",
+            "Twelve tutorials, one per Financial command",
+            "Quick reference and built-in model guide",
+        ),
+        "Press F1 to open it from anywhere.",
+        "Everything is stored in the application; nothing is fetched.",
+    ),
+)
+
+FINANCIAL_TOOL_HELP_BY_KEY = {help.key: help for help in FINANCIAL_TOOL_HELP}

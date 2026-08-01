@@ -122,6 +122,7 @@ from duddysheet.ui.grid_model import GridModel
 from duddysheet.ui.grid_view import GridView
 from duddysheet.ui.ribbon import Ribbon
 from duddysheet.ui.sheet_tabs import SheetTabs
+from duddysheet.ui.tool_help import apply_tool_help
 from duddysheet.util.paths import app_data_dir
 from duddysheet.util.settings import SettingsStore
 from duddysheet.util.autosave import AutosaveManager, RecoveryCandidate
@@ -247,6 +248,15 @@ class MainWindow(QMainWindow):
         )
         self.financial_help_action.setShortcut(Qt.Key.Key_F1)
         self.financial_help_action.triggered.connect(self.show_financial_help)
+        for action, help_key in (
+            (self.financial_model_action, "new_model"),
+            (self.goal_seek_action, "goal_seek"),
+            (self.sensitivity_action, "sensitivity"),
+            (self.scenarios_action, "scenarios"),
+            (self.model_audit_action, "audit"),
+            (self.financial_help_action, "guide"),
+        ):
+            apply_tool_help(action, help_key)
         self.all_functions_help_action = QAction(
             "All Functions / Insert Function...",
             self,
@@ -297,6 +307,9 @@ class MainWindow(QMainWindow):
         formulas_menu = self.menuBar().addMenu("&Formulas")
         formulas_menu.addAction(self.recalculate_action)
         financial_menu = self.menuBar().addMenu("&Financial")
+        self.financial_menu = financial_menu
+        # Qt suppresses action tooltips inside menus unless this is enabled.
+        financial_menu.setToolTipsVisible(True)
         financial_menu.addAction(self.financial_model_action)
         financial_menu.addSeparator()
         financial_menu.addAction(self.goal_seek_action)
