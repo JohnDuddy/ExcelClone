@@ -6,6 +6,12 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Added
 
+- A dedicated tutorial for each Financial menu command — New Financial Model,
+  Goal Seek, Sensitivity Table, Scenario Analysis, and Model Audit — in the
+  Tutorials tab of the financial guide. Each explains every dialog field and
+  works a complete example against a built-in model, quoting the numbers those
+  models actually produce. The model list is generated from the catalog so it
+  cannot drift, and the quoted results are pinned by tests.
 - Function-name autocomplete. Typing a partial name in a formula, such as `=S`,
   opens a scrollable list of matching functions with their signature and
   description. Up and Down scroll, Enter or Tab accepts, and Escape dismisses.

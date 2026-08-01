@@ -83,7 +83,8 @@ complete.
 - [x] Editable DCF, three-statement, LBO, loan, rental-property, and budget/forecast models with live outputs and checks (`test_financial_models.py`)
 - [x] Eight-sheet Financial Calculations Lab with all 46 financial functions, 30 common metrics, synthetic inputs, and 12 editable charts (`test_financial_models.py`)
 - [x] Financial ribbon/menu, validated dialogs, undoable output tables, and dirty-workbook template replacement warning (`test_financial_ui.py`)
-- [x] F1 offline financial help with complete 46-function coverage, searchable categories, copyable examples, nine tutorials, quick reference, model instructions, and Help/ribbon access (`test_financial_help.py`, `test_financial_ui.py`)
+- [x] F1 offline financial help with complete 46-function coverage, searchable categories, copyable examples, twelve tutorials, quick reference, model instructions, and Help/ribbon access (`test_financial_help.py`, `test_financial_ui.py`)
+- [x] Step-by-step tutorial for every Financial menu command, each with a worked example verified against a built-in model (`test_financial_tutorials.py`)
 
 ## M12 Commercial Readiness
 

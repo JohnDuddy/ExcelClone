@@ -32,6 +32,20 @@ from duddysheet.core.financial_help import (
 from duddysheet.core.financial_models import FINANCIAL_MODEL_CATALOG
 
 
+def _model_catalog_table() -> str:
+    """Render the built-in model catalog as a table for the tutorials."""
+    rows = "".join(
+        f"<tr><td><b>{escape(template.name)}</b></td>"
+        f"<td>{escape(template.description)}</td>"
+        f"<td><code>{escape(template.primary_output)}</code></td></tr>"
+        for template in FINANCIAL_MODEL_CATALOG
+    )
+    return (
+        "<table><tr><th>Model</th><th>What it builds</th>"
+        f"<th>Primary output</th></tr>{rows}</table>"
+    )
+
+
 _TUTORIALS = (
     (
         "Start here: financial modeling rules",
@@ -53,6 +67,205 @@ _TUTORIALS = (
         <p>Recalculate with F9, run <b>Financial &gt; Model Audit</b>, and add
         explicit checks such as assets minus liabilities and equity, beginning
         balance plus activity minus ending balance, and sources minus uses.</p>
+        """,
+    ),
+    (
+        "Financial menu: New Financial Model",
+        """
+        <h1>New Financial Model</h1>
+        <p>Builds a complete, editable workbook from a built-in template. The
+        result is an ordinary workbook, not a locked template: every formula,
+        label, and format can be changed.</p>
+        <h2>Steps</h2>
+        <ol>
+          <li>Open <b>Financial &gt; New Financial Model</b>.</li>
+          <li>Choose a model from the list and confirm.</li>
+          <li>Replace the sample assumptions in the input cells with your own.
+          Inputs are blue text on yellow fill; cross-sheet links are green.</li>
+          <li>Press F9 to recalculate, then run <b>Model Audit</b>.</li>
+        </ol>
+        <p><b>This replaces the current document.</b> Save your open workbook
+        first; the new model arrives with a fresh undo history.</p>
+        <h2>The seven models</h2>
+        """
+        + _model_catalog_table()
+        + """
+        <h2>Worked example</h2>
+        <p>Choose <b>Loan Amortization</b>. The Summary sheet arrives with a
+        $350,000 principal in <code>Summary!B3</code>, a 6.5% annual rate in
+        <code>Summary!B4</code>, a 30-year term in <code>Summary!B5</code>, and
+        12 payments per year in <code>Summary!B6</code>. The monthly payment in
+        <code>Summary!B9</code> is:</p>
+        <pre>=-PMT(B4/B6,B5*B6,B3)</pre>
+        <p>It calculates 2,212.24, and the Amortization sheet expands to a full
+        360-month principal and interest schedule. Change
+        <code>Summary!B4</code> to 5% and press F9: the payment and every row of
+        the schedule update together.</p>
+        <p>See the <b>Built-in Models</b> tab for what each model is for.</p>
+        """,
+    ),
+    (
+        "Financial menu: Goal Seek",
+        """
+        <h1>Goal Seek</h1>
+        <p>Answers "what input produces this answer?". It changes one numeric
+        input cell until one formula cell reaches a target you specify.</p>
+        <h2>Fields</h2>
+        <table>
+          <tr><th>Field</th><th>Meaning</th></tr>
+          <tr><td><b>Set formula cell</b></td><td>The cell holding the formula whose result you want to control.</td></tr>
+          <tr><td><b>To value</b></td><td>The number that cell should reach.</td></tr>
+          <tr><td><b>By changing cell</b></td><td>One input cell holding a plain number, never a formula.</td></tr>
+          <tr><td><b>Tolerance</b></td><td>How close counts as solved. The default 0.0000001 suits most models.</td></tr>
+          <tr><td><b>Minimum / Maximum</b></td><td>Optional bracket. Tick the box to confine the search to a range.</td></tr>
+        </table>
+        <h2>Worked example: how much can I borrow?</h2>
+        <p>Open the <b>Loan Amortization</b> model. The payment on a $350,000
+        loan is 2,212.24. Suppose the budget only allows 2,000 a month.</p>
+        <pre>Set formula cell   Summary!B9
+To value           2000
+By changing cell   Summary!B3</pre>
+        <p>Goal Seek returns a principal of <b>316,421.64</b>. Accept it and
+        <code>Summary!B3</code> is written with that value; the whole
+        amortization schedule follows.</p>
+        <h2>Notes</h2>
+        <p>Calculations run on a copy of the workbook, so nothing changes until
+        you accept the result, and accepting is a single undoable edit.</p>
+        <p>The input cell must contain a number. Pointing at a formula gives
+        Goal Seek nothing to vary.</p>
+        <p>If a model has no solution &mdash; a target payment larger than any
+        principal can produce &mdash; the dialog reports that it did not
+        converge. Add a minimum and maximum to steer it, or check that the
+        formula actually depends on the input you chose.</p>
+        """,
+    ),
+    (
+        "Financial menu: Sensitivity Table",
+        """
+        <h1>Sensitivity Table</h1>
+        <p>Recalculates one formula across a range of input values and writes
+        the results as a table. One variable produces a strip; two variables
+        produce a grid.</p>
+        <h2>Fields</h2>
+        <table>
+          <tr><th>Field</th><th>Meaning</th></tr>
+          <tr><td><b>Formula cell</b></td><td>The single output being measured.</td></tr>
+          <tr><td><b>Row input cell</b></td><td>The assumption whose values run <i>across the top</i> of the table.</td></tr>
+          <tr><td><b>Row values</b></td><td>Comma-separated numbers or percentages.</td></tr>
+          <tr><td><b>Column input cell</b></td><td>Optional second assumption, running <i>down the left side</i>. Leave blank for a one-variable table.</td></tr>
+          <tr><td><b>Column values</b></td><td>Required whenever a column input cell is given.</td></tr>
+          <tr><td><b>Write table at</b></td><td>Top-left corner of the output. Choose an empty area.</td></tr>
+        </table>
+        <h2>Worked example: valuation by WACC and terminal growth</h2>
+        <p>Open the <b>Discounted Cash Flow</b> model. Implied value per share
+        sits in <code>Valuation!B15</code> and calculates 16.35. WACC is
+        <code>Inputs!B11</code> and terminal growth is <code>Inputs!B12</code>.</p>
+        <pre>Formula cell        Valuation!B15
+Row input cell      Inputs!B11
+Row values          9%, 10%, 11%
+Column input cell   Inputs!B12
+Column values       2%, 2.5%, 3%
+Write table at      Valuation!A20</pre>
+        <p>The written grid is:</p>
+        <table>
+          <tr><th>Valuation!B15</th><th>9%</th><th>10%</th><th>11%</th></tr>
+          <tr><td><b>2%</b></td><td>18.13</td><td>15.41</td><td>13.30</td></tr>
+          <tr><td><b>2.5%</b></td><td>19.41</td><td>16.35</td><td>14.01</td></tr>
+          <tr><td><b>3%</b></td><td>20.91</td><td>17.43</td><td>14.82</td></tr>
+        </table>
+        <p>The centre cell, 16.35, matches the live model, which is the check
+        that the table is wired to the right inputs. Value falls as WACC rises
+        and climbs as terminal growth rises, as it should.</p>
+        <h2>Notes</h2>
+        <p><b>Row values appear across the top, not down the side.</b> The row
+        input is the one that varies along each row.</p>
+        <p>Percentages may be typed as <code>2.5%</code> or <code>0.025</code>.</p>
+        <p>The table is written as values, not live formulas, and the whole
+        table is one undoable edit. Rerun it after changing other assumptions.</p>
+        """,
+    ),
+    (
+        "Financial menu: Scenario Analysis",
+        """
+        <h1>Scenario Analysis</h1>
+        <p>Compares named sets of assumptions side by side. Where a sensitivity
+        table moves one or two inputs, a scenario moves as many as you like at
+        once &mdash; the usual base, downside, and upside cases.</p>
+        <h2>Writing scenarios</h2>
+        <p>One scenario per line, a name, a colon, then comma-separated
+        assignments:</p>
+        <pre>Base: Inputs!B5=8%, Inputs!B6=22%
+Downside: Inputs!B5=3%, Inputs!B6=18%
+Upside: Inputs!B5=12%, Inputs!B6=26%</pre>
+        <p>Values may be numbers, percentages, TRUE/FALSE, or text. Unqualified
+        references such as <code>B5</code> resolve against the active sheet.</p>
+        <h2>Worked example: growth and margin cases</h2>
+        <p>In the <b>Discounted Cash Flow</b> model, revenue growth is
+        <code>Inputs!B5</code> and EBITDA margin is <code>Inputs!B6</code>.
+        Using the three scenarios above with:</p>
+        <pre>Output cells     Valuation!B15
+Write table at   Valuation!A26</pre>
+        <p>produces:</p>
+        <table>
+          <tr><th>Scenario</th><th>Valuation!B15</th></tr>
+          <tr><td>Base</td><td>16.35</td></tr>
+          <tr><td>Downside</td><td>8.52</td></tr>
+          <tr><td>Upside</td><td>25.83</td></tr>
+        </table>
+        <p>Add more output cells, separated by commas, to compare enterprise
+        value and equity value in the same table.</p>
+        <h2>Notes</h2>
+        <p>Every case is calculated on a copy, so your live assumptions are
+        never overwritten. The base case is worth stating explicitly even
+        though it matches the model, because it proves the wiring is right.</p>
+        <p>A line without a colon, or with an empty name, is rejected and the
+        dialog names the line number.</p>
+        """,
+    ),
+    (
+        "Financial menu: Model Audit",
+        """
+        <h1>Model Audit</h1>
+        <p>Recalculates the workbook, then scans every populated cell and ranks
+        what it finds. Run it before trusting any number you intend to publish.</p>
+        <h2>What it reports</h2>
+        <table>
+          <tr><th>Finding</th><th>Severity</th><th>Meaning</th></tr>
+          <tr><td>FORMULA_ERROR</td><td>Error</td><td>The formula evaluates to an error value.</td></tr>
+          <tr><td>CIRCULAR_REFERENCE</td><td>Error</td><td>The formula depends on itself and returns #CIRC!.</td></tr>
+          <tr><td>UNCALCULATED_FORMULA</td><td>Warning</td><td>No cached result. Recalculate with F9.</td></tr>
+          <tr><td>BLANK_PRECEDENT</td><td>Warning</td><td>The formula points directly at an empty cell.</td></tr>
+          <tr><td>EMBEDDED_CONSTANT</td><td>Info</td><td>A number is hard-coded inside a formula rather than held in a labeled input cell.</td></tr>
+        </table>
+        <p>Findings are sorted with errors first, then warnings, then
+        information, so the top of the list is always the most urgent.</p>
+        <h2>Worked example</h2>
+        <p>Open the <b>Loan Amortization</b> model and run
+        <b>Financial &gt; Model Audit</b>. It reports 2,527 formulas, 384
+        inputs, no errors, and one information finding:</p>
+        <pre>info  EMBEDDED_CONSTANT  Summary!B7
+Review hard-coded formula constant(s): 2026, 8.</pre>
+        <p>That is the first payment date, <code>=DATE(2026,8,1)</code>. This is
+        the judgement the audit is asking you to make: a start date genuinely
+        belongs in the model, so leave it &mdash; but if it were a growth rate
+        or a tax rate buried in a formula, move it to a labeled input cell so a
+        reviewer can find and change it.</p>
+        <p>An audit finding is a prompt to look, not proof of a mistake.</p>
+        <h2>Reading error values</h2>
+        <p><b>#VALUE!</b> usually indicates the wrong data type or mismatched
+        ranges. <b>#NUM!</b> indicates an invalid financial domain or a solver
+        that could not find a result. <b>#DIV/0!</b> indicates a zero
+        denominator. <b>#NAME?</b> indicates an unknown function or a misspelled
+        name. <b>#CIRC!</b> identifies a circular dependency.</p>
+        <h2>Workflow</h2>
+        <ol>
+          <li>Press F9 to recalculate the entire workbook.</li>
+          <li>Open <b>Financial &gt; Model Audit</b>.</li>
+          <li>Resolve formula errors and circular references first.</li>
+          <li>Review blank precedents and uncalculated formulas.</li>
+          <li>Inspect embedded constants and move real assumptions to labeled cells.</li>
+          <li>Confirm balance, roll-forward, sources-and-uses, and cash checks.</li>
+        </ol>
         """,
     ),
     (
@@ -149,43 +362,6 @@ _TUTORIALS = (
         <p>Build one row per period with beginning book value, depreciation, and
         ending book value. The ending value must not fall below salvage, and total
         depreciation must not exceed cost minus salvage.</p>
-        """,
-    ),
-    (
-        "Use Goal Seek, sensitivity, and scenarios",
-        """
-        <h1>What-if analysis</h1>
-        <h2>Goal Seek</h2>
-        <p>Select a formula output, choose one numeric input, and specify a target.
-        Duddy Spreadsheet solves on a copy of the workbook. The live input changes only
-        after confirmation and the change is undoable.</p>
-        <h2>Sensitivity tables</h2>
-        <p>Use one variable for a single assumption range, such as revenue growth.
-        Use two variables for combinations such as WACC by terminal growth or
-        rent by vacancy. Write results to an unused area; the entire table is one
-        undoable edit.</p>
-        <h2>Scenarios</h2>
-        <p>Enter one line per case:
-        <code>Downside: B4=2%, B5=18%, B9=11%</code>. Choose output cells and
-        compare base, downside, and upside cases without overwriting assumptions.</p>
-        """,
-    ),
-    (
-        "Audit and troubleshoot a model",
-        """
-        <h1>Model audit workflow</h1>
-        <ol>
-          <li>Press F9 to recalculate the entire workbook.</li>
-          <li>Open <b>Financial &gt; Model Audit</b>.</li>
-          <li>Resolve formula errors and circular references first.</li>
-          <li>Review blank precedents and uncalculated formulas.</li>
-          <li>Inspect embedded constants and move real assumptions to labeled cells.</li>
-          <li>Confirm balance, roll-forward, sources-and-uses, and cash checks.</li>
-        </ol>
-        <p><b>#VALUE!</b> usually indicates the wrong data type or mismatched
-        ranges. <b>#NUM!</b> indicates an invalid financial domain or a solver
-        that could not find a result. <b>#DIV/0!</b> indicates a zero denominator.
-        <b>#CIRC!</b> identifies a circular dependency.</p>
         """,
     ),
     (

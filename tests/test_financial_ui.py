@@ -188,7 +188,13 @@ def test_financial_help_contains_tutorials_quick_reference_and_models() -> None:
     dialog = FinancialHelpDialog()
 
     assert dialog.tutorial_list.count() >= 9
-    dialog.tutorial_list.setCurrentRow(1)
+    titles = [
+        dialog.tutorial_list.item(row).text()
+        for row in range(dialog.tutorial_list.count())
+    ]
+    dialog.tutorial_list.setCurrentRow(
+        titles.index("Build a loan amortization schedule")
+    )
     assert "Loan amortization" in dialog.tutorial_detail.toPlainText()
     quick_reference = dialog.findChild(
         type(dialog.function_detail),
