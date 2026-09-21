@@ -97,7 +97,9 @@ analysis = Analysis(
     pathex=[str(ROOT)],
     binaries=[],
     datas=datas,
-    hiddenimports=collect_submodules("duddysheet"),
+    # matplotlib resolves projection="3d" by name at runtime, which static
+    # analysis cannot see; 3-D charts need the toolkit bundled explicitly.
+    hiddenimports=collect_submodules("duddysheet") + ["mpl_toolkits.mplot3d"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

@@ -57,11 +57,25 @@ values and emits renderer-neutral categories and numeric series.
 `expand_chart_range` discovers the connected sparse data island around a single
 selection. Neither service depends on Qt or matplotlib.
 
-The Qt Chart Studio owns live preview and editing, while `ChartPanel` owns the
-interactive matplotlib figure, navigation, clipboard, and PNG/SVG/PDF export.
-Both call the same renderer. Commands add, replace, or remove complete immutable
+`CHART_CATALOG` lists every chart type with its label, Excel family, purpose,
+and expected data layout, in Excel's gallery order. Menus, the ribbon
+galleries, Chart Studio, and the tutorial's reference tables are all generated
+from it. The Qt-free core also holds the analytical math the renderer needs:
+trendline regression in Excel's forms, error-bar amounts, 100% stacking,
+Pareto ordering, bubble pairing, treemap hierarchies, and squarified layout.
+
+`duddysheet.ui.chart_renderer` draws each chart family, then applies the chart
+elements and axis format in one shared finishing pass. The Qt Chart Studio
+owns live preview and editing, while `ChartPanel` owns the interactive
+matplotlib figure, navigation, clipboard, and PNG/SVG/PDF export. Both call
+the same renderer. Commands add, replace, or remove complete immutable
 specifications, preserving undo, native persistence, structural translation,
 and live refresh without duplicating source data.
+
+Sparklines are sheet metadata beside charts: one immutable `Sparkline` per
+cell, created by commands and translated by structural edits. The grid model
+exposes each one with its live values through a dedicated role, and the cell
+delegate paints it. They are persisted from native schema 4.
 
 ## Financial Analysis
 
@@ -115,7 +129,7 @@ printer, and PDF export all drive one renderer over one pagination, so they
 cannot drift apart. PDF export uses a PDF writer rather than a printer, which
 avoids the Windows print spooler entirely.
 
-Page setup is sheet metadata, persisted in the native format under schema 3.
+Page setup is sheet metadata, persisted in the native format since schema 3.
 A malformed stored setup falls back to defaults rather than refusing the file.
 
 ## Licensing

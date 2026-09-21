@@ -88,6 +88,20 @@ complete.
 - [x] Step-by-step tutorial for every Financial menu command, each with a worked example verified against a built-in model (`test_financial_tutorials.py`)
 - [x] Hover bubbles and status-bar text on every Financial menu command and ribbon button, with worked examples (`test_financial_tool_help.py`)
 
+## M13 Excel Charting Parity
+
+- [x] 62 chart types covering every Excel chart family except Map, including 100% stacked, 3-D, stock, surface, treemap, sunburst, Pareto, funnel, and custom combo charts (`test_chart_catalog.py`, `test_chart_ui.py`)
+- [x] Every chart type renders with every chart element and format option enabled, warning-free (`test_chart_studio.py`)
+- [x] Chart elements: axes, titles, three gridline kinds, positioned data labels with five content choices, data table, error bars, trendlines, drop lines, high-low lines, up/down bars (`test_chart_studio.py`)
+- [x] Excel-accurate trendline fits, equations, R-squared, forecasts, moving averages, and error-bar amounts (`test_chart_catalog.py`)
+- [x] Axis bounds, major unit, log scale, display units, reverse order, color schemes, gap width, overlap, pie and doughnut options, histogram bins, Switch Row/Column, empty-cell modes (`test_chart_catalog.py`, `test_chart_studio.py`)
+- [x] Treemap and sunburst hierarchies from level columns, with squarified layout (`test_chart_catalog.py`)
+- [x] Chart Studio round-trips every option when editing and keeps the chart's own type (`test_chart_studio.py`)
+- [x] Insert menu and ribbon chart galleries insert any chart type from the selection, undoably (`test_chart_studio.py`)
+- [x] Line, Column, and Win/Loss sparklines: creation, replacement, clearing, undo, structural translation, sheet rename, live values, painting, and native persistence (`test_sparklines.py`)
+- [x] Native schema 4 with lossless chart options and a migration from schema 3 (`test_chart_studio.py`)
+- [x] Help > Charts and Graphing Tutorial with 25 searchable lessons, a generated reference for every chart type, and context help from Chart Studio and chart windows (`test_chart_studio.py`)
+
 ## M12 Commercial Readiness
 
 - [x] Printing with page setup, print preview, and print areas (`test_printing.py`, `test_printing_ui.py`)

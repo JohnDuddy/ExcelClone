@@ -26,6 +26,7 @@ from duddysheet.core.fill import fill_range
 from duddysheet.core.operations import edit_structure
 from duddysheet.core.refs import Reference, RangeReference
 from duddysheet.core.sheet import Sheet
+from duddysheet.core.sparkline import Sparkline
 from duddysheet.core.translation import rename_formula_sheet, translate_formula_copy
 from duddysheet.core.workbook import Workbook
 
@@ -445,6 +446,63 @@ class RemoveChartCommand(_WorkbookSnapshotCommand):
         if len(retained) == len(sheet.charts):
             raise KeyError(f"Unknown chart ID: {self.chart_id}")
         sheet.charts = retained
+
+
+@dataclass
+class AddSparklinesCommand(_WorkbookSnapshotCommand):
+    """Place sparklines in cells, replacing any already in those cells."""
+
+    sheet_name: str
+    sparklines: tuple[Sparkline, ...]
+
+    @property
+    def description(self) -> str:
+        return "Insert sparklines"
+
+    def do(self) -> None:
+        if not self.sparklines:
+            raise ValueError("No sparklines to insert")
+        self._capture()
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        occupied = {(item.row, item.column) for item in self.sparklines}
+        sheet.sparklines = [
+            item
+            for item in sheet.sparklines
+            if (getattr(item, "row", None), getattr(item, "column", None))
+            not in occupied
+        ] + list(self.sparklines)
+
+
+@dataclass
+class ClearSparklinesCommand(_WorkbookSnapshotCommand):
+    """Remove every sparkline whose cell lies inside a range."""
+
+    sheet_name: str
+    target: Reference
+
+    @property
+    def description(self) -> str:
+        return "Clear sparklines"
+
+    def do(self) -> None:
+        target = (
+            self.target
+            if isinstance(self.target, RangeReference)
+            else RangeReference(self.target, self.target)
+        )
+        self._capture()
+        sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        retained = [
+            item
+            for item in sheet.sparklines
+            if not (
+                isinstance(item, Sparkline)
+                and target.contains(item.row, item.column)
+            )
+        ]
+        if len(retained) == len(sheet.sparklines):
+            raise ValueError("The selection contains no sparklines")
+        sheet.sparklines = retained
 
 
 @dataclass
@@ -957,3 +1015,21 @@ def _rename_formula_sheet_references(
                 )
             )
         sheet.charts = renamed_charts
+        renamed_sparklines: list[Any] = []
+        for sparkline in sheet.sparklines:
+            data_range = getattr(sparkline, "data_range", None)
+            if (
+                isinstance(sparkline, Sparkline)
+                and data_range is not None
+                and data_range.sheet is not None
+                and data_range.sheet.casefold() == old_name.casefold()
+            ):
+                sparkline = replace(
+                    sparkline,
+                    data_range=RangeReference(
+                        replace(data_range.start, sheet=new_name),
+                        replace(data_range.end, sheet=new_name),
+                    ),
+                )
+            renamed_sparklines.append(sparkline)
+        sheet.sparklines = renamed_sparklines

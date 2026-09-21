@@ -34,6 +34,56 @@ All notable changes follow Keep a Changelog conventions.
   signature with the one being typed emphasized, advancing as each comma is
   entered. It follows the innermost call when functions are nested and closes
   with the call.
+- Excel's complete chart gallery apart from Map charts: 62 chart types in
+  Excel's families — every Column, Line, Pie, Bar, and Area subtype including
+  100% stacked and 3-D variants, five Scatter styles, Bubble and 3-D Bubble,
+  the four Stock charts, 3-D Surface, Wireframe Surface, Contour and Wireframe
+  Contour, three Radar styles, Treemap, Sunburst, Histogram, Pareto, Box and
+  Whisker, Waterfall, Funnel, and four Combo presets including a Custom
+  Combination with per-series chart types and secondary axis.
+- Every Add Chart Element item: axes, axis titles, gridlines (major value,
+  major category, minor), data labels with position and content choices, data
+  table, error bars (standard error, percentage, standard deviation, fixed),
+  trendlines (linear, exponential, logarithmic, polynomial, power, moving
+  average) with forward and backward forecasts, equation, and R-squared, drop
+  lines, high-low lines, and up/down bars.
+- Excel's format options: value-axis minimum, maximum, and major unit,
+  logarithmic scale, display units, reverse category order, Change Colors
+  schemes, smoothed lines, gap width, series overlap, first slice angle, point
+  explosion, doughnut hole size, values in the second plot, histogram bin
+  count, Switch Row/Column, and how empty cells are shown.
+- An Insert menu with every chart family, Recommended Charts, Quick Chart
+  (Alt+F1), and Sparklines, and Excel-style chart galleries on the ribbon's
+  Insert tab. Choosing a chart type inserts it immediately from the selection.
+- Chart Studio gains an All Charts gallery that explains each type and the data
+  layout it needs, plus Elements, Format, and Data tabs.
+- Line, Column, and Win/Loss sparklines drawn inside cells, with markers,
+  high, low, first, last, and negative points, and an axis. They are undoable,
+  follow row and column insertion and deletion, and are saved with the
+  workbook.
+- Help > Charts and Graphing Tutorial: 25 searchable lessons covering every
+  chart type, element, and format option with worked examples whose numbers
+  are pinned by tests, a reference for all 62 chart types generated from the
+  chart catalog, and a quick reference mapping Excel's chart commands to their
+  place here. The Help button in Chart Studio and on each chart window opens
+  the lesson for that chart's type.
+
+### Changed
+
+- Native schema raised to 4 to carry sparklines and the new chart options,
+  with a migration from 3. Older charts open with their original appearance.
+- Pie and doughnut slices now run clockwise from 12 o'clock, as in Excel.
+- The Radar type draws lines only, as in Excel; Filled Radar and Radar with
+  Markers are new types.
+- The chart type previously labelled Line is now labelled Line with Markers,
+  which is what it draws; a new Line type has no markers.
+
+### Fixed
+
+- Editing a chart no longer silently switches it to the top recommended chart
+  type.
+- Turning gridlines off on a radar chart now hides them.
+- Clearing sparklines accepts a single cell as well as a range.
 
 ## [1.0.0] - 2026-07-27
 

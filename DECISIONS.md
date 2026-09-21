@@ -261,3 +261,19 @@ during development and fatal at distribution. `tools/release_check.py` and
 build refuses to package. The packaged application additionally runs its own
 self-test, so breakage introduced by freezing fails the build rather than the
 customer.
+
+## 2026-09-21 - Excel chart parity, without Map charts
+
+Charting now follows Excel's Insert Chart gallery family by family, keeping
+its names and subtypes so Excel users find what they expect. Map charts are
+excluded: Excel geocodes place names through an online service, which this
+offline product deliberately does not call.
+
+New chart options are appended to `ChartSpec` with defaults that reproduce the
+previous rendering, so existing workbooks look the same. The native schema
+moved to 4 because a schema-3 build could not read the new chart types or
+sparklines, and a clear "newer version" message is better than a failed load.
+
+Trendlines number category charts 1..n and compute exponential and power
+R-squared on the log scale, matching Excel, so equations shown here agree
+with Excel's for the same data.

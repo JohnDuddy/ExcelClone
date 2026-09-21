@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from PySide6.QtCore import QEvent, QPointF, QRectF, Qt
@@ -10,7 +11,13 @@ from PySide6.QtWidgets import QLineEdit, QStyledItemDelegate, QStyleOptionViewIt
 
 from duddysheet.core.cell import BorderStyle, CellFormat
 from duddysheet.ui.completer import FunctionCompleter
-from duddysheet.ui.grid_model import DATA_BAR_ROLE, EFFECTIVE_FORMAT_ROLE, ICON_ROLE
+from duddysheet.core.sparkline import Sparkline
+from duddysheet.ui.grid_model import (
+    DATA_BAR_ROLE,
+    EFFECTIVE_FORMAT_ROLE,
+    ICON_ROLE,
+    SPARKLINE_ROLE,
+)
 
 _PEN_STYLES = {
     "thin": (1, Qt.PenStyle.SolidLine),
@@ -87,6 +94,9 @@ class CellDelegate(QStyledItemDelegate):
 
         if icon:
             self._paint_icon(painter, option.rect, str(icon))
+        sparkline = index.data(SPARKLINE_ROLE)
+        if sparkline is not None:
+            paint_sparkline(painter, QRectF(option.rect), *sparkline)
         if isinstance(cell_format, CellFormat):
             self._paint_borders(painter, option.rect, cell_format)
 
@@ -152,3 +162,101 @@ class CellDelegate(QStyledItemDelegate):
                 else:
                     painter.drawLine(start.x() - offset, start.y(), end.x() - offset, end.y())
         painter.restore()
+
+
+def paint_sparkline(
+    painter: QPainter,
+    rect: QRectF,
+    sparkline: Sparkline,
+    values: tuple[float, ...],
+) -> None:
+    """Draw a line, column, or win/loss sparkline inside a cell rectangle."""
+    finite = [value for value in values if math.isfinite(value)]
+    if not finite:
+        return
+    area = rect.adjusted(3, 3, -3, -3)
+    if area.width() <= 2 or area.height() <= 2:
+        return
+    painter.save()
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    count = len(values)
+    color = QColor(sparkline.color)
+    negative = QColor(sparkline.negative_color)
+    marker = QColor(sparkline.marker_color)
+    highest, lowest = max(finite), min(finite)
+    first_index = next(i for i, v in enumerate(values) if math.isfinite(v))
+    last_index = max(i for i, v in enumerate(values) if math.isfinite(v))
+
+    def highlighted(position: int, value: float) -> bool:
+        return (
+            (sparkline.show_high and value == highest)
+            or (sparkline.show_low and value == lowest)
+            or (sparkline.show_first and position == first_index)
+            or (sparkline.show_last and position == last_index)
+            or (sparkline.show_negative and value < 0)
+        )
+
+    if sparkline.kind == "win_loss":
+        slot = area.width() / count
+        middle = area.center().y()
+        for position, value in enumerate(values):
+            if not math.isfinite(value) or value == 0:
+                continue
+            height = area.height() / 2 - 1
+            top = middle - height if value > 0 else middle + 1
+            bar = QRectF(area.left() + position * slot + slot * 0.15, top, slot * 0.7, height)
+            fill = negative if value < 0 else color
+            if highlighted(position, value) and value > 0:
+                fill = marker
+            painter.fillRect(bar, fill)
+    else:
+        low = min(0.0, lowest) if sparkline.kind == "column" else lowest
+        high = max(0.0, highest) if sparkline.kind == "column" else highest
+        span = (high - low) or 1.0
+
+        def y_of(value: float) -> float:
+            return area.bottom() - (value - low) / span * area.height()
+
+        if sparkline.show_axis and low < 0 < high:
+            painter.setPen(QPen(QColor("#8c8c8c"), 1))
+            painter.drawLine(QPointF(area.left(), y_of(0)), QPointF(area.right(), y_of(0)))
+        if sparkline.kind == "column":
+            slot = area.width() / count
+            base = y_of(max(low, 0.0)) if low < 0 else area.bottom()
+            for position, value in enumerate(values):
+                if not math.isfinite(value):
+                    continue
+                top = y_of(value)
+                bar = QRectF(
+                    area.left() + position * slot + slot * 0.15,
+                    min(top, base),
+                    slot * 0.7,
+                    max(1.0, abs(base - top)),
+                )
+                fill = negative if value < 0 else color
+                if highlighted(position, value):
+                    fill = marker if value >= 0 else negative
+                painter.fillRect(bar, fill)
+        else:
+            step = area.width() / max(1, count - 1)
+            points = [
+                QPointF(area.left() + position * step, y_of(value))
+                for position, value in enumerate(values)
+                if math.isfinite(value)
+            ]
+            painter.setPen(QPen(color, 1.5))
+            if len(points) > 1:
+                painter.drawPolyline(QPolygonF(points))
+            painter.setPen(Qt.PenStyle.NoPen)
+            for position, value in enumerate(values):
+                if not math.isfinite(value):
+                    continue
+                if sparkline.show_markers or highlighted(position, value):
+                    point = QPointF(area.left() + position * step, y_of(value))
+                    painter.setBrush(
+                        negative
+                        if value < 0 and sparkline.show_negative
+                        else (marker if highlighted(position, value) else color)
+                    )
+                    painter.drawEllipse(point, 2.2, 2.2)
+    painter.restore()

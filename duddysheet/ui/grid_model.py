@@ -11,6 +11,7 @@ from PySide6.QtGui import QBrush, QColor, QFont
 from duddysheet.commands.base import CommandHistory
 from duddysheet.commands.edits import SetCellCommand
 from duddysheet.core.conditional import ConditionalFormatEngine, ConditionalResult
+from duddysheet.core.sparkline import Sparkline, sparkline_at, sparkline_values
 from duddysheet.core.data_tools import validation_for_cell, validate_value
 from duddysheet.core.engine import FormulaEngine, SpillCellReadOnlyError
 from duddysheet.core.formats import format_value
@@ -21,6 +22,7 @@ DATA_BAR_ROLE = int(Qt.ItemDataRole.UserRole) + 1
 ICON_ROLE = int(Qt.ItemDataRole.UserRole) + 2
 EFFECTIVE_FORMAT_ROLE = int(Qt.ItemDataRole.UserRole) + 3
 HYPERLINK_ROLE = int(Qt.ItemDataRole.UserRole) + 4
+SPARKLINE_ROLE = int(Qt.ItemDataRole.UserRole) + 5
 
 _INTEGER_RE = re.compile(r"^[+-]?[0-9]+$")
 _FLOAT_RE = re.compile(
@@ -119,6 +121,8 @@ class GridModel(QAbstractTableModel):
             return cell_format
         if role == HYPERLINK_ROLE:
             return cell.hyperlink
+        if role == SPARKLINE_ROLE:
+            return self._sparkline(index)
         return None
 
     def setData(
@@ -226,6 +230,25 @@ class GridModel(QAbstractTableModel):
             index.row(),
             index.column(),
         )
+
+    def _sparkline(
+        self,
+        index: QModelIndex,
+    ) -> tuple[Sparkline, tuple[float, ...]] | None:
+        """Return a cell's sparkline with its current values, if it has one."""
+        sheet = self.sheet
+        if not sheet.sparklines:
+            return None
+        sparkline = sparkline_at(sheet.sparklines, index.row(), index.column())
+        if sparkline is None:
+            return None
+        try:
+            values = sparkline_values(
+                self.engine.workbook, self.active_sheet_name, sparkline
+            )
+        except KeyError:
+            return None
+        return sparkline, values
 
     def _history_changed(self, history: CommandHistory) -> None:
         self.refresh()

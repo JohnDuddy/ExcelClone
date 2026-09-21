@@ -129,7 +129,22 @@ def _check_charts() -> str:
 
     if not data.series:
         raise AssertionError("chart extraction produced no series")
-    return f"charts ok ({len(data.series)} series)"
+
+    # Draw a 2-D and a 3-D chart: the 3-D toolkit is loaded by name at run
+    # time, so a frozen build can lack it while every import still succeeds.
+    from dataclasses import replace
+
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+
+    from duddysheet.ui.chart_renderer import draw_chart
+
+    for chart_type in ("column", "column_3d"):
+        figure = Figure(figsize=(4, 3))
+        FigureCanvasAgg(figure)
+        draw_chart(figure, workbook, replace(spec, chart_type=chart_type))
+        figure.canvas.draw()
+    return f"charts ok ({len(data.series)} series, 2-D and 3-D rendered)"
 
 
 def _check_bundled_resources() -> str:

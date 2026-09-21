@@ -35,9 +35,11 @@ from duddysheet.commands.base import CommandHistory
 from duddysheet.commands.edits import (
     AddSheetCommand,
     AddChartCommand,
+    AddSparklinesCommand,
     AddValidationCommand,
     ApplyFilterCommand,
     ClearFilterCommand,
+    ClearSparklinesCommand,
     DeleteSheetCommand,
     DuplicateSheetCommand,
     InsertColumnsCommand,
@@ -62,6 +64,9 @@ from duddysheet.commands.edits import (
     UpdateChartCommand,
 )
 from duddysheet.core.chart import (
+    CHART_FAMILIES,
+    CHART_TYPE_LABELS,
+    CHART_TYPES,
     ChartSpec,
     chart_data,
     detect_chart_headers,
@@ -97,7 +102,9 @@ from duddysheet.ui.delegates import CellDelegate
 from duddysheet.ui.charting import ChartPanel
 from duddysheet.ui.dialogs.about import AboutDialog
 from duddysheet.ui.dialogs.activation import ActivationDialog, prompt_when_trial_expired
+from duddysheet.ui.dialogs.chart_help import ChartHelpDialog, topic_for_chart_type
 from duddysheet.ui.dialogs.chart_wizard import ChartWizard
+from duddysheet.ui.dialogs.sparklines import SparklineDialog, default_location
 from duddysheet.ui.dialogs.format_cells import FormatCellsDialog
 from duddysheet.ui.dialogs.function_help import FunctionHelpDialog
 from duddysheet.ui.dialogs.page_setup import PageSetupDialog
@@ -120,7 +127,7 @@ from duddysheet.ui.dialogs.data_tools import (
 from duddysheet.ui.formula_bar import FormulaBar
 from duddysheet.ui.grid_model import GridModel
 from duddysheet.ui.grid_view import GridView
-from duddysheet.ui.ribbon import Ribbon
+from duddysheet.ui.ribbon import Ribbon, chart_menu_entries, sparkline_menu_entries
 from duddysheet.ui.sheet_tabs import SheetTabs
 from duddysheet.ui.tool_help import apply_tool_help
 from duddysheet.util.paths import app_data_dir
@@ -262,6 +269,18 @@ class MainWindow(QMainWindow):
             self,
         )
         self.all_functions_help_action.triggered.connect(self.insert_function)
+        self.chart_help_action = QAction("Charts and Graphing Tutorial...", self)
+        self.chart_help_action.setObjectName("chartHelpAction")
+        self.chart_help_action.setStatusTip(
+            "Step-by-step lessons for every chart type, chart element, and sparkline"
+        )
+        self.chart_help_action.triggered.connect(lambda: self.show_chart_help())
+        self.recommended_charts_action = QAction("Recommended Charts...", self)
+        self.recommended_charts_action.triggered.connect(self.insert_chart)
+        self.quick_chart_action = QAction("Quick Chart", self)
+        # Excel's Alt+F1 inserts a default chart without asking anything.
+        self.quick_chart_action.setShortcut(QKeySequence("Alt+F1"))
+        self.quick_chart_action.triggered.connect(self.insert_quick_chart)
         self.about_action = QAction(f"About {PRODUCT_NAME}...", self)
         self.about_action.triggered.connect(self.show_about)
         self.activation_action = QAction("Licence and Activation...", self)
@@ -297,6 +316,8 @@ class MainWindow(QMainWindow):
         edit_menu = self.menuBar().addMenu("&Edit")
         edit_menu.addAction(self.undo_action)
         edit_menu.addAction(self.redo_action)
+        self.insert_menu = self.menuBar().addMenu("&Insert")
+        self._build_insert_menu(self.insert_menu)
         sheet_menu = self.menuBar().addMenu("&Sheet")
         sheet_menu.addAction(self.add_sheet_action)
         sheet_menu.addAction(self.rename_sheet_action)
@@ -319,6 +340,7 @@ class MainWindow(QMainWindow):
         financial_menu.addAction(self.model_audit_action)
         financial_menu.addAction(self.financial_help_action)
         help_menu = self.menuBar().addMenu("&Help")
+        help_menu.addAction(self.chart_help_action)
         help_menu.addAction(self.financial_help_action)
         help_menu.addAction(self.all_functions_help_action)
         help_menu.addSeparator()
@@ -346,6 +368,7 @@ class MainWindow(QMainWindow):
                 self.model_audit_action,
                 self.financial_help_action,
                 self.all_functions_help_action,
+                self.quick_chart_action,
             ]
         )
         self._update_history_actions(self.history)
@@ -836,7 +859,40 @@ class MainWindow(QMainWindow):
         self._sync_grid_metadata()
         self._sync_charts()
 
+    def _build_insert_menu(self, menu: Any) -> None:
+        """Fill the Insert menu: chart families, sparklines, and help."""
+        menu.addAction(self.recommended_charts_action)
+        menu.addAction(self.quick_chart_action)
+        menu.addSeparator()
+        for family, entries in chart_menu_entries(
+            tuple(family for family, _ in CHART_FAMILIES)
+        ):
+            submenu = menu.addMenu(family)
+            for label, action_name in entries:
+                action = submenu.addAction(label)
+                action.triggered.connect(
+                    lambda checked=False, name=action_name: self._ribbon_action(name)
+                )
+        menu.addSeparator()
+        sparkline_menu = menu.addMenu("Sparklines")
+        for _, entries in sparkline_menu_entries():
+            for label, action_name in entries:
+                if action_name == "Clear Sparklines":
+                    sparkline_menu.addSeparator()
+                action = sparkline_menu.addAction(label)
+                action.triggered.connect(
+                    lambda checked=False, name=action_name: self._ribbon_action(name)
+                )
+        menu.addSeparator()
+        menu.addAction(self.chart_help_action)
+
     def _ribbon_action(self, name: str) -> None:
+        if name.startswith("chart:"):
+            self.insert_chart_of_type(name.partition(":")[2])
+            return
+        if name.startswith("sparkline:"):
+            self.insert_sparklines(name.partition(":")[2])
+            return
         actions = {
             "Undo": self.history.undo,
             "Redo": self.history.redo,
@@ -882,6 +938,8 @@ class MainWindow(QMainWindow):
             "Chart": self.insert_chart,
             "Chart Studio": self.insert_chart,
             "Quick Chart": self.insert_quick_chart,
+            "Clear Sparklines": self.clear_sparklines,
+            "Chart Help": self.show_chart_help,
         }
         action = actions.get(name)
         if action is not None:
@@ -1400,6 +1458,95 @@ class MainWindow(QMainWindow):
             5000,
         )
 
+    def insert_chart_of_type(self, chart_type: str) -> None:
+        """Insert one chart type from the selection, as Excel's chart icons do."""
+        if chart_type not in CHART_TYPES:
+            self.statusBar().showMessage(f"Unknown chart type: {chart_type}", 4000)
+            return
+        sheet_name = self.grid_model.active_sheet_name
+        target = expand_chart_range(
+            self.engine.workbook,
+            sheet_name,
+            self._selected_range(),
+        )
+        if len(target) < 2:
+            self.statusBar().showMessage(
+                "Select a data range or a cell inside a contiguous data table",
+                4000,
+            )
+            return
+        has_headers = detect_chart_headers(self.engine.workbook, sheet_name, target)
+        probe = ChartSpec(
+            "insert-preview",
+            sheet_name,
+            target,
+            chart_type,
+            has_headers=has_headers,
+        )
+        spec = ChartSpec(
+            uuid4().hex,
+            sheet_name,
+            target,
+            chart_type,
+            title=infer_chart_title(chart_data(self.engine.workbook, probe)),
+            has_headers=has_headers,
+        )
+        self.history.execute(AddChartCommand(self.engine, sheet_name, spec))
+        self.statusBar().showMessage(
+            f"Inserted {CHART_TYPE_LABELS[chart_type]}. Click Edit on the chart "
+            "to add elements or change its format.",
+            5000,
+        )
+
+    def insert_sparklines(self, kind: str) -> None:
+        """Open Create Sparklines for the selected data."""
+        sheet_name = self.grid_model.active_sheet_name
+        selection = self._selected_range()
+        dialog = SparklineDialog(
+            sheet_name,
+            kind,
+            selection.to_a1(),
+            default_location(selection).to_a1(),
+            self,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            sparklines = dialog.sparklines()
+            self.history.execute(
+                AddSparklinesCommand(self.engine, sheet_name, sparklines)
+            )
+        except (KeyError, ValueError) as error:
+            self.statusBar().showMessage(str(error), 5000)
+            return
+        noun = "sparkline" if len(sparklines) == 1 else "sparklines"
+        self.statusBar().showMessage(f"Inserted {len(sparklines)} {noun}", 4000)
+
+    def clear_sparklines(self) -> None:
+        """Remove sparklines from the selected cells."""
+        try:
+            self.history.execute(
+                ClearSparklinesCommand(
+                    self.engine,
+                    self.grid_model.active_sheet_name,
+                    self._selected_range(),
+                )
+            )
+        except ValueError as error:
+            self.statusBar().showMessage(str(error), 4000)
+
+    def show_chart_help(
+        self,
+        topic: str | None = None,
+        *,
+        chart_type: str | None = None,
+    ) -> None:
+        """Open the Charts and Graphing Tutorial, optionally at one lesson."""
+        ChartHelpDialog(
+            self,
+            topic=topic or topic_for_chart_type(chart_type),
+        ).exec()
+
     def _sync_charts(self) -> None:
         active_specs = {
             chart.chart_id: chart
@@ -1418,6 +1565,11 @@ class MainWindow(QMainWindow):
                 panel = ChartPanel(self.engine.workbook, spec, self)
                 panel.closeRequested.connect(self._remove_chart)
                 panel.editRequested.connect(self._edit_chart)
+                panel.helpRequested.connect(
+                    lambda panel=panel: self.show_chart_help(
+                        chart_type=panel.spec.chart_type
+                    )
+                )
                 self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, panel)
                 panel.setFloating(True)
                 panel.show()

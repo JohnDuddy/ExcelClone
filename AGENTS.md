@@ -42,11 +42,17 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M12 is complete. Duddy Spreadsheet includes explainable chart recommendations, Quick
-Chart, a live-preview Chart Studio, 17 analytical chart types, five themes,
-labels, trendlines, extrema, secondary axes, interactive navigation,
-PNG/SVG/PDF export, undoable editing, and lossless native chart persistence.
-The prior M11 financial modeling, the 76-calculation/12-chart Financial
+M13 is complete. Charting matches Excel's gallery apart from Map charts: 62
+chart types across Excel's families (including 100% stacked, 3-D, stock,
+surface, treemap, sunburst, Pareto, funnel, and custom combos), every Add
+Chart Element item, Excel's axis and series format options, Line, Column, and
+Win/Loss sparklines, an Insert menu and ribbon galleries, and a 25-lesson
+Charts and Graphing Tutorial under Help. The chart catalog in
+`duddysheet.core.chart` is the single source for type names, gallery order,
+and tutorial reference tables; rendering lives in `duddysheet.ui.chart_renderer`.
+The native schema is 4.
+
+The prior M12 commercial readiness, M11 financial modeling with the Financial
 Calculations Lab, and comprehensive F1 help remain covered by the release
 regression contract.
 
@@ -54,4 +60,6 @@ regression contract.
 
 No shipped behavior is known to be broken. VBA, pivots, Power Query, live
 market feeds, multi-variable optimization, collaboration, and embedded Office
-objects remain intentionally outside scope.
+objects remain intentionally outside scope. Map charts are out of scope
+because they need an online geography service. Charts and sparklines persist
+only in `.dsheet`; `.xlsx` import and export carry data without them.

@@ -7,8 +7,9 @@ from dataclasses import replace
 from duddysheet.core.conditional import ConditionalRule
 from duddysheet.core.chart import ChartSpec
 from duddysheet.core.data_tools import AutoFilter, DataValidation
-from duddysheet.core.refs import RangeReference
+from duddysheet.core.refs import CellReference, RangeReference
 from duddysheet.core.refs import MAX_COLUMNS, MAX_ROWS
+from duddysheet.core.sparkline import Sparkline
 from duddysheet.core.translation import (
     translate_formula_structure,
     translate_reference_structure,
@@ -76,6 +77,16 @@ def edit_structure(
                     replace(chart, source_range=translated_range)
                 )
         formula_sheet.charts = translated_charts
+        formula_sheet.sparklines = _translate_sparklines(
+            formula_sheet.sparklines,
+            owner_name=formula_sheet.name,
+            owner_is_target=formula_sheet is target,
+            target_name=target.name,
+            axis=axis,
+            index=index,
+            count=count,
+            delete=delete,
+        )
 
     _move_cells(target, axis=axis, index=index, count=count, delete=delete)
     if axis == "row":
@@ -305,3 +316,51 @@ def _move_index_set(
         )
         is not None
     }
+
+
+def _translate_sparklines(
+    sparklines: list[object],
+    *,
+    owner_name: str,
+    owner_is_target: bool,
+    target_name: str,
+    axis: str,
+    index: int,
+    count: int,
+    delete: bool,
+) -> list[object]:
+    """Move sparkline cells and data ranges with a structural edit.
+
+    A sparkline whose cell or whole data range is deleted is removed, as in
+    Excel.
+    """
+    translated: list[object] = []
+    for sparkline in sparklines:
+        if not isinstance(sparkline, Sparkline):
+            translated.append(sparkline)
+            continue
+        data_range = sparkline.data_range
+        data_sheet = data_range.sheet or owner_name
+        if data_sheet.casefold() == target_name.casefold():
+            moved_range = translate_reference_structure(
+                data_range, axis=axis, index=index, count=count, delete=delete
+            )
+            if not isinstance(moved_range, RangeReference):
+                continue
+            data_range = moved_range
+        row, column = sparkline.row, sparkline.column
+        if owner_is_target:
+            moved_cell = translate_reference_structure(
+                CellReference(row, column),
+                axis=axis,
+                index=index,
+                count=count,
+                delete=delete,
+            )
+            if not isinstance(moved_cell, CellReference):
+                continue
+            row, column = moved_cell.row, moved_cell.column
+        translated.append(
+            replace(sparkline, row=row, column=column, data_range=data_range)
+        )
+    return translated

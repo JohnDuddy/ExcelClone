@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import fields
+from dataclasses import asdict, fields
 from datetime import date, datetime, time
 from pathlib import Path
 from typing import Any, Callable
@@ -14,10 +14,11 @@ from duddysheet.core.chart import ChartSpec
 from duddysheet.core.conditional import ConditionalRule, FormatPatch
 from duddysheet.core.data_tools import AutoFilter, DataValidation
 from duddysheet.core.printing import setup_from_dict, setup_to_dict
-from duddysheet.core.refs import parse_a1
+from duddysheet.core.refs import RangeReference, parse_a1
+from duddysheet.core.sparkline import Sparkline
 from duddysheet.core.workbook import Workbook
 
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 Migration = Callable[[dict[str, Any], dict[str, dict[str, Any]]], None]
 
 
@@ -37,9 +38,18 @@ def _migrate_v2_to_v3(
     del manifest, sheet_data
 
 
+def _migrate_v3_to_v4(
+    manifest: dict[str, Any],
+    sheet_data: dict[str, dict[str, Any]],
+) -> None:
+    """Accept v3 sheets: no sparklines, and chart options at their defaults."""
+    del manifest, sheet_data
+
+
 MIGRATIONS: dict[int, Migration] = {
     1: _migrate_v1_to_v2,
     2: _migrate_v2_to_v3,
+    3: _migrate_v3_to_v4,
 }
 
 
@@ -171,6 +181,11 @@ def _sheet_to_data(sheet: Any) -> dict[str, Any]:
             for item in sheet.charts
             if isinstance(item, ChartSpec)
         ],
+        "sparklines": [
+            _sparkline_to_data(item)
+            for item in sheet.sparklines
+            if isinstance(item, Sparkline)
+        ],
         "freeze_panes": list(sheet.freeze_panes) if sheet.freeze_panes else None,
         "tab_color": sheet.tab_color,
         "visible": sheet.visible,
@@ -235,6 +250,9 @@ def _restore_sheet(sheet: Any, data: dict[str, Any]) -> None:
     sheet.filtered_rows = {int(value) for value in data.get("filtered_rows", ())}
     sheet.charts = [
         _chart_from_data(item) for item in data.get("charts", ())
+    ]
+    sheet.sparklines = [
+        _sparkline_from_data(item) for item in data.get("sparklines", ())
     ]
     panes = data.get("freeze_panes")
     sheet.freeze_panes = tuple(panes) if panes is not None else None
@@ -387,55 +405,52 @@ def _filter_from_data(data: dict[str, Any]) -> AutoFilter:
     )
 
 
+_CHART_TUPLE_FIELDS = frozenset(
+    {"series_columns", "combo_series_types", "secondary_series"}
+)
+
+
 def _chart_to_data(chart: ChartSpec) -> dict[str, Any]:
-    return {
-        "chart_id": chart.chart_id,
-        "sheet_name": chart.sheet_name,
-        "source_range": chart.source_range.to_a1(),
-        "chart_type": chart.chart_type,
-        "title": chart.title,
-        "x_axis_title": chart.x_axis_title,
-        "y_axis_title": chart.y_axis_title,
-        "legend_position": chart.legend_position,
-        "has_headers": chart.has_headers,
-        "category_column": chart.category_column,
-        "series_columns": (
-            list(chart.series_columns)
-            if chart.series_columns is not None
-            else None
-        ),
-        "theme": chart.theme,
-        "show_data_labels": chart.show_data_labels,
-        "show_trendline": chart.show_trendline,
-        "highlight_extrema": chart.highlight_extrema,
-        "show_grid": chart.show_grid,
-        "secondary_axis": chart.secondary_axis,
-        "number_format": chart.number_format,
-    }
+    data: dict[str, Any] = {}
+    for spec_field in fields(ChartSpec):
+        value = getattr(chart, spec_field.name)
+        if isinstance(value, RangeReference):
+            value = value.to_a1()
+        elif isinstance(value, tuple):
+            value = list(value)
+        data[spec_field.name] = value
+    return data
 
 
 def _chart_from_data(data: dict[str, Any]) -> ChartSpec:
-    columns = data.get("series_columns")
-    return ChartSpec(
-        data["chart_id"],
-        data["sheet_name"],
-        parse_a1(data["source_range"]),
-        data["chart_type"],
-        data.get("title", ""),
-        data.get("x_axis_title", ""),
-        data.get("y_axis_title", ""),
-        data.get("legend_position", "right"),
-        bool(data.get("has_headers", True)),
-        data.get("category_column"),
-        tuple(columns) if columns is not None else None,
-        data.get("theme", "executive"),
-        bool(data.get("show_data_labels", False)),
-        bool(data.get("show_trendline", False)),
-        bool(data.get("highlight_extrema", False)),
-        bool(data.get("show_grid", True)),
-        bool(data.get("secondary_axis", False)),
-        data.get("number_format", "auto"),
-    )
+    """Rebuild a chart; fields missing from older files keep their defaults."""
+    values: dict[str, Any] = {}
+    for spec_field in fields(ChartSpec):
+        if spec_field.name not in data:
+            continue
+        value = data[spec_field.name]
+        if spec_field.name == "source_range":
+            value = parse_a1(value)
+        elif spec_field.name in _CHART_TUPLE_FIELDS and value is not None:
+            value = tuple(value)
+        values[spec_field.name] = value
+    return ChartSpec(**values)
+
+
+def _sparkline_to_data(sparkline: Sparkline) -> dict[str, Any]:
+    data = asdict(sparkline)
+    data["data_range"] = sparkline.data_range.to_a1()
+    return data
+
+
+def _sparkline_from_data(data: dict[str, Any]) -> Sparkline:
+    values = {
+        spec_field.name: data[spec_field.name]
+        for spec_field in fields(Sparkline)
+        if spec_field.name in data
+    }
+    values["data_range"] = parse_a1(values["data_range"])
+    return Sparkline(**values)
 
 
 def _encode_value(value: Any) -> Any:
