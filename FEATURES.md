@@ -55,6 +55,7 @@ complete.
 - [x] Explicit XLSX dropped-feature warnings (`test_io_roundtrip.py`)
 - [x] CSV/TSV encoding, delimiter, scalar/date detection, and export (`test_csv_io.py`)
 - [x] File menu workflow and persisted ten-item recent-files list (`test_ui_workflow.py`, `test_settings.py`)
+- [x] Startup workbook from the command line via `--open PATH` or a bare path (`test_app_smoke.py`)
 - [x] Reference-safe row/column insert-delete with atomic undo (`test_structural_commands.py`, `test_translation.py`)
 - [x] Multi-key sort and value-list autofilter (`test_data_tools.py`, `test_data_dialogs.py`)
 - [x] Find/replace with value/formula, regex, case, and whole-cell scope (`test_data_tools.py`)

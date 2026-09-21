@@ -6,6 +6,12 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Added
 
+- A workbook named on the command line now opens at startup. `--open PATH`,
+  `--open=PATH`, or a single bare path all work, so Duddy Spreadsheet can be
+  launched from a script or a shortcut, or registered as the handler for a
+  spreadsheet file type. A file that cannot be read reports the reason and
+  leaves an empty window open rather than exiting, and import warnings appear
+  as they do for File > Open.
 - Hover bubbles on every Financial menu command, and on the matching Financial
   ribbon buttons. Each names the command, says in one line what it does, gives
   the real situation that calls for it — the committee that disputes your
