@@ -119,3 +119,7 @@ complete.
 - [x] PyInstaller onedir freeze and Inno Setup installer configuration (`test_distribution.py`)
 - [x] Packaged-build self-test covering formulas, both file formats, models, charts, PDF, and licensing (`duddysheet/selftest.py`)
 - [x] Release checks blocking a placeholder signing key or missing licence texts (`test_distribution.py`, `test_licensing_compliance.py`)
+
+## Manuscript Desk workbook links
+
+File > Link selection to Manuscript Desk opens the selected sheet and range in the local document companion. Links use saved native workbooks, including calculated values. Install the matching Manuscript Desk build on Windows to enable the handoff.

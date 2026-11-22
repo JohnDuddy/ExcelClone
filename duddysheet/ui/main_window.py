@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -313,6 +315,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.print_preview_action)
         file_menu.addAction(self.print_action)
         file_menu.addAction(self.export_pdf_action)
+        file_menu.addAction("Link selection to Manuscript Desk...", self.link_to_manuscript)
         edit_menu = self.menuBar().addMenu("&Edit")
         edit_menu.addAction(self.undo_action)
         edit_menu.addAction(self.redo_action)
@@ -1270,6 +1273,54 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Print Failed", str(error))
             return
         self.statusBar().showMessage(f"Sent {pages} page(s) to the printer", 4000)
+
+    def link_to_manuscript(self) -> None:
+        """Open the saved native workbook selection in Manuscript Desk."""
+        title = "Link selection to Manuscript Desk"
+        home = Path(os.environ.get("LOCALAPPDATA", "")) / "ManuscriptDesk"
+        python = home / "source-env" / "Scripts" / "pythonw.exe"
+        script = home / "source_window.pyw"
+        if not (home.is_absolute() and python.is_file() and script.is_file()
+                and (home / "native_source.py").is_file()):
+            QMessageBox.information(self, title, "Install Manuscript Desk with native Duddy Spreadsheet support first.")
+            return
+        selections = list(self.grid.selectionModel().selection())
+        if len(selections) == 1:
+            rect = selections[0]
+            region = RangeReference(CellReference(rect.top(), rect.left()),
+                                    CellReference(rect.bottom(), rect.right()))
+        elif not selections and self.grid.currentIndex().isValid():
+            index = self.grid.currentIndex()
+            point = CellReference(index.row(), index.column())
+            region = RangeReference(point, point)
+        else:
+            QMessageBox.information(self, title, "Select one rectangular range to link.")
+            return
+        if region.max_column - region.min_column >= 16 or region.max_row - region.min_row >= 500:
+            QMessageBox.information(self, title, "Select at most 16 columns and 500 rows.")
+            return
+        path = self.current_path
+        try:
+            if path is None or path.suffix.lower() != NATIVE_SUFFIX:
+                name, _ = QFileDialog.getSaveFileName(
+                    self, "Save native workbook for linking",
+                    str((path or Path.home() / "Workbook").with_suffix(NATIVE_SUFFIX)),
+                    "Duddy Spreadsheet (*.dsheet)",
+                )
+                if not name:
+                    return
+                path = Path(name)
+                if path.suffix.lower() != NATIVE_SUFFIX:
+                    raise ValueError("Choose a .dsheet filename.")
+                self.save_path(path)
+            elif self.dirty or not path.is_file():
+                if QMessageBox.question(self, title, "Save the current workbook before linking?") != QMessageBox.StandardButton.Yes:
+                    return
+                self.save_path(path)
+            subprocess.Popen([str(python), str(script), str(path.resolve()),
+                              self.grid_model.active_sheet_name, region.to_a1()])
+        except (OSError, ValueError) as error:
+            QMessageBox.warning(self, title, str(error))
 
     def export_pdf(self) -> None:
         """Write the active sheet to a PDF file."""
