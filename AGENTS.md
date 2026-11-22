@@ -63,3 +63,7 @@ market feeds, multi-variable optimization, collaboration, and embedded Office
 objects remain intentionally outside scope. Map charts are out of scope
 because they need an online geography service. Charts and sparklines persist
 only in `.dsheet`; `.xlsx` import and export carry data without them.
+
+## Manuscript Desk workbook links
+
+File > Link selection to Manuscript Desk opens the selected sheet and range in the local document companion. Links use saved native workbooks, including calculated values. Install the matching Manuscript Desk build on Windows to enable the handoff.

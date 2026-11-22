@@ -255,3 +255,7 @@ First commercial release, as Duddy Spreadsheet.
 - `NPER` now accepts valid same-sign logarithm terms while rejecting cash-flow
   sets that have no financial solution.
 - Optional `#` integer placeholders now suppress insignificant zero values.
+
+## Manuscript Desk workbook links
+
+File > Link selection to Manuscript Desk opens the selected sheet and range in the local document companion. Links use saved native workbooks, including calculated values. Install the matching Manuscript Desk build on Windows to enable the handoff.
