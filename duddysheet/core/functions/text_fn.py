@@ -212,8 +212,8 @@ def rept(context: Any, value: Any, count: Any) -> Any:
 
 @register("TRIM", min_args=1, max_args=1, argument_spec="text")
 def trim(context: Any, value: Any) -> str:
-    """Remove leading, trailing, and repeated ASCII spaces."""
-    return " ".join(text(scalar(context, value)).split())
+    """Remove leading, trailing, and repeated ASCII spaces (not tabs or line breaks)."""
+    return re.sub(" {2,}", " ", text(scalar(context, value))).strip(" ")
 
 
 @register("UPPER", min_args=1, max_args=1, argument_spec="text")
@@ -240,36 +240,19 @@ def proper(context: Any, value: Any) -> str:
 
 @register("TEXT", min_args=2, max_args=2, argument_spec="value, format_text")
 def text_function(context: Any, value: Any, format_text: Any) -> Any:
-    """Render a value with common worksheet number-format patterns."""
+    """Format a value as text using an Excel number-format code."""
+    from duddysheet.core.formats import format_number_text
+
     selected = scalar(context, value)
+    if is_error(selected):
+        return selected
     pattern = text(scalar(context, format_text))
-    if any(token in pattern.lower() for token in ("yy", "mm", "dd", "hh", "ss")):
-        converted_date = serial_datetime(selected)
-        if is_error(converted_date):
-            return converted_date
-        replacements = {
-            "yyyy": "%Y",
-            "yy": "%y",
-            "mmmm": "%B",
-            "mmm": "%b",
-            "mm": "%m",
-            "dd": "%d",
-            "hh": "%H",
-            "ss": "%S",
-        }
-        rendered_pattern = pattern
-        for source, target in replacements.items():
-            rendered_pattern = rendered_pattern.replace(source, target)
-        return converted_date.strftime(rendered_pattern)
-    converted = number(selected)
-    if is_error(converted):
-        return converted
-    if "%" in pattern:
-        decimals = len(pattern.partition(".")[2].partition("%")[0]) if "." in pattern else 0
-        return f"{converted * 100:.{decimals}f}%"
-    decimals = len(pattern.partition(".")[2]) if "." in pattern else 0
-    grouping = "," in pattern.partition(".")[0]
-    return f"{converted:,.{decimals}f}" if grouping else f"{converted:.{decimals}f}"
+    if selected is None:
+        selected = 0
+    if isinstance(selected, bool):
+        return "TRUE" if selected else "FALSE"
+    rendered = format_number_text(selected, pattern)
+    return VALUE_ERROR if rendered is None else rendered
 
 
 @register("VALUE", min_args=1, max_args=1, argument_spec="text")

@@ -18,6 +18,7 @@ from duddysheet.core.parser import (
     ReferenceNode,
     ReferenceOperatorNode,
     UnaryNode,
+    node_children,
     collect_references,
     parse_formula,
 )
@@ -487,20 +488,9 @@ def _embedded_constants(ast: Node) -> tuple[float, ...]:
                 and float(node.value) not in (0.0, 1.0)
             ):
                 constants.append(float(node.value))
-        elif isinstance(node, (UnaryNode, PercentNode)):
-            visit(node.operand)
-        elif isinstance(node, (BinaryNode, ReferenceOperatorNode)):
-            visit(node.left)
-            visit(node.right)
-        elif isinstance(node, FunctionNode):
-            for argument in node.arguments:
-                visit(argument)
-        elif isinstance(node, ArrayNode):
-            for row in node.rows:
-                for item in row:
-                    visit(item)
-        elif isinstance(node, (ReferenceNode, NameNode)):
             return
+        for child in node_children(node):
+            visit(child)
 
     visit(ast)
     return tuple(dict.fromkeys(constants))

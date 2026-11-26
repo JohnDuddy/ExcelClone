@@ -28,6 +28,12 @@ class FormatPatch:
     horizontal_alignment: str | None = None
     vertical_alignment: str | None = None
     wrap_text: bool | None = None
+    strikethrough: bool | None = None
+    indent: int | None = None
+    text_rotation: int | None = None
+    shrink_to_fit: bool | None = None
+    locked: bool | None = None
+    formula_hidden: bool | None = None
     left_border: BorderStyle | None = None
     right_border: BorderStyle | None = None
     top_border: BorderStyle | None = None
@@ -79,7 +85,13 @@ class ConditionalFormatEngine:
     def evaluate(self, sheet: Sheet, row: int, column: int) -> ConditionalResult:
         """Return the effective presentation for a coordinate."""
         cell = sheet.get_cell(row, column)
-        effective = cell.format
+        effective = sheet.effective_format(row, column) if cell.is_empty else cell.format
+        if sheet.tables:
+            from duddysheet.core.tables import style_cell, table_at
+
+            table = table_at(sheet, row, column)
+            if table is not None:
+                effective = style_cell(table, row, column, effective)
         data_bar: float | None = None
         icon: str | None = None
         for rule in sheet.conditional_formats:

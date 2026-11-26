@@ -42,7 +42,19 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M13 is complete. Charting matches Excel's gallery apart from Map charts: 62
+M14 is complete. Excel functional parity covers Excel 365 calculation
+semantics (spills, `@`, `#`, LET, LAMBDA, 3-D references), 524 functions,
+Excel's editing and keyboard model, auditing, styles, protection, outlines,
+and calculation options. Excel Tables live in `duddysheet.core.tables`
+(structured references resolve there), PivotTables in
+`duddysheet.core.pivot`, and What-If data tables in
+`duddysheet.core.data_table` (TABLE evaluates through `WhatIfEvaluator`
+without touching real inputs). Their commands are in
+`duddysheet.commands.analysis`, their window wiring in
+`duddysheet.ui.analysis_ui`, and their 16-lesson tutorial and practice
+workbook in `duddysheet.core.analysis_help`. The native schema is 5.
+
+M13 is also complete. Charting matches Excel's gallery apart from Map charts: 62
 chart types across Excel's families (including 100% stacked, 3-D, stock,
 surface, treemap, sunburst, Pareto, funnel, and custom combos), every Add
 Chart Element item, Excel's axis and series format options, Line, Column, and
@@ -50,7 +62,6 @@ Win/Loss sparklines, an Insert menu and ribbon galleries, and a 25-lesson
 Charts and Graphing Tutorial under Help. The chart catalog in
 `duddysheet.core.chart` is the single source for type names, gallery order,
 and tutorial reference tables; rendering lives in `duddysheet.ui.chart_renderer`.
-The native schema is 4.
 
 The prior M12 commercial readiness, M11 financial modeling with the Financial
 Calculations Lab, and comprehensive F1 help remain covered by the release
@@ -58,8 +69,10 @@ regression contract.
 
 ## Known Issues
 
-No shipped behavior is known to be broken. VBA, pivots, Power Query, live
-market feeds, multi-variable optimization, collaboration, and embedded Office
-objects remain intentionally outside scope. Map charts are out of scope
+No shipped behavior is known to be broken. VBA, Power Query, live market
+feeds, multi-variable optimization, collaboration, and embedded Office objects
+remain intentionally outside scope. PivotTables persist only in `.dsheet`;
+`.xlsx` export keeps their output values but not the PivotTable object.
+Calculated fields, slicers, and PivotCharts are not implemented. Map charts are out of scope
 because they need an online geography service. Charts and sparklines persist
 only in `.dsheet`; `.xlsx` import and export carry data without them.

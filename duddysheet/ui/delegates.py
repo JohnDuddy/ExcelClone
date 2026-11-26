@@ -30,6 +30,88 @@ _PEN_STYLES = {
 }
 
 
+_POINT_TRIGGERS = set("=(,+-*/^&<>:; ")
+
+
+def clear_point(editor: Any) -> None:
+    """Forget any in-progress point-mode reference."""
+    editor.setProperty("pointSpan", None)
+    editor.setProperty("pointCell", None)
+    editor.setProperty("pointAnchor", None)
+
+
+def can_point(editor: Any) -> bool:
+    """Return whether the formula is waiting for a reference at the cursor."""
+    text = editor.text()
+    if not text.startswith("="):
+        return False
+    if editor.property("pointSpan") is not None:
+        return True
+    position = editor.cursorPosition()
+    return position > 0 and text[position - 1] in _POINT_TRIGGERS
+
+
+def insert_point_reference(
+    editor: Any,
+    row: int,
+    column: int,
+    *,
+    anchor: tuple[int, int] | None = None,
+) -> None:
+    """Insert or replace the point-mode reference with a cell or range."""
+    from duddysheet.core.refs import CellReference, RangeReference
+
+    text = editor.text()
+    span = editor.property("pointSpan")
+    if span is None:
+        start = end = editor.cursorPosition()
+    else:
+        start, end = span
+    if anchor is not None and anchor != (row, column):
+        top, bottom = sorted((anchor[0], row))
+        left, right = sorted((anchor[1], column))
+        reference = RangeReference(CellReference(top, left), CellReference(bottom, right)).to_a1()
+    else:
+        reference = CellReference(row, column).to_a1(include_sheet=False)
+    editor.setText(text[:start] + reference + text[end:])
+    editor.setCursorPosition(start + len(reference))
+    editor.setProperty("pointSpan", (start, start + len(reference)))
+    editor.setProperty("pointCell", (row, column))
+
+
+def point_reference(
+    editor: Any,
+    view: Any,
+    d_row: int,
+    d_column: int,
+    *,
+    extend: bool,
+    to_edge: bool,
+) -> bool:
+    """Excel point mode: arrow keys while typing a formula insert a reference."""
+    if not can_point(editor):
+        return False
+    current = view.currentIndex()
+    base = editor.property("pointCell") or (current.row(), current.column())
+    anchor = editor.property("pointAnchor")
+    if extend and anchor is None:
+        anchor = tuple(base)
+        editor.setProperty("pointAnchor", anchor)
+    if not extend:
+        editor.setProperty("pointAnchor", None)
+        anchor = None
+    if to_edge:
+        from duddysheet.core.navigation import data_edge
+
+        row, column = data_edge(view.grid_model.sheet, base[0], base[1], d_row, d_column)
+    else:
+        row = max(0, base[0] + d_row)
+        column = max(0, base[1] + d_column)
+    insert_point_reference(editor, row, column, anchor=anchor)
+    view.scrollTo(view.grid_model.index(row, column))
+    return True
+
+
 def _completer_for(editor: Any) -> FunctionCompleter | None:
     """Return the suggestion controller owned by a cell editor, if present."""
     if not isinstance(editor, QLineEdit):
@@ -54,12 +136,58 @@ class CellDelegate(QStyledItemDelegate):
         return editor
 
     def eventFilter(self, editor: Any, event: QEvent) -> bool:
-        """Let an open suggestion list claim navigation keys before the view."""
+        """Excel editing keys: suggestions first, then point mode, then commit-and-move."""
         if event.type() == QEvent.Type.KeyPress and isinstance(event, QKeyEvent):
             completer = _completer_for(editor)
             if completer is not None and completer.handle_key(event):
                 return True
+            if isinstance(editor, QLineEdit) and self._handle_excel_key(editor, event):
+                return True
         return super().eventFilter(editor, event)
+
+    _MOVES = {
+        Qt.Key.Key_Up: (-1, 0),
+        Qt.Key.Key_Down: (1, 0),
+        Qt.Key.Key_Left: (0, -1),
+        Qt.Key.Key_Right: (0, 1),
+    }
+
+    def _view(self) -> Any:
+        view = self.parent()
+        return view if hasattr(view, "move_after_edit") else None
+
+    def _commit_and_move(self, editor: QLineEdit, d_row: int, d_column: int) -> None:
+        view = self._view()
+        self.commitData.emit(editor)
+        self.closeEditor.emit(editor, QStyledItemDelegate.EndEditHint.NoHint)
+        if view is not None:
+            view.move_after_edit(d_row, d_column)
+
+    def _handle_excel_key(self, editor: QLineEdit, event: QKeyEvent) -> bool:
+        key = event.key()
+        modifiers = event.modifiers()
+        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        control = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        alt = bool(modifiers & Qt.KeyboardModifier.AltModifier)
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not alt and not control:
+            self._commit_and_move(editor, -1 if shift else 1, 0)
+            return True
+        if key == Qt.Key.Key_Tab:
+            self._commit_and_move(editor, 0, 1)
+            return True
+        if key == Qt.Key.Key_Backtab:
+            self._commit_and_move(editor, 0, -1)
+            return True
+        view = self._view()
+        if key in self._MOVES and not alt and view is not None and view.edit_mode == "enter":
+            d_row, d_column = self._MOVES[key]
+            if point_reference(editor, view, d_row, d_column, extend=shift, to_edge=control):
+                return True
+            self._commit_and_move(editor, d_row, d_column)
+            return True
+        if event.text():
+            clear_point(editor)
+        return False
 
     def destroyEditor(self, editor: QWidget, index: Any) -> None:
         """Dismiss any open guidance before the editor is torn down."""

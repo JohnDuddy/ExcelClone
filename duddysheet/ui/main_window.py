@@ -96,14 +96,10 @@ from duddysheet.core.refs import CellReference, RangeReference, parse_a1
 from duddysheet.core.workbook import Workbook
 from duddysheet.io.csv_io import read_delimited, write_delimited
 from duddysheet.io.native import load_native, save_native
-from duddysheet.io.xlsx_reader import read_xlsx
-from duddysheet.io.xlsx_writer import write_xlsx
 from duddysheet.ui.delegates import CellDelegate
-from duddysheet.ui.charting import ChartPanel
 from duddysheet.ui.dialogs.about import AboutDialog
 from duddysheet.ui.dialogs.activation import ActivationDialog, prompt_when_trial_expired
 from duddysheet.ui.dialogs.chart_help import ChartHelpDialog, topic_for_chart_type
-from duddysheet.ui.dialogs.chart_wizard import ChartWizard
 from duddysheet.ui.dialogs.sparklines import SparklineDialog, default_location
 from duddysheet.ui.dialogs.format_cells import FormatCellsDialog
 from duddysheet.ui.dialogs.function_help import FunctionHelpDialog
@@ -126,7 +122,9 @@ from duddysheet.ui.dialogs.data_tools import (
 )
 from duddysheet.ui.formula_bar import FormulaBar
 from duddysheet.ui.grid_model import GridModel
+from duddysheet.ui.excel_ui import ExcelFeaturesMixin
 from duddysheet.ui.grid_view import GridView
+from duddysheet.ui.analysis_ui import AnalysisFeaturesMixin
 from duddysheet.ui.ribbon import Ribbon, chart_menu_entries, sparkline_menu_entries
 from duddysheet.ui.sheet_tabs import SheetTabs
 from duddysheet.ui.tool_help import apply_tool_help
@@ -136,7 +134,7 @@ from duddysheet.util.autosave import AutosaveManager, RecoveryCandidate
 from duddysheet.util.logging_setup import configure_logging
 
 
-class MainWindow(QMainWindow):
+class MainWindow(AnalysisFeaturesMixin, ExcelFeaturesMixin, QMainWindow):
     """Top-level Duddy Spreadsheet window using command-driven workbook mutations."""
 
     def __init__(
@@ -160,7 +158,7 @@ class MainWindow(QMainWindow):
         self.current_path: Path | None = None
         self.dirty = False
         self._suppress_dirty = False
-        self._chart_panels: dict[str, ChartPanel] = {}
+        self._chart_panels: dict[str, Any] = {}
 
         self.engine = FormulaEngine(workbook if workbook is not None else Workbook())
         self.history = CommandHistory(limit=200)
@@ -195,6 +193,8 @@ class MainWindow(QMainWindow):
 
         self._create_actions()
         self._connect_signals()
+        self._install_excel_features()
+        self._install_analysis_features()
         self.autosave_timer = QTimer(self)
         self.autosave_timer.setInterval(5 * 60 * 1000)
         self.autosave_timer.timeout.connect(self.autosave_now)
@@ -429,6 +429,8 @@ class MainWindow(QMainWindow):
         if suffix in (NATIVE_SUFFIX, LEGACY_NATIVE_SUFFIX):
             workbook = load_native(source)
         elif suffix in (".xlsx", ".xlsm"):
+            from duddysheet.io.xlsx_reader import read_xlsx
+
             result = read_xlsx(source)
             workbook = result.workbook
             warnings = result.warnings
@@ -478,6 +480,8 @@ class MainWindow(QMainWindow):
         if suffix == ".dsheet":
             save_native(self.engine.workbook, destination)
         elif suffix == ".xlsx":
+            from duddysheet.io.xlsx_writer import write_xlsx
+
             write_xlsx(self.engine.workbook, destination)
         elif suffix in (".csv", ".tsv"):
             write_delimited(self.engine.workbook, destination)
@@ -654,6 +658,27 @@ class MainWindow(QMainWindow):
         if self.grid_model.setData(index, self.formula_bar.editor.text()):
             self.on_current_cell_changed(index)
 
+    def _define_from_name_box(self, text: str) -> bool:
+        """Typing a new name in the Name Box names the selection, as in Excel."""
+        name = text.strip()
+        bounds = self.grid.selection_bounds()
+        if not name or bounds is None:
+            return False
+        start = CellReference(
+            bounds[0], bounds[1], sheet=self.grid_model.active_sheet_name,
+            row_absolute=True, column_absolute=True,
+        )
+        end = CellReference(
+            bounds[2], bounds[3], sheet=self.grid_model.active_sheet_name,
+            row_absolute=True, column_absolute=True,
+        )
+        reference = start if bounds[:2] == bounds[2:] else RangeReference(start, end)
+        try:
+            self.engine.workbook._validate_defined_name(name)
+        except ValueError:
+            return False
+        return self._define(name, "=" + reference.to_a1(), None, "")
+
     def goto_reference(self, text: str) -> None:
         """Navigate to an A1 cell and optional sheet."""
         try:
@@ -665,7 +690,15 @@ class MainWindow(QMainWindow):
                     scope=self.grid_model.active_sheet_name,
                 ).reference
             except (KeyError, ValueError):
+                if self._define_from_name_box(text):
+                    return
                 self.statusBar().showMessage(str(error), 5000)
+                return
+            if reference is None:
+                self.statusBar().showMessage(
+                    f"{text} is a named formula, not a cell location",
+                    5000,
+                )
                 return
         if not isinstance(reference, CellReference):
             row, column = reference.min_row, reference.min_column
@@ -892,6 +925,25 @@ class MainWindow(QMainWindow):
             return
         if name.startswith("sparkline:"):
             self.insert_sparklines(name.partition(":")[2])
+            return
+        if name.startswith("style:"):
+            self.apply_cell_style(name.partition(":")[2])
+            return
+        if name.startswith("numberFormat:"):
+            self.set_number_format(name.partition(":")[2])
+            return
+        if name.startswith("fontFamily:"):
+            self.format_selection(FormatPatch(font_family=name.partition(":")[2]))
+            return
+        if name.startswith("fontSize:"):
+            try:
+                self.format_selection(FormatPatch(font_size=float(name.partition(":")[2])))
+            except ValueError:
+                pass
+            return
+        excel_handler = getattr(self, "excel_ribbon_handlers", {}).get(name)
+        if excel_handler is not None:
+            excel_handler()
             return
         actions = {
             "Undo": self.history.undo,
@@ -1374,6 +1426,8 @@ class MainWindow(QMainWindow):
                 4000,
             )
             return
+        from duddysheet.ui.dialogs.chart_wizard import ChartWizard
+
         wizard = ChartWizard(
             self.grid_model.active_sheet_name,
             target.to_a1(),
@@ -1562,6 +1616,8 @@ class MainWindow(QMainWindow):
         for chart_id, spec in active_specs.items():
             panel = self._chart_panels.get(chart_id)
             if panel is None:
+                from duddysheet.ui.charting import ChartPanel
+
                 panel = ChartPanel(self.engine.workbook, spec, self)
                 panel.closeRequested.connect(self._remove_chart)
                 panel.editRequested.connect(self._edit_chart)
@@ -1606,6 +1662,8 @@ class MainWindow(QMainWindow):
         )
         if spec is None:
             return
+        from duddysheet.ui.dialogs.chart_wizard import ChartWizard
+
         wizard = ChartWizard(
             spec.sheet_name,
             spec.source_range.to_a1(),

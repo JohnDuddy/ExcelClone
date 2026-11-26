@@ -5,6 +5,7 @@ import math
 import pytest
 
 from duddysheet.core.errors import (
+    CALC_ERROR,
     DIV_ZERO_ERROR,
     NA_ERROR,
     NUM_ERROR,
@@ -54,7 +55,8 @@ EDGE_CASES = [
     ('=MEDIAN({"x"})', NUM_ERROR),
     ("=MODE({1,2,3})", NA_ERROR),
     ('=COUNT({1,TRUE,"2"})', 1),
-    ('=COUNTA({1,"",2})', 2),
+    # Excel's COUNTA counts empty text.
+    ('=COUNTA({1,"",2})', 3),
     ('=COUNTBLANK({1,"",2})', 1),
     ('=COUNTIF({"a","b","ab"},"a*")', 2),
     ("=COUNTIFS({1,2},1,{1,2})", VALUE_ERROR),
@@ -144,7 +146,7 @@ EDGE_CASES = [
     ("=OFFSET(1,0,0)", VALUE_ERROR),
     ("=OFFSET(A1,-1,0)", REF_ERROR),
     ('=INDIRECT("bad ref")', REF_ERROR),
-    ('=INDIRECT("R[1]C[1]",FALSE)', None),
+    ('=INDIRECT("R[1]C[1]",FALSE)', 0),
     ("=ROW(A2)", 2),
     ("=ROW(1)", VALUE_ERROR),
     ("=COLUMN(B1)", 2),
@@ -158,7 +160,8 @@ EDGE_CASES = [
     ("=SORT({1,2},3,1)", VALUE_ERROR),
     ("=FILTER({1;2},{TRUE})", VALUE_ERROR),
     ("=FILTER({1;2},{FALSE;FALSE},99)", 99),
-    ("=FILTER({1;2},{FALSE;FALSE})", NA_ERROR),
+    # Excel's FILTER returns #CALC! when nothing matches and no if_empty is given.
+    ("=FILTER({1;2},{FALSE;FALSE})", CALC_ERROR),
     ("=DATE(26,1,1)", 9498),
     ("=DATE(2026,13,1)", 46388),
     ("=DATE(10000,1,1)", NUM_ERROR),

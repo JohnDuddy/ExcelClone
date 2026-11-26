@@ -129,7 +129,7 @@ def test_equality_operator_is_distinct_from_formula_prefix() -> None:
         '="unterminated',
         "='unterminated!A1",
         "=1+€",
-        "=#UNKNOWN!",
+        "=#BOGUS!",
     ],
 )
 def test_invalid_lexemes_report_source_position(formula: str) -> None:

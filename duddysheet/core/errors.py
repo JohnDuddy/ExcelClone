@@ -23,8 +23,14 @@ REF_ERROR = SpreadsheetError("#REF!", 4)
 NAME_ERROR = SpreadsheetError("#NAME?", 5)
 NUM_ERROR = SpreadsheetError("#NUM!", 6)
 NA_ERROR = SpreadsheetError("#N/A", 7)
+GETTING_DATA_ERROR = SpreadsheetError("#GETTING_DATA", 8)
+SPILL_ERROR = SpreadsheetError("#SPILL!", 9)
+CONNECT_ERROR = SpreadsheetError("#CONNECT!", 10)
+BLOCKED_ERROR = SpreadsheetError("#BLOCKED!", 11)
+UNKNOWN_ERROR = SpreadsheetError("#UNKNOWN!", 12)
+FIELD_ERROR = SpreadsheetError("#FIELD!", 13)
+CALC_ERROR = SpreadsheetError("#CALC!", 14)
 CIRC_ERROR = SpreadsheetError("#CIRC!")
-SPILL_ERROR = SpreadsheetError("#SPILL!")
 
 ERRORS_BY_LITERAL = {
     error.literal: error
@@ -36,8 +42,14 @@ ERRORS_BY_LITERAL = {
         NAME_ERROR,
         NUM_ERROR,
         NA_ERROR,
-        CIRC_ERROR,
+        GETTING_DATA_ERROR,
         SPILL_ERROR,
+        CONNECT_ERROR,
+        BLOCKED_ERROR,
+        UNKNOWN_ERROR,
+        FIELD_ERROR,
+        CALC_ERROR,
+        CIRC_ERROR,
     )
 }
 

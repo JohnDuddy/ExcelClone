@@ -10,6 +10,7 @@ from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication, QStyleOptionViewItem
 
+from duddysheet.core.functions import FUNCTION_REGISTRY
 from duddysheet.core.completion import (
     active_call_at,
     find_functions,
@@ -55,7 +56,7 @@ def test_find_functions_is_case_insensitive_and_handles_misses() -> None:
         spec.name for spec in find_functions("SU")
     ]
     assert find_functions("zzzz") == ()
-    assert len(find_functions("")) == 196
+    assert len(find_functions("")) == len(FUNCTION_REGISTRY)
 
 
 @pytest.mark.parametrize(
@@ -157,8 +158,8 @@ def test_formula_bar_accepts_a_suggestion_with_return() -> None:
     press(bar.editor, Qt.Key.Key_Down)
     press(bar.editor, Qt.Key.Key_Return)
 
-    assert bar.completer.suggestions()[:2] == ("SUBSTITUTE", "SUM")
-    assert bar.editor.text() == "=SUM"
+    assert bar.completer.suggestions()[:2] == ("SUBSTITUTE", "SUBTOTAL")
+    assert bar.editor.text() == "=SUBTOTAL"
     assert not bar.completer.is_active()
 
     bar.close()

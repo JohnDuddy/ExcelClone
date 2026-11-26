@@ -74,6 +74,12 @@ class GridModel(QAbstractTableModel):
                 return None
             return format_value(cell.display_value, cell_format.number_format).text
         if role == Qt.ItemDataRole.EditRole:
+            if (
+                self.sheet.protection is not None
+                and cell_format.formula_hidden
+                and cell.is_formula
+            ):
+                return ""
             return "" if cell.raw_input is None else str(cell.raw_input)
         if role == Qt.ItemDataRole.ToolTipRole:
             if cell.error is not None:
@@ -88,6 +94,7 @@ class GridModel(QAbstractTableModel):
             font.setBold(cell_format.bold)
             font.setItalic(cell_format.italic)
             font.setUnderline(cell_format.underline or cell.hyperlink is not None)
+            font.setStrikeOut(cell_format.strikethrough)
             return font
         if role == Qt.ItemDataRole.ForegroundRole:
             if cell.hyperlink is not None:
@@ -135,6 +142,31 @@ class GridModel(QAbstractTableModel):
             return False
         if self.sheet.get_cell(index.row(), index.column()).is_spill:
             return False
+        from duddysheet.core.protection import can_edit_cell
+
+        sheet = self.sheet
+        row, column = index.row(), index.column()
+        if sheet.pivots:
+            from duddysheet.core.pivot import pivot_at
+
+            if pivot_at(sheet, row, column) is not None:
+                self.last_error = "Cannot change this part of a PivotTable report."
+                self.editRejected.emit(self.last_error)
+                return False
+        if sheet.data_tables:
+            from duddysheet.core.data_table import data_table_at
+
+            if data_table_at(sheet, row, column) is not None:
+                self.last_error = "Cannot change part of a data table."
+                self.editRejected.emit(self.last_error)
+                return False
+        if not can_edit_cell(self.sheet, index.row(), index.column()):
+            self.last_error = (
+                "The cell or chart you're trying to change is on a protected sheet. "
+                "To make a change, unprotect the sheet."
+            )
+            self.editRejected.emit(self.last_error)
+            return False
         parsed_value = _parse_user_input(value)
         validation = validation_for_cell(self.sheet, index.row(), index.column())
         if validation is not None:
@@ -156,6 +188,16 @@ class GridModel(QAbstractTableModel):
             index.column(),
             parsed_value,
         )
+        if sheet.tables and _touches_table(sheet, row, column):
+            from duddysheet.commands.analysis import TableEntryCommand
+
+            command = TableEntryCommand(
+                self.engine,
+                self.active_sheet_name,
+                row,
+                column,
+                parsed_value,
+            )
         try:
             self.history.execute(command)
         except (FormulaSyntaxError, SpillCellReadOnlyError, ValueError) as error:
@@ -280,6 +322,18 @@ class GridModel(QAbstractTableModel):
                         Qt.ItemDataRole.ToolTipRole,
                     ],
                 )
+
+
+def _touches_table(sheet: Any, row: int, column: int) -> bool:
+    """Whether an entry is inside a table or just below/right of one."""
+    for table in sheet.tables:
+        if table.contains(row, column):
+            return True
+        if row == table.bottom + 1 and table.left <= column <= table.right and not table.show_totals:
+            return True
+        if column == table.right + 1 and table.top <= row <= table.bottom:
+            return True
+    return False
 
 
 def _parse_user_input(value: Any) -> Any:

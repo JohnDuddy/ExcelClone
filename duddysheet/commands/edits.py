@@ -24,7 +24,7 @@ from duddysheet.core.data_tools import (
 from duddysheet.core.engine import FormulaEngine, RecalculationResult
 from duddysheet.core.fill import fill_range
 from duddysheet.core.operations import edit_structure
-from duddysheet.core.refs import Reference, RangeReference
+from duddysheet.core.refs import MAX_COLUMNS, MAX_ROWS, Reference, RangeReference
 from duddysheet.core.sheet import Sheet
 from duddysheet.core.sparkline import Sparkline
 from duddysheet.core.translation import rename_formula_sheet, translate_formula_copy
@@ -152,6 +152,10 @@ class SetFormatCommand(Command):
     patch: FormatPatch
     previous: dict[tuple[int, int], Cell] = field(default_factory=dict, init=False)
     _captured: bool = field(default=False, init=False)
+    _previous_axis: tuple[dict[int, Any], dict[int, Any]] = field(
+        default_factory=lambda: ({}, {}),
+        init=False,
+    )
 
     @property
     def description(self) -> str:
@@ -164,25 +168,55 @@ class SetFormatCommand(Command):
         minimum_column, maximum_column = sorted(
             (self.start_column, self.end_column)
         )
+        whole_columns = minimum_row == 0 and maximum_row == MAX_ROWS - 1
+        whole_rows = minimum_column == 0 and maximum_column == MAX_COLUMNS - 1
         if not self._captured:
-            self.previous = {
-                (row, column): sheet.get_cell(row, column)
-                for row in range(minimum_row, maximum_row + 1)
-                for column in range(minimum_column, maximum_column + 1)
-            }
+            if whole_columns or whole_rows:
+                # Whole rows/columns: store axis formats and touch only
+                # populated cells, instead of allocating every coordinate.
+                self.previous = {
+                    coordinate: cell
+                    for coordinate, cell in sheet.iter_unordered()
+                    if minimum_row <= coordinate[0] <= maximum_row
+                    and minimum_column <= coordinate[1] <= maximum_column
+                }
+            else:
+                self.previous = {
+                    (row, column): sheet.get_cell(row, column)
+                    for row in range(minimum_row, maximum_row + 1)
+                    for column in range(minimum_column, maximum_column + 1)
+                }
+            self._previous_axis = (dict(sheet.column_formats), dict(sheet.row_formats))
             self._captured = True
+        if whole_columns:
+            for column in range(minimum_column, maximum_column + 1):
+                base = self._previous_axis[0].get(column, CellFormat())
+                sheet.column_formats[column] = self.patch.apply(base)
+            for row in list(sheet.row_formats):
+                sheet.row_formats[row] = self.patch.apply(self._previous_axis[1][row])
+        elif whole_rows:
+            for row in range(minimum_row, maximum_row + 1):
+                base = self._previous_axis[1].get(row, CellFormat())
+                sheet.row_formats[row] = self.patch.apply(base)
         for (row, column), original in self.previous.items():
             current = sheet.get_cell(row, column)
+            original_format = (
+                original.format
+                if not original.is_empty
+                else sheet.effective_format(row, column)
+            )
             sheet.put_cell(
                 row,
                 column,
-                replace(current, format=self.patch.apply(original.format)),
+                replace(current, format=self.patch.apply(original_format)),
             )
 
     def undo(self) -> None:
         if not self._captured:
             raise RuntimeError("Command has not been executed")
         sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        sheet.column_formats = dict(self._previous_axis[0])
+        sheet.row_formats = dict(self._previous_axis[1])
         for (row, column), cell in self.previous.items():
             current = sheet.get_cell(row, column)
             sheet.put_cell(row, column, replace(current, format=cell.format))
@@ -529,7 +563,7 @@ class FillRangeCommand(_WorkbookSnapshotCommand):
 
 @dataclass
 class PasteCellsCommand(_WorkbookSnapshotCommand):
-    """Paste a rich cell matrix with Paste Special behavior."""
+    """Paste a rich cell matrix with Excel's Paste Special options."""
 
     sheet_name: str
     start_row: int
@@ -538,14 +572,33 @@ class PasteCellsCommand(_WorkbookSnapshotCommand):
     source_origin: tuple[int, int]
     mode: str = "all"
     transpose: bool = False
+    operation: str = "none"
+    skip_blanks: bool = False
+    source_sheet: str | None = None
+    column_widths: tuple[float | None, ...] = ()
+
+    MODES = (
+        "all",
+        "values",
+        "formulas",
+        "formats",
+        "values_number_formats",
+        "formulas_number_formats",
+        "all_except_borders",
+        "column_widths",
+        "link",
+    )
+    OPERATIONS = ("none", "add", "subtract", "multiply", "divide")
 
     @property
     def description(self) -> str:
-        return "Paste cells"
+        return "Paste cells" if self.mode == "all" else "Paste special"
 
     def do(self) -> None:
-        if self.mode not in ("all", "values", "formulas", "formats"):
+        if self.mode not in self.MODES:
             raise ValueError(f"Unknown paste mode: {self.mode!r}")
+        if self.operation not in self.OPERATIONS:
+            raise ValueError(f"Unknown paste operation: {self.operation!r}")
         self._capture()
         matrix = (
             tuple(tuple(row[index] for row in self.cells) for index in range(len(self.cells[0])))
@@ -553,8 +606,16 @@ class PasteCellsCommand(_WorkbookSnapshotCommand):
             else self.cells
         )
         sheet = self.engine.workbook.get_sheet(self.sheet_name)
+        if self.mode == "column_widths":
+            for offset, width in enumerate(self.column_widths):
+                if width is not None:
+                    sheet.column_widths[self.start_column + offset] = width
+            self._rebuild()
+            return
         for row_offset, row_cells in enumerate(matrix):
             for column_offset, source in enumerate(row_cells):
+                if self.skip_blanks and source.raw_input in (None, "") and source.cached_value in (None, ""):
+                    continue
                 row = self.start_row + row_offset
                 column = self.start_column + column_offset
                 current = sheet.get_cell(row, column)
@@ -569,39 +630,106 @@ class PasteCellsCommand(_WorkbookSnapshotCommand):
                         self.source_origin[1] + column_offset,
                     )
                 )
-                if self.mode == "formats":
-                    selected = replace(current, format=source.format)
-                elif self.mode == "values":
-                    selected = Cell(
-                        raw_input=source.display_value,
-                        cached_value=source.display_value,
-                        format=current.format,
-                        hyperlink=current.hyperlink,
-                    )
-                else:
-                    raw = source.raw_input
-                    if source.is_formula:
-                        raw = translate_formula_copy(
-                            source.raw_input,
-                            rows=row - source_row,
-                            columns=column - source_column,
-                        )
-                    selected = Cell(
-                        raw_input=raw,
-                        cached_value=(
-                            None if isinstance(raw, str) and raw.startswith("=")
-                            else raw
-                        ),
-                        format=source.format if self.mode == "all" else current.format,
-                        error=None,
-                        hyperlink=(
-                            source.hyperlink
-                            if self.mode == "all"
-                            else current.hyperlink
-                        ),
-                    )
+                selected = self._pasted_cell(source, current, row, column, source_row, source_column)
+                if self.operation != "none" and self.mode not in ("formats",):
+                    selected = _combine_operation(current, selected, self.operation)
                 sheet.put_cell(row, column, selected)
         self._rebuild()
+
+    def _pasted_cell(
+        self,
+        source: Cell,
+        current: Cell,
+        row: int,
+        column: int,
+        source_row: int,
+        source_column: int,
+    ) -> Cell:
+        mode = self.mode
+        if mode == "formats":
+            return replace(current, format=source.format)
+        if mode == "link":
+            from duddysheet.core.refs import CellReference, quote_sheet_name
+
+            reference = CellReference(source_row, source_column).to_a1(include_sheet=False)
+            if self.source_sheet and self.source_sheet.casefold() != self.sheet_name.casefold():
+                reference = f"{quote_sheet_name(self.source_sheet)}!{reference}"
+            return Cell(raw_input="=" + reference, format=current.format, hyperlink=current.hyperlink)
+        if mode in ("values", "values_number_formats"):
+            value = None if source.error is not None else source.display_value
+            number_format = source.format.number_format if mode == "values_number_formats" else current.format.number_format
+            return Cell(
+                raw_input=value,
+                cached_value=value,
+                format=replace(current.format, number_format=number_format),
+                hyperlink=current.hyperlink,
+            )
+        raw = source.raw_input
+        if source.is_formula:
+            raw = translate_formula_copy(
+                source.raw_input,
+                rows=row - source_row,
+                columns=column - source_column,
+            )
+        if mode in ("all", "all_except_borders"):
+            cell_format = source.format
+            if mode == "all_except_borders":
+                cell_format = replace(
+                    source.format,
+                    left_border=current.format.left_border,
+                    right_border=current.format.right_border,
+                    top_border=current.format.top_border,
+                    bottom_border=current.format.bottom_border,
+                )
+        elif mode == "formulas_number_formats":
+            cell_format = replace(current.format, number_format=source.format.number_format)
+        else:
+            cell_format = current.format
+        return Cell(
+            raw_input=raw,
+            cached_value=None if isinstance(raw, str) and raw.startswith("=") else raw,
+            format=cell_format,
+            error=None,
+            hyperlink=source.hyperlink if mode == "all" else current.hyperlink,
+        )
+
+
+def _combine_operation(current: Cell, pasted: Cell, operation: str) -> Cell:
+    """Combine a pasted value with the destination using Add/Subtract/Multiply/Divide."""
+    symbol = {"add": "+", "subtract": "-", "multiply": "*", "divide": "/"}[operation]
+    incoming = pasted.raw_input
+    if isinstance(incoming, str) and incoming.startswith("="):
+        incoming_text = "(" + incoming[1:] + ")"
+        incoming_number = None
+    elif isinstance(incoming, (int, float)) and not isinstance(incoming, bool):
+        incoming_text = repr(incoming) if isinstance(incoming, float) else str(incoming)
+        incoming_number = incoming
+    elif incoming in (None, ""):
+        incoming_text = "0"
+        incoming_number = 0
+    else:
+        return pasted
+    existing = current.raw_input
+    if current.is_formula:
+        return replace(pasted, raw_input=f"=({existing[1:]}){symbol}{incoming_text}", cached_value=None)
+    if isinstance(existing, (int, float)) and not isinstance(existing, bool) or existing in (None, ""):
+        base = existing if existing not in (None, "") else 0
+        if incoming_number is None:
+            return replace(pasted, raw_input=f"={base}{symbol}{incoming_text}", cached_value=None)
+        if operation == "add":
+            result = base + incoming_number
+        elif operation == "subtract":
+            result = base - incoming_number
+        elif operation == "multiply":
+            result = base * incoming_number
+        else:
+            if incoming_number == 0:
+                return replace(pasted, raw_input="=" + f"{base}/0", cached_value=None)
+            result = base / incoming_number
+        if isinstance(result, float) and result.is_integer():
+            result = int(result)
+        return replace(pasted, raw_input=result, cached_value=result)
+    return replace(pasted, raw_input=existing, cached_value=existing)
 
 
 @dataclass

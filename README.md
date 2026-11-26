@@ -41,7 +41,8 @@ has is a fast, correct, auditable modeling environment.
 
 ### Spreadsheet engine
 
-- **196 functions** with searchable in-application help.
+- **524 functions** with searchable in-application help, including
+  Excel 365 dynamic arrays, LET, and LAMBDA.
 - Excel-sized virtual grid, dynamic-array spilling with `#SPILL!` reporting,
   and an incremental dependency graph that recalculates only what changed.
 - 200-level undo across every mutation, including structural edits.
@@ -50,12 +51,27 @@ has is a fast, correct, auditable modeling environment.
 - **Verified against Microsoft Excel**: 200 formulas are cross-checked
   against values Excel itself computed, and the suite fails if they diverge.
 
+### Tables, PivotTables, and What-If Analysis
+
+- **Excel Tables** (Ctrl+T): named, self-formatting lists that grow as you
+  type, fill formulas down automatically, add a total row, and can be used in
+  formulas by name, such as `=SUM(Sales[Amount])` or `=[@Qty]*[@Price]`.
+- **PivotTables** (Insert > PivotTable): drag fields into Rows, Columns,
+  Values, and Filters to total, average, or count a list by category, group
+  dates by year, quarter, or month, and show values as percentages. Refresh
+  with Alt+F5 and pull numbers into formulas with `GETPIVOTDATA`.
+- **Data tables** (Data > What-If Analysis > Data Table): see a formula's
+  result for a column of input values, or for every combination of two
+  inputs, without changing your model.
+- **Directions**: Help > PivotTables, Tables, and What-If Tutorial has 16
+  step-by-step lessons and opens a practice workbook to try them on.
+
 ### Presenting the work
 
 - **Printing and PDF export** with page setup, print preview, print areas,
   repeating header rows and columns, fit-to-page scaling, and header/footer
   tokens. Page setup is saved with the workbook.
-- **17 chart types** that stay bound to their ranges through edits, row and
+- **62 chart types** that stay bound to their ranges through edits, row and
   column changes, and sheet renames, exportable to PNG, SVG, and PDF.
 
 ### Files
@@ -107,6 +123,9 @@ Enter a licence key under **Help > Licence and Activation**.
 | `Ctrl+C`, `Ctrl+V` | Copy, paste |
 | `Ctrl+Enter` | Fill the selection with the current cell |
 | `Ctrl+D`, `Ctrl+R` | Fill down, fill right |
+| `Ctrl+T` | Create a table |
+| `Ctrl+Shift+T` | Toggle a table's total row |
+| `Alt+F5`, `Ctrl+Alt+F5` | Refresh the PivotTable, refresh all |
 | `F1` | Financial functions guide |
 | `F2` | Edit the active cell |
 | `F4` | Cycle relative/absolute references while editing |
@@ -115,10 +134,9 @@ Enter a licence key under **Help > Licence and Activation**.
 
 ## Deliberately out of scope
 
-VBA and macros, pivot tables, Power Query, live market data, real-time
-collaboration, embedded Office objects, and a multi-variable optimisation
-solver. These are not silently approximated: the application says so when a
-file uses them.
+VBA and macros, Power Query, live market data, real-time collaboration,
+embedded Office objects, and a multi-variable optimisation solver. These are
+not silently approximated: the application says so when a file uses them.
 
 ## Building from source
 

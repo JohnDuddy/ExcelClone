@@ -38,7 +38,10 @@ def test_financial_menu_sits_between_formulas_and_help() -> None:
     titles = [action.text() for action in window.menuBar().actions()]
     window.close()
 
-    assert titles.index("&Formulas") + 1 == titles.index("&Financial")
+    # Excel's tab order, with the Financial menu as the last before Help.
+    order = ["&Formulas", "&Data", "&Review", "&View", "&Financial", "&Help"]
+    positions = [titles.index(title) for title in order]
+    assert positions == sorted(positions)
     assert titles.index("&Financial") + 1 == titles.index("&Help")
 
 

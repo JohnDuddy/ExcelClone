@@ -9,6 +9,7 @@ from typing import Any
 
 from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
+from openpyxl.worksheet.formula import ArrayFormula, DataTableFormula
 from openpyxl.styles.colors import COLOR_INDEX
 
 from duddysheet.core.cell import BorderStyle, CellFormat, Hyperlink
@@ -18,6 +19,11 @@ from duddysheet.core.refs import CellReference, parse_a1
 from duddysheet.core.tokenizer import FormulaSyntaxError
 from duddysheet.core.workbook import Workbook
 from duddysheet.io.formula_compat import from_xlsx_formula
+from duddysheet.io.xlsx_features import (
+    read_cell_extras,
+    read_sheet_extras,
+    read_workbook_extras,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +57,18 @@ def read_xlsx(path: str | Path) -> WorkbookLoadResult:
         raise ValueError("XLSX workbook contains no worksheets")
     workbook.active_sheet = min(package.index(package.active), len(workbook) - 1)
     _read_defined_names(package, workbook, warnings)
+    read_workbook_extras(package, workbook)
+    calculation = getattr(package, "calculation", None)
+    if calculation is not None:
+        workbook.calculation_mode = {
+            "manual": "manual",
+            "autoNoTable": "automatic_except_tables",
+        }.get(getattr(calculation, "calcMode", None) or "auto", "automatic")
+        workbook.iterative_calculation = bool(getattr(calculation, "iterate", False))
+        if getattr(calculation, "iterateCount", None):
+            workbook.max_iterations = int(calculation.iterateCount)
+        if getattr(calculation, "iterateDelta", None):
+            workbook.max_change = float(calculation.iterateDelta)
     if getattr(package, "_external_links", None):
         warnings.append("External workbook links are not supported and were dropped.")
     package.close()
@@ -65,15 +83,81 @@ def read_xlsx(path: str | Path) -> WorkbookLoadResult:
     return WorkbookLoadResult(workbook, tuple(dict.fromkeys(warnings)))
 
 
+def _array_formula_cells(worksheet: Any) -> set[tuple[int, int]]:
+    """Cells covered by array formulas other than their anchors (spill results)."""
+    covered: set[tuple[int, int]] = set()
+    for cell in worksheet._cells.values():
+        value = getattr(cell, "value", None)
+        if not isinstance(value, ArrayFormula) or not value.ref:
+            continue
+        try:
+            reference = parse_a1(value.ref)
+        except ValueError:
+            continue
+        if isinstance(reference, CellReference):
+            continue
+        for item in reference:
+            if (item.row, item.column) != (cell.row - 1, cell.column - 1):
+                covered.add((item.row, item.column))
+    return covered
+
+
+def _read_data_tables(worksheet: Any, sheet: Any) -> None:
+    """Recreate What-If data tables from dataTable formulas."""
+    from duddysheet.core.data_table import DataTableSpec, table_formula
+
+    for cell in list(worksheet._cells.values()):
+        value = getattr(cell, "value", None)
+        if not isinstance(value, DataTableFormula):
+            continue
+        try:
+            area = parse_a1(value.ref)
+        except ValueError:
+            continue
+        if isinstance(area, CellReference):
+            top = bottom = area.row
+            left = right = area.column
+        else:
+            top, left, bottom, right = area.min_row, area.min_column, area.max_row, area.max_column
+
+        def address(text: Any) -> tuple[str, int, int] | None:
+            if not text:
+                return None
+            reference = parse_a1(str(text))
+            return (sheet.name, reference.row, reference.column) if isinstance(reference, CellReference) else None
+
+        two = str(value.dt2D) in ("1", "True", "true")
+        row_flag = str(value.dtr) in ("1", "True", "true")
+        if two:
+            spec = DataTableSpec(top - 1, left - 1, bottom, right, address(value.r1), address(value.r2))
+        elif row_flag:
+            spec = DataTableSpec(top - 1, left - 1, bottom, right, address(value.r1), None)
+        else:
+            spec = DataTableSpec(top - 1, left - 1, bottom, right, None, address(value.r1))
+        sheet.data_tables.append(spec)
+        formula = table_formula(spec, sheet.name)
+        for row in range(top, bottom + 1):
+            for column in range(left, right + 1):
+                sheet.set_cell(row, column, formula, cell_format=sheet.get_cell(row, column).format)
+
+
 def _read_worksheet(worksheet: Any, sheet: Any, warnings: list[str]) -> None:
+    spill_results = _array_formula_cells(worksheet)
     for cell in worksheet._cells.values():
         if isinstance(cell, MergedCell):
             continue
-        cell_format = _read_cell_format(cell)
+        cell_format = read_cell_extras(cell, _read_cell_format(cell))
         hyperlink = _read_hyperlink(cell)
-        if cell.value is None and cell_format.is_default and hyperlink is None:
-            continue
         value = cell.value
+        if (cell.row - 1, cell.column - 1) in spill_results:
+            # Excel caches spilled values; the anchor formula recreates them.
+            value = None
+        if value is None and cell_format.is_default and hyperlink is None:
+            continue
+        if isinstance(value, DataTableFormula):
+            continue
+        if isinstance(value, ArrayFormula):
+            value = value.text if value.text.startswith("=") else "=" + value.text
         if isinstance(value, str) and value.startswith("="):
             value = from_xlsx_formula(value)
         sheet.set_cell(
@@ -83,10 +167,6 @@ def _read_worksheet(worksheet: Any, sheet: Any, warnings: list[str]) -> None:
             cell_format=cell_format,
             hyperlink=hyperlink,
         )
-        if cell.comment is not None:
-            warnings.append(
-                f"Comments on sheet {worksheet.title!r} are not supported and were dropped."
-            )
 
     for index, dimension in worksheet.row_dimensions.items():
         row = int(index) - 1
@@ -128,16 +208,11 @@ def _read_worksheet(worksheet: Any, sheet: Any, warnings: list[str]) -> None:
         )
     if getattr(worksheet, "_pivots", None):
         warnings.append(
-            f"Pivot tables on sheet {worksheet.title!r} are not supported and were dropped."
+            f"PivotTables on sheet {worksheet.title!r} were imported as values. "
+            "Use Insert > PivotTable to rebuild them as refreshable PivotTables."
         )
-    if worksheet.tables:
-        warnings.append(
-            f"Structured tables on sheet {worksheet.title!r} were imported as cells."
-        )
-    if len(worksheet.conditional_formatting):
-        warnings.append(
-            f"XLSX conditional formatting on sheet {worksheet.title!r} was dropped."
-        )
+    read_sheet_extras(worksheet, sheet, warnings)
+    _read_data_tables(worksheet, sheet)
     _read_validations(worksheet, sheet, warnings)
     _read_filter(worksheet, sheet, warnings)
 
@@ -230,12 +305,23 @@ def _read_defined_name(
     text = defined_name.attr_text
     if not text or defined_name.name.startswith("_xlnm."):
         return
+    comment = getattr(defined_name, "comment", None) or ""
     try:
         reference = parse_a1(text)
-        workbook.define_name(defined_name.name, reference, scope=scope)
+        workbook.define_name(defined_name.name, reference, scope=scope, comment=comment)
+        return
+    except ValueError:
+        pass
+    try:
+        workbook.define_name(
+            defined_name.name,
+            "=" + from_xlsx_formula(text),
+            scope=scope,
+            comment=comment,
+        )
     except ValueError:
         warnings.append(
-            f"Defined name {defined_name.name!r} is not a simple cell range and was dropped."
+            f"Defined name {defined_name.name!r} uses an unsupported formula and was dropped."
         )
 
 

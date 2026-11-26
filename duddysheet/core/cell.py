@@ -29,6 +29,13 @@ class CellFormat:
     horizontal_alignment: str = "general"
     vertical_alignment: str = "bottom"
     wrap_text: bool = False
+    strikethrough: bool = False
+    indent: int = 0
+    text_rotation: int = 0
+    shrink_to_fit: bool = False
+    #: Protection flags take effect only while the sheet is protected.
+    locked: bool = True
+    formula_hidden: bool = False
     left_border: BorderStyle = field(default_factory=BorderStyle)
     right_border: BorderStyle = field(default_factory=BorderStyle)
     top_border: BorderStyle = field(default_factory=BorderStyle)
@@ -38,6 +45,37 @@ class CellFormat:
     def is_default(self) -> bool:
         """Return whether every formatting attribute has its default value."""
         return self == DEFAULT_CELL_FORMAT
+
+
+@dataclass(frozen=True, slots=True)
+class Note:
+    """A cell note (Excel's classic comment): text plus an author."""
+
+    text: str
+    author: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class SheetProtection:
+    """Worksheet protection with Excel's permission switches.
+
+    ``password_hash`` stores a salted SHA-256 digest, never the password.
+    """
+
+    password_hash: str = ""
+    select_locked_cells: bool = True
+    select_unlocked_cells: bool = True
+    format_cells: bool = False
+    format_columns: bool = False
+    format_rows: bool = False
+    insert_columns: bool = False
+    insert_rows: bool = False
+    insert_hyperlinks: bool = False
+    delete_columns: bool = False
+    delete_rows: bool = False
+    sort: bool = False
+    auto_filter: bool = False
+    edit_objects: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +123,17 @@ class Cell:
     def is_spill(self) -> bool:
         """Return whether this cell is owned by a dynamic-array anchor."""
         return self.spill_parent is not None
+
+    def with_result(self, cached_value: Any, error: str | None) -> Cell:
+        """Return this cell with a new calculated value (fast ``replace``)."""
+        return Cell(
+            self.raw_input,
+            cached_value,
+            self.format,
+            error,
+            self.spill_parent,
+            self.hyperlink,
+        )
 
     @property
     def display_value(self) -> Any:

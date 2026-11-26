@@ -9,16 +9,26 @@ from pathlib import Path
 from typing import Any, Callable
 from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
-from duddysheet.core.cell import BorderStyle, Cell, CellFormat, Hyperlink
+from duddysheet.core.cell import (
+    BorderStyle,
+    Cell,
+    CellFormat,
+    Hyperlink,
+    Note,
+    SheetProtection,
+)
 from duddysheet.core.chart import ChartSpec
 from duddysheet.core.conditional import ConditionalRule, FormatPatch
 from duddysheet.core.data_tools import AutoFilter, DataValidation
 from duddysheet.core.printing import setup_from_dict, setup_to_dict
 from duddysheet.core.refs import RangeReference, parse_a1
 from duddysheet.core.sparkline import Sparkline
-from duddysheet.core.workbook import Workbook
+from duddysheet.core.data_table import data_table_from_dict, data_table_to_dict
+from duddysheet.core.pivot import pivot_from_dict, pivot_to_dict
+from duddysheet.core.tables import table_from_dict, table_to_dict
+from duddysheet.core.workbook import WORKBOOK_OPTIONS, Workbook
 
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 Migration = Callable[[dict[str, Any], dict[str, dict[str, Any]]], None]
 
 
@@ -46,10 +56,19 @@ def _migrate_v3_to_v4(
     del manifest, sheet_data
 
 
+def _migrate_v4_to_v5(
+    manifest: dict[str, Any],
+    sheet_data: dict[str, dict[str, Any]],
+) -> None:
+    """Accept v4 sheets: no notes, outlines, protection, or axis formats."""
+    del manifest, sheet_data
+
+
 MIGRATIONS: dict[int, Migration] = {
     1: _migrate_v1_to_v2,
     2: _migrate_v2_to_v3,
     3: _migrate_v3_to_v4,
+    4: _migrate_v4_to_v5,
 }
 
 
@@ -65,11 +84,15 @@ def save_native(workbook: Workbook, path: str | Path) -> Path:
             {"name": sheet.name, "file": sheet_file}
             for sheet, sheet_file in zip(workbook, sheet_files)
         ],
+        "options": {
+            option: getattr(workbook, option) for option in WORKBOOK_OPTIONS
+        },
         "defined_names": [
             {
                 "name": item.name,
-                "reference": item.reference.to_a1(),
+                "reference": item.refers_to,
                 "scope": item.scope,
+                **({"comment": item.comment} if item.comment else {}),
             }
             for item in workbook.defined_names
         ],
@@ -121,11 +144,15 @@ def load_native(path: str | Path) -> Workbook:
         workbook.active_sheet = int(manifest.get("active_sheet", 0))
     except (IndexError, ValueError, TypeError) as error:
         raise ValueError("Duddy Spreadsheet active-sheet index is invalid") from error
+    for option, value in manifest.get("options", {}).items():
+        if option in WORKBOOK_OPTIONS:
+            setattr(workbook, option, value)
     for item in manifest.get("defined_names", ()):
         workbook.define_name(
             item["name"],
             item["reference"],
             scope=item.get("scope"),
+            comment=str(item.get("comment", "")),
         )
     return workbook
 
@@ -192,6 +219,30 @@ def _sheet_to_data(sheet: Any) -> dict[str, Any]:
         "page_setup": (
             setup_to_dict(sheet.page_setup) if sheet.page_setup is not None else None
         ),
+        "notes": [
+            {"row": row, "column": column, "text": note.text, "author": note.author}
+            for (row, column), note in sorted(sheet.notes.items())
+        ],
+        "row_outline": {str(key): value for key, value in sheet.row_outline.items()},
+        "column_outline": {
+            str(key): value for key, value in sheet.column_outline.items()
+        },
+        "protection": (
+            {item.name: getattr(sheet.protection, item.name) for item in fields(sheet.protection)}
+            if sheet.protection is not None
+            else None
+        ),
+        "column_formats": {
+            str(key): _format_to_data(value) for key, value in sheet.column_formats.items()
+        },
+        "row_formats": {
+            str(key): _format_to_data(value) for key, value in sheet.row_formats.items()
+        },
+        "default_column_width": sheet.default_column_width,
+        "default_row_height": sheet.default_row_height,
+        "tables": [table_to_dict(item) for item in sheet.tables],
+        "pivots": [pivot_to_dict(item) for item in sheet.pivots],
+        "data_tables": [data_table_to_dict(item) for item in sheet.data_tables],
     }
 
 
@@ -262,6 +313,36 @@ def _restore_sheet(sheet: Any, data: dict[str, Any]) -> None:
     sheet.page_setup = (
         setup_from_dict(page_setup) if isinstance(page_setup, dict) else None
     )
+    sheet.notes = {
+        (int(item["row"]), int(item["column"])): Note(
+            str(item.get("text", "")),
+            str(item.get("author", "")),
+        )
+        for item in data.get("notes", ())
+    }
+    sheet.row_outline = {
+        int(key): int(value) for key, value in data.get("row_outline", {}).items()
+    }
+    sheet.column_outline = {
+        int(key): int(value) for key, value in data.get("column_outline", {}).items()
+    }
+    protection = data.get("protection")
+    sheet.protection = (
+        SheetProtection(**protection) if isinstance(protection, dict) else None
+    )
+    sheet.column_formats = {
+        int(key): _format_from_data(value)
+        for key, value in data.get("column_formats", {}).items()
+    }
+    sheet.row_formats = {
+        int(key): _format_from_data(value)
+        for key, value in data.get("row_formats", {}).items()
+    }
+    sheet.default_column_width = data.get("default_column_width")
+    sheet.default_row_height = data.get("default_row_height")
+    sheet.tables = [table_from_dict(item) for item in data.get("tables", ())]
+    sheet.pivots = [pivot_from_dict(item) for item in data.get("pivots", ())]
+    sheet.data_tables = [data_table_from_dict(item) for item in data.get("data_tables", ())]
 
 
 def _format_to_data(cell_format: CellFormat) -> dict[str, Any]:

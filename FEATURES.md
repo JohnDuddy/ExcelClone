@@ -88,6 +88,20 @@ complete.
 - [x] Step-by-step tutorial for every Financial menu command, each with a worked example verified against a built-in model (`test_financial_tutorials.py`)
 - [x] Hover bubbles and status-bar text on every Financial menu command and ribbon button, with worked examples (`test_financial_tool_help.py`)
 
+## M14 Excel Functional Parity
+
+- [x] Excel 365 calculation semantics: array broadcasting, spilling ranges, `@` implicit intersection, `A1#` spill references, LET, LAMBDA, named formulas, 3-D references, and dynamic range operators (`test_excel365_semantics.py`)
+- [x] 524 worksheet functions, including Excel's dynamic-array, lookup, text, date, statistical, engineering, database, and financial additions, verified case by case (`test_function_parity.py`, `test_functions_all.py`)
+- [x] Excel keyboard and editing model: Enter/Tab move-after-edit, point mode, Ctrl+arrow data edges, current region, cut-and-move, insert/delete cells with shifting, every Paste Special mode, Flash Fill, AutoSum (`test_excel365_semantics.py`, `test_ui_workflow.py`)
+- [x] Go To Special, Trace Precedents/Dependents, Evaluate Formula, error checking, and the Watch Window (`test_excel365_semantics.py`)
+- [x] Cell styles, the number-format gallery, Excel format codes, notes, sheet and workbook protection with Excel's password hash, grouping and outlines, Subtotal, Consolidate, and Advanced Filter (`test_excel365_semantics.py`, `test_formats.py`)
+- [x] Calculation options (automatic, automatic except tables, manual) and iterative calculation (`test_excel365_semantics.py`)
+- [x] Excel Tables: Ctrl+T, structured references (`Table1[Col]`, `[@Col]`, `#Headers`, `#Totals`, `#All`, column ranges, bare table names), calculated columns, AutoExpansion, total row with per-column SUBTOTAL functions, style gallery and options, rename, resize, Convert to Range (`test_tables.py`, `test_analysis_ui.py`)
+- [x] PivotTables: Rows/Columns/Values/Filters areas, 11 summary functions, Show Values As, item filters, date grouping, compact/outline/tabular layouts, subtotals and grand totals, refresh, change source, Show Details, GETPIVOTDATA, table sources that grow (`test_pivot.py`, `test_analysis_ui.py`)
+- [x] What-If data tables: one-variable (row or column) and two-variable `{=TABLE()}` tables evaluated without touching the real inputs, live recalculation, and Automatic Except for Data Tables (`test_data_table.py`)
+- [x] Tables and data tables round-trip through `.xlsx` as Excel objects; PivotTables, tables, and data tables persist in native schema 5 (`test_tables.py`, `test_pivot.py`, `test_data_table.py`, `test_xlsx_excel365.py`)
+- [x] Help > PivotTables, Tables, and What-If Tutorial with 16 searchable lessons and a practice workbook (`test_analysis_ui.py`)
+
 ## M13 Excel Charting Parity
 
 - [x] 62 chart types covering every Excel chart family except Map, including 100% stacked, 3-D, stock, surface, treemap, sunburst, Pareto, funnel, and custom combo charts (`test_chart_catalog.py`, `test_chart_ui.py`)

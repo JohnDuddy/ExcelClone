@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import fnmatch
 import math
 import re
 from datetime import date, datetime, time, timedelta
@@ -10,6 +9,7 @@ from typing import Any
 
 from duddysheet.core.errors import VALUE_ERROR, SpreadsheetError, is_error
 from duddysheet.core.refs import CellReference, RangeReference
+from duddysheet.core.values import parse_number_text, to_text
 
 
 def scalar(context: Any, value: Any) -> Any:
@@ -43,17 +43,10 @@ def number(value: Any, *, blank_as_zero: bool = True) -> int | float | Spreadshe
     if isinstance(value, (date, datetime)):
         return _date_to_serial(value)
     if isinstance(value, str):
-        normalized = value.strip().replace(",", "")
-        if not normalized and blank_as_zero:
+        if not value.strip() and blank_as_zero:
             return 0
-        try:
-            return (
-                float(normalized)
-                if any(character in normalized for character in ".eE")
-                else int(normalized)
-            )
-        except ValueError:
-            return VALUE_ERROR
+        parsed = parse_number_text(value)
+        return VALUE_ERROR if parsed is None else parsed
     return VALUE_ERROR
 
 
@@ -62,31 +55,72 @@ def numeric_values(
     *arguments: Any,
     ignore_non_numeric: bool = True,
 ) -> list[int | float] | SpreadsheetError:
-    """Flatten arguments and collect numeric values."""
-    values = flatten(context, *arguments)
-    error = first_error(values)
-    if error is not None:
-        return error
+    """Collect numbers with Excel's aggregate rules.
+
+    Values inside references and arrays count only when they are numbers or
+    dates; logicals, text, and blanks there are skipped. Arguments typed
+    directly are coerced, so ``SUM("3", TRUE)`` is 4 and ``SUM("x")`` is
+    #VALUE!. Errors anywhere propagate.
+    """
+    del ignore_non_numeric  # retained for callers; Excel's rules are uniform
     result: list[int | float] = []
-    for value in values:
+    for argument in arguments:
+        if is_collection(argument):
+            for value in context.values(argument):
+                if is_error(value):
+                    return value
+                if isinstance(value, bool) or value is None or isinstance(value, str):
+                    continue
+                if isinstance(value, (int, float)):
+                    result.append(value)
+                elif isinstance(value, (date, datetime)):
+                    result.append(_date_to_serial(value))
+            continue
+        value = context.scalar(argument)
         converted = number(value)
         if is_error(converted):
-            if ignore_non_numeric:
-                continue
+            return converted
+        result.append(converted)
+    return result
+
+
+def is_collection(value: Any) -> bool:
+    """Return whether a function argument is a reference or array."""
+    return isinstance(value, tuple) or hasattr(value, "areas")
+
+
+def a_values(context: Any, *arguments: Any) -> list[int | float] | SpreadsheetError:
+    """Collect values for the A-suffixed functions (AVERAGEA, MAXA, ...).
+
+    In references, text counts as 0 and logicals as 1 or 0; blanks are skipped.
+    """
+    result: list[int | float] = []
+    for argument in arguments:
+        if is_collection(argument):
+            for value in context.values(argument):
+                if is_error(value):
+                    return value
+                if value is None:
+                    continue
+                if isinstance(value, bool):
+                    result.append(int(value))
+                elif isinstance(value, str):
+                    result.append(0)
+                elif isinstance(value, (int, float)):
+                    result.append(value)
+                elif isinstance(value, (date, datetime)):
+                    result.append(_date_to_serial(value))
+            continue
+        converted = number(context.scalar(argument))
+        if is_error(converted):
             return converted
         result.append(converted)
     return result
 
 
 def text(value: Any) -> str:
-    """Coerce a scalar to general-display text."""
-    if value is None:
-        return ""
-    if isinstance(value, bool):
-        return "TRUE" if value else "FALSE"
-    if isinstance(value, float) and value.is_integer():
-        return str(int(value))
-    return str(value)
+    """Coerce a scalar to text with Excel's 15-significant-digit General rule."""
+    return to_text(value)
 
 
 def truthy(value: Any) -> bool | SpreadsheetError:
@@ -110,6 +144,12 @@ def truthy(value: Any) -> bool | SpreadsheetError:
 
 def matrix(context: Any, value: Any) -> list[list[Any]]:
     """Convert a scalar, array, or first reference area to a rectangular matrix."""
+    to_matrix = getattr(context, "matrix", None)
+    if to_matrix is not None:
+        areas = getattr(value, "areas", None)
+        if areas and len(areas) > 1:
+            value = type(value)((areas[0],))
+        return to_matrix(value)
     if isinstance(value, tuple):
         if value and all(isinstance(row, tuple) for row in value):
             return [list(row) for row in value]
@@ -134,54 +174,123 @@ def rectangular(rows: list[list[Any]]) -> tuple[tuple[Any, ...], ...]:
     return tuple(tuple(row) for row in rows)
 
 
-def criteria_match(value: Any, criterion: Any) -> bool:
-    """Apply an Excel-style comparison or wildcard criterion."""
-    if is_error(value) or is_error(criterion):
-        return False
+_CRITERION_RE = re.compile(r"^(<=|>=|<>|=|<|>)(.*)$", re.DOTALL)
+
+
+def parse_criterion(criterion: Any) -> tuple[str, Any, bool]:
+    """Split a criterion into (operator, typed operand, uses_wildcards)."""
+    if is_error(criterion):
+        return "=", criterion, False
+    if criterion is None:
+        return "=", 0, False
     if not isinstance(criterion, str):
-        return _equal(value, criterion)
-    match = re.match(r"^(<=|>=|<>|=|<|>)(.*)$", criterion)
-    if match:
-        operator, operand_text = match.groups()
-        operand: Any = operand_text
-        converted = number(operand_text)
-        if not is_error(converted):
-            operand = converted
-        return _compare(value, operand, operator)
-    if any(character in criterion for character in "*?"):
-        escaped = criterion.replace("~*", "[*]").replace("~?", "[?]")
-        return fnmatch.fnmatchcase(text(value).casefold(), escaped.casefold())
-    return _equal(value, criterion)
+        return "=", criterion, False
+    match = _CRITERION_RE.match(criterion)
+    operator, operand_text = match.groups() if match else ("=", criterion)
+    if operand_text == "":
+        return operator, "", False
+    upper = operand_text.strip().upper()
+    if upper in ("TRUE", "FALSE"):
+        return operator, upper == "TRUE", False
+    if upper.startswith("#"):
+        from duddysheet.core.errors import ERRORS_BY_LITERAL
+
+        if upper in ERRORS_BY_LITERAL:
+            return operator, ERRORS_BY_LITERAL[upper], False
+    parsed = parse_number_text(operand_text)
+    if parsed is not None:
+        return operator, parsed, False
+    wildcard = operator in ("=", "<>") and any(
+        character in operand_text for character in "*?"
+    )
+    return operator, operand_text, wildcard
 
 
-def _equal(left: Any, right: Any) -> bool:
-    left_number = number(left)
-    right_number = number(right)
-    if not is_error(left_number) and not is_error(right_number):
-        return float(left_number) == float(right_number)
-    return text(left).casefold() == text(right).casefold()
+def _wildcard_pattern(operand: str) -> re.Pattern[str]:
+    parts: list[str] = []
+    index = 0
+    while index < len(operand):
+        character = operand[index]
+        if character == "~" and index + 1 < len(operand) and operand[index + 1] in "*?~":
+            parts.append(re.escape(operand[index + 1]))
+            index += 2
+            continue
+        if character == "*":
+            parts.append(".*")
+        elif character == "?":
+            parts.append(".")
+        else:
+            parts.append(re.escape(character))
+        index += 1
+    return re.compile("".join(parts), re.IGNORECASE | re.DOTALL)
 
 
-def _compare(left: Any, right: Any, operator: str) -> bool:
-    left_number = number(left)
-    right_number = number(right)
-    if not is_error(left_number) and not is_error(right_number):
-        normalized_left: Any = float(left_number)
-        normalized_right: Any = float(right_number)
-    else:
-        normalized_left = text(left).casefold()
-        normalized_right = text(right).casefold()
+def _ordering(operator: str, difference: int) -> bool:
     if operator == "=":
-        return normalized_left == normalized_right
+        return difference == 0
     if operator == "<>":
-        return normalized_left != normalized_right
+        return difference != 0
     if operator == "<":
-        return normalized_left < normalized_right
+        return difference < 0
     if operator == ">":
-        return normalized_left > normalized_right
+        return difference > 0
     if operator == "<=":
-        return normalized_left <= normalized_right
-    return normalized_left >= normalized_right
+        return difference <= 0
+    return difference >= 0
+
+
+def criteria_match(value: Any, criterion: Any) -> bool:
+    """Apply an Excel criterion as COUNTIF, SUMIF, and AVERAGEIF do.
+
+    Blank cells match only ``""``, ``"="``, and not-equal criteria; numeric
+    criteria match numbers and numeric text; wildcards apply only to text;
+    logical criteria match only logicals.
+    """
+    operator, operand, wildcard = parse_criterion(criterion)
+    if isinstance(operand, SpreadsheetError):
+        if operator == "=":
+            return value == operand
+        if operator == "<>":
+            return value != operand
+        return False
+    if is_error(value):
+        return operator == "<>"
+    if isinstance(value, (date, datetime)):
+        value = _date_to_serial(value)
+    if operand == "" and isinstance(operand, str):
+        blank = value is None or value == ""
+        if operator == "=":
+            return blank
+        if operator == "<>":
+            return not blank
+        return False
+    if value is None:
+        return operator == "<>"
+    if wildcard:
+        if not isinstance(value, str):
+            return operator == "<>"
+        matched = _wildcard_pattern(operand).fullmatch(value) is not None
+        return matched if operator == "=" else not matched
+    if isinstance(operand, bool):
+        if not isinstance(value, bool):
+            return operator == "<>"
+        return _ordering(operator, int(value) - int(operand))
+    if isinstance(operand, (int, float)):
+        if isinstance(value, bool):
+            return operator == "<>"
+        if isinstance(value, str):
+            if operator not in ("=", "<>"):
+                return False
+            parsed = parse_number_text(value)
+            if parsed is None:
+                return operator == "<>"
+            value = parsed
+        left, right = float(value), float(operand)
+        return _ordering(operator, (left > right) - (left < right))
+    if not isinstance(value, str):
+        return operator == "<>"
+    left_text, right_text = value.casefold(), str(operand).casefold()
+    return _ordering(operator, (left_text > right_text) - (left_text < right_text))
 
 
 def round_away(value: float, digits: int = 0) -> float:

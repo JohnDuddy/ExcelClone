@@ -100,7 +100,7 @@ class Ribbon(QTabWidget):
                 "Find",
                 "Format Cells",
             ),
-            "Insert": ("Quick Chart", "Chart Studio", "Rows", "Columns"),
+            "Insert": ("PivotTable", "Table", "Quick Chart", "Chart Studio", "Rows", "Columns"),
             "Data": (
                 "Sort",
                 "Filter",
@@ -108,6 +108,7 @@ class Ribbon(QTabWidget):
                 "Validate",
                 "Remove Duplicates",
                 "Text to Columns",
+                "Refresh All",
             ),
             "Formulas": ("Insert Function", "Recalculate", "Sheet Recalculate"),
             "Financial": (
@@ -161,6 +162,30 @@ class Ribbon(QTabWidget):
                     lambda checked=False: self.actionRequested.emit("Chart Help")
                 )
                 layout.addWidget(help_button)
+            if tab_name == "Data":
+                layout.addWidget(
+                    self._menu_button(
+                        "What-If Analysis",
+                        [
+                            (
+                                "What-If Analysis",
+                                [
+                                    ("Scenario Manager...", "Scenarios"),
+                                    ("Goal Seek...", "Goal Seek"),
+                                    ("Data Table...", "Data Table"),
+                                ],
+                            )
+                        ],
+                    )
+                )
+                analysis_help = QToolButton()
+                analysis_help.setText("Analysis Help")
+                analysis_help.setObjectName("analysisHelpButton")
+                analysis_help.setToolTip("Open the PivotTables, Tables, and What-If tutorial")
+                analysis_help.clicked.connect(
+                    lambda checked=False: self.actionRequested.emit("Analysis Help")
+                )
+                layout.addWidget(analysis_help)
             layout.addStretch(1)
             self.addTab(page, tab_name)
 

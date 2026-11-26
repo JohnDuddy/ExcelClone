@@ -26,8 +26,18 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QApplication, QAbstractItemView, QTableView
 
+from duddysheet.commands.editing import ClearRangesCommand, MoveCellsCommand
 from duddysheet.commands.edits import FillRangeCommand, PasteCellsCommand, SetRangeCommand
 from duddysheet.core.cell import Cell
+from duddysheet.core.formats import general_number
+from duddysheet.core.navigation import (
+    clip_range,
+    current_region,
+    data_edge,
+    last_cell,
+    selection_statistics,
+)
+from duddysheet.core.refs import MAX_COLUMNS, MAX_ROWS
 from duddysheet.core.clipboard import (
     RICH_CELL_MIME,
     decode_cell_matrix,
@@ -44,6 +54,8 @@ class GridView(QTableView):
     selectionSummaryChanged = Signal(str)
     externalHyperlinkRequested = Signal(str)
     internalHyperlinkRequested = Signal(str)
+    #: Ctrl+PgUp / Ctrl+PgDn ask the window to step to the previous/next sheet.
+    sheetStepRequested = Signal(int)
 
     def __init__(self, parent: Any = None) -> None:
         super().__init__(parent)
@@ -65,6 +77,17 @@ class GridView(QTableView):
         self._fill_handle_rect = QRect()
         self._fill_drag_source: tuple[int, int, int, int] | None = None
         self._fill_drag_target: QModelIndex | None = None
+        #: The moving corner of a keyboard-extended selection (Excel keeps the
+        #: active cell fixed while Shift+Arrow grows the block).
+        self._corner: tuple[int, int] | None = None
+        #: (sheet name, rectangle) marked by Cut, shown with a dashed marquee.
+        self.cut_source: tuple[str, tuple[int, int, int, int]] | None = None
+        #: "enter" when editing began by typing, "edit" after F2/double-click.
+        self.edit_mode = "edit"
+        #: Formula auditing arrows as ((from_row, from_column), (to_row, to_column)).
+        self.trace_arrows: list[tuple[tuple[int, int], tuple[int, int]]] = []
+        #: Show Excel's green error-checking triangles.
+        self.error_checking = True
         self._frozen_rows = self._create_frozen_view(
             "frozenRows",
             "border: 0; border-bottom: 2px solid #557063;",
@@ -101,12 +124,61 @@ class GridView(QTableView):
             for overlay in self._frozen_views:
                 overlay.setItemDelegate(delegate)
 
+    # ------------------------------------------------------------ keyboard
+    _ARROWS = {
+        Qt.Key.Key_Up: (-1, 0),
+        Qt.Key.Key_Down: (1, 0),
+        Qt.Key.Key_Left: (0, -1),
+        Qt.Key.Key_Right: (0, 1),
+    }
+
+    def edit(self, index: QModelIndex, trigger: Any = None, event: Any = None) -> bool:
+        """Open the editor, remembering whether typing (Enter mode) started it."""
+        if trigger is None:
+            return super().edit(index)
+        if trigger == QAbstractItemView.EditTrigger.AnyKeyPressed:
+            self.edit_mode = "enter"
+        elif trigger in (
+            QAbstractItemView.EditTrigger.DoubleClicked,
+            QAbstractItemView.EditTrigger.EditKeyPressed,
+        ):
+            self.edit_mode = "edit"
+        return super().edit(index, trigger, event)
+
     def keyPressEvent(self, event: QKeyEvent) -> None:
         modifiers = event.modifiers()
         key = event.key()
-        if modifiers & Qt.KeyboardModifier.ControlModifier:
+        control = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        alt = bool(modifiers & Qt.KeyboardModifier.AltModifier)
+        if key in self._ARROWS and not alt:
+            d_row, d_column = self._ARROWS[key]
+            self.navigate(d_row, d_column, to_edge=control, extend=shift)
+            return
+        if key in (Qt.Key.Key_Home, Qt.Key.Key_End) and not alt:
+            current = self.currentIndex()
+            row = current.row() if current.isValid() else 0
+            if key == Qt.Key.Key_Home:
+                target = (0, 0) if control else (row, 0)
+            elif control:
+                target = last_cell(self.grid_model.sheet)
+            else:
+                super().keyPressEvent(event)
+                return
+            if shift:
+                self.extend_to(*target)
+            else:
+                self.set_active_cell(*target)
+            return
+        if control and key in (Qt.Key.Key_PageUp, Qt.Key.Key_PageDown):
+            self.sheetStepRequested.emit(-1 if key == Qt.Key.Key_PageUp else 1)
+            return
+        if control and not shift:
             if key == Qt.Key.Key_C:
                 self.copy_selection()
+                return
+            if key == Qt.Key.Key_X:
+                self.cut_selection()
                 return
             if key == Qt.Key.Key_V:
                 self.paste_clipboard()
@@ -117,7 +189,7 @@ class GridView(QTableView):
             if key == Qt.Key.Key_Y:
                 self.grid_model.history.redo()
                 return
-            if key == Qt.Key.Key_Enter:
+            if key in (Qt.Key.Key_Enter, Qt.Key.Key_Return):
                 self.fill_selection_with_current()
                 return
             if key == Qt.Key.Key_D:
@@ -126,13 +198,206 @@ class GridView(QTableView):
             if key == Qt.Key.Key_R:
                 self.fill_right()
                 return
+            if key == Qt.Key.Key_A:
+                self.select_current_region_or_all()
+                return
+            if key == Qt.Key.Key_Space:
+                self.select_entire_columns()
+                return
+        if shift and not control and key == Qt.Key.Key_Space:
+            self.select_entire_rows()
+            return
+        if control and shift and key in (Qt.Key.Key_Space, Qt.Key.Key_Asterisk, Qt.Key.Key_8):
+            self.select_current_region_or_all()
+            return
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not control and not alt:
+            self.move_within_selection(-1 if shift else 1, 0)
+            return
+        if key == Qt.Key.Key_Tab and not control:
+            self.move_within_selection(0, 1)
+            return
+        if key == Qt.Key.Key_Backtab:
+            self.move_within_selection(0, -1)
+            return
         if key == Qt.Key.Key_Delete:
             self.clear_selection_contents()
             return
+        if key == Qt.Key.Key_Backspace and self.currentIndex().isValid():
+            self.clear_selection_contents(active_only=True)
+            self.edit_mode = "enter"
+            super().edit(self.currentIndex())
+            return
+        if key == Qt.Key.Key_Escape and self.cut_source is not None:
+            self.cut_source = None
+            self.viewport().update()
+            return
         if key == Qt.Key.Key_F2 and self.currentIndex().isValid():
-            self.edit(self.currentIndex())
+            self.edit_mode = "edit"
+            super().edit(self.currentIndex())
             return
         super().keyPressEvent(event)
+
+    def _visible_step(self, row: int, column: int, d_row: int, d_column: int) -> tuple[int, int]:
+        """Move one visible cell, skipping hidden rows and columns."""
+        sheet = self.grid_model.sheet
+        row, column = row + d_row, column + d_column
+        while 0 <= row < MAX_ROWS and 0 <= column < MAX_COLUMNS and (
+            row in sheet.hidden_rows or column in sheet.hidden_columns
+        ):
+            row, column = row + d_row, column + d_column
+        return (
+            max(0, min(MAX_ROWS - 1, row)),
+            max(0, min(MAX_COLUMNS - 1, column)),
+        )
+
+    def navigate(self, d_row: int, d_column: int, *, to_edge: bool, extend: bool) -> None:
+        """Excel arrow navigation: Ctrl jumps to data edges, Shift extends."""
+        current = self.currentIndex()
+        if not current.isValid():
+            self.set_active_cell(0, 0)
+            return
+        origin = self._corner if extend and self._corner is not None else (current.row(), current.column())
+        if to_edge:
+            target = data_edge(self.grid_model.sheet, origin[0], origin[1], d_row, d_column)
+        else:
+            target = self._visible_step(origin[0], origin[1], d_row, d_column)
+        if extend:
+            self.extend_to(*target)
+        else:
+            self.set_active_cell(*target)
+
+    def set_active_cell(self, row: int, column: int) -> None:
+        """Select one cell and make it active, scrolling it into view."""
+        index = self.grid_model.index(row, column)
+        if not index.isValid():
+            return
+        self.setCurrentIndex(index)
+        self.selectionModel().select(
+            index,
+            QItemSelectionModel.SelectionFlag.ClearAndSelect,
+        )
+        self._corner = (row, column)
+        self.scrollTo(index)
+
+    def extend_to(self, row: int, column: int) -> None:
+        """Grow the selection from the active cell to (row, column)."""
+        current = self.currentIndex()
+        if not current.isValid():
+            return
+        top, bottom = sorted((current.row(), row))
+        left, right = sorted((current.column(), column))
+        self.select_block(top, left, bottom, right, keep_current=True)
+        self._corner = (row, column)
+        self.scrollTo(self.grid_model.index(row, column))
+
+    def select_block(
+        self,
+        top: int,
+        left: int,
+        bottom: int,
+        right: int,
+        *,
+        keep_current: bool = False,
+    ) -> None:
+        """Select a rectangle as one selection range."""
+        model = self.grid_model
+        selection = QItemSelection(model.index(top, left), model.index(bottom, right))
+        self.selectionModel().select(
+            selection,
+            QItemSelectionModel.SelectionFlag.ClearAndSelect,
+        )
+        if not keep_current:
+            self.selectionModel().setCurrentIndex(
+                model.index(top, left),
+                QItemSelectionModel.SelectionFlag.NoUpdate,
+            )
+
+    def select_entire_columns(self) -> None:
+        """Ctrl+Space: select the columns of the current selection."""
+        bounds = self.selection_bounds()
+        if bounds is not None:
+            self.select_block(0, bounds[1], MAX_ROWS - 1, bounds[3], keep_current=True)
+
+    def select_entire_rows(self) -> None:
+        """Shift+Space: select the rows of the current selection."""
+        bounds = self.selection_bounds()
+        if bounds is not None:
+            self.select_block(bounds[0], 0, bounds[2], MAX_COLUMNS - 1, keep_current=True)
+
+    def select_current_region_or_all(self) -> None:
+        """Ctrl+A: select the data region; when already selected, the whole sheet."""
+        current = self.currentIndex()
+        if not current.isValid():
+            return
+        region = current_region(self.grid_model.sheet, current.row(), current.column())
+        bounds = self.selection_bounds()
+        single_empty = region[0] == region[2] and region[1] == region[3]
+        if bounds == region or single_empty:
+            self.select_block(0, 0, MAX_ROWS - 1, MAX_COLUMNS - 1, keep_current=True)
+        else:
+            self.select_block(*region, keep_current=True)
+
+    def move_within_selection(self, d_row: int, d_column: int) -> None:
+        """Enter/Tab: move the active cell, cycling inside a multi-cell selection."""
+        current = self.currentIndex()
+        if not current.isValid():
+            return
+        ranges = self.selection_ranges()
+        bounds = self.selection_bounds()
+        single = (
+            bounds is None
+            or (bounds[0] == bounds[2] and bounds[1] == bounds[3])
+            or len(ranges) != 1
+            or (bounds[2] - bounds[0] + 1) * (bounds[3] - bounds[1] + 1) > 1_000_000
+        )
+        if single:
+            target = self._visible_step(current.row(), current.column(), d_row, d_column)
+            self.set_active_cell(*target)
+            return
+        top, left, bottom, right = bounds
+        row, column = current.row(), current.column()
+        if d_row:
+            row += d_row
+            if row > bottom:
+                row, column = top, column + 1 if column < right else left
+            elif row < top:
+                row, column = bottom, column - 1 if column > left else right
+        else:
+            column += d_column
+            if column > right:
+                column, row = left, row + 1 if row < bottom else top
+            elif column < left:
+                column, row = right, row - 1 if row > top else bottom
+        self.selectionModel().setCurrentIndex(
+            self.grid_model.index(row, column),
+            QItemSelectionModel.SelectionFlag.NoUpdate,
+        )
+        self.scrollTo(self.grid_model.index(row, column))
+
+    def move_after_edit(self, d_row: int, d_column: int) -> None:
+        """Move after committing an edit with Enter, Tab, or an arrow key."""
+        self.move_within_selection(d_row, d_column)
+
+    def currentChanged(self, current: QModelIndex, previous: QModelIndex) -> None:
+        super().currentChanged(current, previous)
+        if current.isValid() and not (
+            QApplication.keyboardModifiers() & Qt.KeyboardModifier.ShiftModifier
+        ):
+            self._corner = (current.row(), current.column())
+
+    # ----------------------------------------------------------- selection
+    def selection_ranges(self) -> list[tuple[int, int, int, int]]:
+        """Return selected rectangles as (top, left, bottom, right) without expanding cells."""
+        ranges: list[tuple[int, int, int, int]] = []
+        model = self.selectionModel()
+        if model is not None:
+            for item in model.selection():
+                ranges.append((item.top(), item.left(), item.bottom(), item.right()))
+        if not ranges:
+            current = self.currentIndex()
+            if current.isValid():
+                ranges.append((current.row(), current.column(), current.row(), current.column()))
+        return ranges
 
     def selectionChanged(
         self,
@@ -140,23 +405,25 @@ class GridView(QTableView):
         deselected: QItemSelection,
     ) -> None:
         super().selectionChanged(selected, deselected)
-        values: list[float] = []
-        count = 0
-        for index in self.selectedIndexes()[:10_000]:
-            raw = self.grid_model.sheet.get_cell(index.row(), index.column()).display_value
-            if raw is not None:
-                count += 1
-            if isinstance(raw, (int, float)) and not isinstance(raw, bool):
-                values.append(float(raw))
-        if values:
-            summary = (
-                f"Average: {sum(values) / len(values):g}   "
-                f"Count: {count}   Sum: {sum(values):g}"
-            )
-        else:
-            summary = f"Count: {count}"
-        self.selectionSummaryChanged.emit(summary)
+        self.selectionSummaryChanged.emit(self.selection_summary())
         self.viewport().update()
+
+    def selection_summary(self) -> str:
+        """Return Excel's status bar text: Average, Count, and Sum of the selection."""
+        if self.model() is None:
+            return ""
+        ranges = self.selection_ranges()
+        area = sum((b - t + 1) * (r - l + 1) for t, l, b, r in ranges)
+        if area <= 1:
+            return ""
+        statistics = selection_statistics(self.grid_model.sheet, ranges)
+        if statistics.count == 0:
+            return ""
+        if statistics.numerical_count == 0:
+            return f"Count: {statistics.count}"
+        average = general_number(statistics.average or 0.0)
+        total = general_number(statistics.total)
+        return f"Average: {average}   Count: {statistics.count}   Sum: {total}"
 
     @property
     def grid_model(self) -> GridModel:
@@ -165,42 +432,34 @@ class GridView(QTableView):
             raise RuntimeError("GridView requires GridModel")
         return model
 
+    def _copy_bounds(self) -> tuple[int, int, int, int] | None:
+        bounds = self.selection_bounds()
+        if bounds is None:
+            return None
+        whole = bounds[2] - bounds[0] + 1 >= MAX_ROWS or bounds[3] - bounds[1] + 1 >= MAX_COLUMNS
+        if whole:
+            clipped = clip_range(self.grid_model.sheet, bounds)
+            return clipped if clipped is not None else (bounds[0], bounds[1], bounds[0], bounds[1])
+        return bounds
+
     def copy_selection(self) -> None:
-        """Copy the selected bounding rectangle as TSV."""
-        indexes = self.selectedIndexes()
-        if not indexes:
+        """Copy the selected rectangle as TSV text plus rich cells."""
+        bounds = self._copy_bounds()
+        if bounds is None:
             return
-        rows = [index.row() for index in indexes]
-        columns = [index.column() for index in indexes]
-        minimum_row, maximum_row = min(rows), max(rows)
-        minimum_column, maximum_column = min(columns), max(columns)
-        selected = {(index.row(), index.column()) for index in indexes}
+        self.cut_source = None
+        minimum_row, minimum_column, maximum_row, maximum_column = bounds
+        sheet = self.grid_model.sheet
+        block = sheet.cell_block(minimum_row, minimum_column, maximum_row, maximum_column)
         lines: list[str] = []
-        for row in range(minimum_row, maximum_row + 1):
-            fields = [
-                (
-                    self.grid_model.data(
-                        self.grid_model.index(row, column),
-                        Qt.ItemDataRole.DisplayRole,
-                    )
-                    or ""
-                )
-                if (row, column) in selected
-                else ""
-                for column in range(minimum_column, maximum_column + 1)
-            ]
-            lines.append("\t".join(str(field) for field in fields))
-        cells = tuple(
-            tuple(
-                (
-                    self.grid_model.sheet.get_cell(row, column)
-                    if (row, column) in selected
-                    else Cell()
-                )
-                for column in range(minimum_column, maximum_column + 1)
-            )
-            for row in range(minimum_row, maximum_row + 1)
-        )
+        for offset, row_cells in enumerate(block):
+            fields = []
+            for column_offset, cell in enumerate(row_cells):
+                index = self.grid_model.index(minimum_row + offset, minimum_column + column_offset)
+                text = self.grid_model.data(index, Qt.ItemDataRole.DisplayRole) if not cell.is_empty else ""
+                fields.append("" if text is None else str(text))
+            lines.append("\t".join(fields))
+        cells = tuple(tuple(row_cells) for row_cells in block)
         mime = QMimeData()
         mime.setText("\n".join(lines))
         mime.setData(
@@ -209,10 +468,39 @@ class GridView(QTableView):
         )
         QApplication.clipboard().setMimeData(mime)
 
+    def cut_selection(self) -> None:
+        """Mark the selection for moving; the next paste moves it (Ctrl+X)."""
+        bounds = self._copy_bounds()
+        if bounds is None:
+            return
+        self.copy_selection()
+        self.cut_source = (self.grid_model.active_sheet_name, bounds)
+        self.viewport().update()
+
     def paste_clipboard(self) -> None:
-        """Paste TSV text at the current cell as one command."""
+        """Paste at the active cell; a cut moves cells, one cell fills a selection."""
         current = self.currentIndex()
         if not current.isValid():
+            return
+        if self.cut_source is not None:
+            sheet_name, source = self.cut_source
+            self.cut_source = None
+            try:
+                self.grid_model.history.execute(
+                    MoveCellsCommand(
+                        self.grid_model.engine,
+                        sheet_name,
+                        source,
+                        self.grid_model.active_sheet_name,
+                        current.row(),
+                        current.column(),
+                    )
+                )
+            except (IndexError, ValueError):
+                return
+            height, width = source[2] - source[0], source[3] - source[1]
+            self.select_block(current.row(), current.column(), current.row() + height, current.column() + width)
+            self.grid_model.refresh()
             return
         mime = QApplication.clipboard().mimeData()
         if mime.hasFormat(RICH_CELL_MIME):
@@ -221,16 +509,17 @@ class GridView(QTableView):
             except (ValueError, TypeError):
                 pass
             else:
-                self.grid_model.history.execute(
-                    PasteCellsCommand(
-                        self.grid_model.engine,
-                        self.grid_model.active_sheet_name,
-                        current.row(),
-                        current.column(),
-                        cells,
-                        origin,
+                for row, column in self._paste_targets(len(cells), len(cells[0]) if cells else 0):
+                    self.grid_model.history.execute(
+                        PasteCellsCommand(
+                            self.grid_model.engine,
+                            self.grid_model.active_sheet_name,
+                            row,
+                            column,
+                            cells,
+                            origin,
+                        )
                     )
-                )
                 self.grid_model.refresh()
                 return
         text = QApplication.clipboard().text().replace("\r\n", "\n").replace("\r", "\n")
@@ -250,26 +539,39 @@ class GridView(QTableView):
         )
         self.grid_model.refresh()
 
-    def clear_selection_contents(self) -> None:
-        """Clear selected cells as one range command when rectangular."""
-        indexes = self.selectedIndexes()
-        if not indexes:
+    def _paste_targets(self, height: int, width: int) -> list[tuple[int, int]]:
+        """Top-left corners: tile the source over a selection that is a multiple of it."""
+        current = self.currentIndex()
+        bounds = self.selection_bounds()
+        if not height or not width or bounds is None:
+            return [(current.row(), current.column())]
+        top, left, bottom, right = bounds
+        rows, columns = bottom - top + 1, right - left + 1
+        if (rows, columns) == (height, width) or rows % height or columns % width:
+            return [(current.row(), current.column())]
+        if rows * columns > 100_000:
+            return [(current.row(), current.column())]
+        return [
+            (row, column)
+            for row in range(top, bottom + 1, height)
+            for column in range(left, right + 1, width)
+        ]
+
+    def clear_selection_contents(self, *, active_only: bool = False) -> None:
+        """Delete key: clear contents (keeping formats) of the selection."""
+        if active_only:
+            current = self.currentIndex()
+            ranges = [(current.row(), current.column(), current.row(), current.column())]
+        else:
+            ranges = self.selection_ranges()
+        if not ranges:
             return
-        rows = [index.row() for index in indexes]
-        columns = [index.column() for index in indexes]
-        minimum_row, maximum_row = min(rows), max(rows)
-        minimum_column, maximum_column = min(columns), max(columns)
-        values = tuple(
-            tuple(None for _ in range(minimum_column, maximum_column + 1))
-            for _ in range(minimum_row, maximum_row + 1)
-        )
         self.grid_model.history.execute(
-            SetRangeCommand(
+            ClearRangesCommand(
                 self.grid_model.engine,
                 self.grid_model.active_sheet_name,
-                minimum_row,
-                minimum_column,
-                values,
+                tuple(ranges),
+                "contents",
             )
         )
         self.grid_model.refresh()
@@ -347,16 +649,16 @@ class GridView(QTableView):
         )
 
     def selection_bounds(self) -> tuple[int, int, int, int] | None:
-        """Return the bounding rectangle of selected cells."""
-        indexes = self.selectedIndexes()
-        if not indexes:
-            current = self.currentIndex()
-            indexes = [current] if current.isValid() else []
-        if not indexes:
+        """Return the bounding rectangle of the selection (top, left, bottom, right)."""
+        ranges = self.selection_ranges()
+        if not ranges:
             return None
-        rows = [index.row() for index in indexes]
-        columns = [index.column() for index in indexes]
-        return min(rows), min(columns), max(rows), max(columns)
+        return (
+            min(item[0] for item in ranges),
+            min(item[1] for item in ranges),
+            max(item[2] for item in ranges),
+            max(item[3] for item in ranges),
+        )
 
     def activate_hyperlink(self, index: QModelIndex) -> bool:
         """Emit the appropriate activation request for a linked cell."""
@@ -442,6 +744,10 @@ class GridView(QTableView):
                 7,
             )
         painter = QPainter(self.viewport())
+        self._paint_note_markers(painter)
+        self._paint_error_markers(painter)
+        self._paint_cut_marquee(painter)
+        self._paint_trace_arrows(painter)
         if not self._fill_handle_rect.isNull():
             painter.setPen(QPen(QColor("#ffffff"), 1))
             painter.setBrush(QBrush(QColor("#217346")))
@@ -458,7 +764,146 @@ class GridView(QTableView):
                 painter.drawRect(preview.adjusted(1, 1, -1, -1))
         painter.end()
 
+    def _paint_note_markers(self, painter: QPainter) -> None:
+        """Draw Excel's red triangle in the corner of cells that carry a note."""
+        notes = self.grid_model.sheet.notes
+        if not notes:
+            return
+        viewport = self.viewport().rect()
+        top = self.rowAt(0)
+        bottom = self.rowAt(viewport.height() - 1)
+        left = self.columnAt(0)
+        right = self.columnAt(viewport.width() - 1)
+        bottom = MAX_ROWS - 1 if bottom < 0 else bottom
+        right = MAX_COLUMNS - 1 if right < 0 else right
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(QColor("#c00000")))
+        for row, column in notes:
+            if not (top <= row <= bottom and left <= column <= right):
+                continue
+            rect = self.visualRect(self.grid_model.index(row, column))
+            if not rect.isValid():
+                continue
+            from PySide6.QtCore import QPoint
+            from PySide6.QtGui import QPolygon
+
+            corner = rect.topRight()
+            painter.drawPolygon(
+                QPolygon(
+                    [
+                        QPoint(corner.x() - 6, corner.y()),
+                        QPoint(corner.x(), corner.y()),
+                        QPoint(corner.x(), corner.y() + 6),
+                    ]
+                )
+            )
+
+    def _visible_bounds(self) -> tuple[int, int, int, int]:
+        viewport = self.viewport().rect()
+        top = max(0, self.rowAt(0))
+        left = max(0, self.columnAt(0))
+        bottom = self.rowAt(viewport.height() - 1)
+        right = self.columnAt(viewport.width() - 1)
+        return (
+            top,
+            left,
+            MAX_ROWS - 1 if bottom < 0 else bottom,
+            MAX_COLUMNS - 1 if right < 0 else right,
+        )
+
+    def _paint_error_markers(self, painter: QPainter) -> None:
+        """Draw the green triangle Excel uses for error-checking findings."""
+        if not self.error_checking:
+            return
+        from PySide6.QtCore import QPoint
+        from PySide6.QtGui import QPolygon
+
+        from duddysheet.core.auditing import error_flags
+
+        sheet = self.grid_model.sheet
+        top, left, bottom, right = self._visible_bounds()
+        if (bottom - top + 1) * (right - left + 1) > 20_000:
+            return
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(QColor("#008000")))
+        for row in range(top, bottom + 1):
+            for column in range(left, right + 1):
+                cell = sheet.get_cell(row, column)
+                if cell.is_empty or not error_flags(sheet, row, column):
+                    continue
+                rect = self.visualRect(self.grid_model.index(row, column))
+                corner = rect.topLeft()
+                painter.drawPolygon(
+                    QPolygon(
+                        [
+                            QPoint(corner.x(), corner.y()),
+                            QPoint(corner.x() + 6, corner.y()),
+                            QPoint(corner.x(), corner.y() + 6),
+                        ]
+                    )
+                )
+
+    def _paint_trace_arrows(self, painter: QPainter) -> None:
+        """Draw Trace Precedents/Dependents arrows between cell centers."""
+        if not self.trace_arrows:
+            return
+        import math as _math
+
+        from PySide6.QtCore import QPointF
+        from PySide6.QtGui import QPolygonF
+
+        pen = QPen(QColor("#0000ff"), 1.5)
+        painter.setPen(pen)
+        for (from_row, from_column), (to_row, to_column) in self.trace_arrows:
+            start = self.visualRect(self.grid_model.index(from_row, from_column)).center()
+            end = self.visualRect(self.grid_model.index(to_row, to_column)).center()
+            painter.setBrush(QBrush(QColor("#0000ff")))
+            painter.drawEllipse(start, 3, 3)
+            painter.drawLine(start, end)
+            angle = _math.atan2(end.y() - start.y(), end.x() - start.x())
+            head = QPolygonF(
+                [
+                    QPointF(end),
+                    QPointF(end.x() - 9 * _math.cos(angle - 0.4), end.y() - 9 * _math.sin(angle - 0.4)),
+                    QPointF(end.x() - 9 * _math.cos(angle + 0.4), end.y() - 9 * _math.sin(angle + 0.4)),
+                ]
+            )
+            painter.drawPolygon(head)
+
+    def _paint_cut_marquee(self, painter: QPainter) -> None:
+        if self.cut_source is None or self.cut_source[0] != self.grid_model.active_sheet_name:
+            return
+        top, left, bottom, right = self.cut_source[1]
+        first = self.visualRect(self.grid_model.index(top, left))
+        last = self.visualRect(self.grid_model.index(bottom, right))
+        if not first.isValid() and not last.isValid():
+            return
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor("#217346"), 2, Qt.PenStyle.DashLine))
+        painter.drawRect(first.united(last).adjusted(1, 1, -1, -1))
+
+    def _open_editor(self) -> Any:
+        from PySide6.QtWidgets import QLineEdit
+
+        if self.state() != QAbstractItemView.State.EditingState:
+            return None
+        editor = self.findChild(QLineEdit, "cellEditor")
+        return editor if editor is not None and editor.isVisible() else None
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
+        editor = self._open_editor()
+        if editor is not None and event.button() == Qt.MouseButton.LeftButton:
+            from duddysheet.ui.delegates import can_point, insert_point_reference
+
+            target = self.indexAt(event.position().toPoint())
+            if target.isValid() and target != self.currentIndex() and can_point(editor):
+                # Point mode: clicking while typing a formula inserts a reference.
+                editor.setProperty("pointAnchor", None)
+                insert_point_reference(editor, target.row(), target.column())
+                editor.setProperty("pointDragAnchor", (target.row(), target.column()))
+                editor.setFocus()
+                event.accept()
+                return
         if (
             event.button() == Qt.MouseButton.LeftButton
             and not self._fill_handle_rect.isNull()
@@ -471,6 +916,22 @@ class GridView(QTableView):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        editor = self._open_editor()
+        if editor is not None and editor.property("pointDragAnchor") is not None:
+            if event.buttons() & Qt.MouseButton.LeftButton:
+                from duddysheet.ui.delegates import insert_point_reference
+
+                target = self.indexAt(event.position().toPoint())
+                if target.isValid():
+                    insert_point_reference(
+                        editor,
+                        target.row(),
+                        target.column(),
+                        anchor=tuple(editor.property("pointDragAnchor")),
+                    )
+                event.accept()
+                return
+            editor.setProperty("pointDragAnchor", None)
         if self._fill_drag_source is not None:
             target = self.indexAt(event.position().toPoint())
             if target.isValid():

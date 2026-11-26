@@ -6,6 +6,54 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Added
 
+- Excel Tables. Ctrl+T (or Insert > Table) turns a list into a named table
+  with a styled header and banded rows. Formulas can refer to it by name:
+  `Table1[Qty]`, `[@Qty]` for the same row, `Table1[#Headers]`,
+  `Table1[#Totals]`, `Table1[#All]`, column ranges such as
+  `Table1[[Qty]:[Price]]`, and a bare `Table1` for its data. A formula typed
+  into an empty column fills the whole column, and rows typed below or
+  inserted inside receive it too. Typing beside or below a table grows it.
+  Data > Table offers a total row (Ctrl+Shift+T) with a per-column Sum,
+  Average, Count, Max, Min, StdDev, or Var, plus 35 styles, banding and
+  first/last column options, rename (formulas follow), resize, and Convert to
+  Range, which rewrites structured references as A1 references.
+- PivotTables. Insert > PivotTable summarizes a range or table on a new or
+  existing sheet. The PivotTable Fields dialog places fields in Filters,
+  Columns, Rows, and Values. Eleven summary functions are offered, with Show
+  Values As (% of grand, column, or row total, and running total), item
+  filters, year/quarter/month/day date grouping, compact, outline, or
+  tabular layout, and switchable subtotals and grand totals. Refresh (Alt+F5),
+  Refresh All (Ctrl+Alt+F5), Change Data Source, Show Details, and
+  `GETPIVOTDATA` all work as in Excel. A PivotTable built from a table
+  follows the table as it grows.
+- What-If data tables. Data > What-If Analysis > Data Table creates one- and
+  two-variable `{=TABLE()}` tables that show a formula's result for many
+  input values without changing the real inputs, recalculate as the model
+  changes, and honor Automatic Except for Data Tables. Goal Seek and Scenario
+  Manager share the same submenu.
+- Help > PivotTables, Tables, and What-If Tutorial: 16 searchable lessons
+  with steps, worked examples, and tips, plus a practice workbook holding a
+  sales table, a PivotTable built from it, and a loan data table.
+- Excel 365 formula semantics: arrays broadcast through operators and
+  functions, ranges spill, `@` forces implicit intersection, `A1#` refers to
+  a spill, and LET, LAMBDA, named formulas, 3-D references, and `:` between
+  reference expressions all work. The function library grows to 524,
+  including SORTBY, VSTACK, GROUPBY, PIVOTBY, XMATCH, TEXTSPLIT, and the
+  engineering, database, and remaining statistical and financial functions.
+- Excel's editing model: Enter and Tab move after an edit, arrow keys
+  point at references while typing a formula, Ctrl+arrows jump between data
+  edges, Ctrl+A selects the current region, cut-and-paste moves cells, and
+  Insert/Delete Cells shift neighbours. Every Paste Special mode, Flash Fill,
+  AutoSum, and Excel's formatting shortcuts are included.
+- Go To Special, Trace Precedents and Dependents with arrows, Evaluate
+  Formula, error checking with cell markers, and a Watch Window.
+- Cell styles, the number-format gallery, notes, sheet and workbook
+  protection compatible with Excel passwords, row and column grouping,
+  Subtotal, Consolidate, Advanced Filter, manual and iterative calculation.
+- `.xlsx` files keep tables (with totals and calculated columns), data
+  tables, dynamic-array formulas, notes, protection, outlines, conditional
+  formats, and calculation options.
+
 - A workbook named on the command line now opens at startup. `--open PATH`,
   `--open=PATH`, or a single bare path all work, so Duddy Spreadsheet can be
   launched from a script or a shortcut, or registered as the handler for a
@@ -70,6 +118,9 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Changed
 
+- Native schema 5 stores notes, outlines, protection, row and column formats,
+  workbook calculation options, tables, PivotTables, and data tables. Schema 4
+  files migrate on open.
 - Native schema raised to 4 to carry sparklines and the new chart options,
   with a migration from 3. Older charts open with their original appearance.
 - Pie and doughnut slices now run clockwise from 12 o'clock, as in Excel.
@@ -80,6 +131,7 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Fixed
 
+- The Data menu no longer appears twice in the menu bar.
 - Editing a chart no longer silently switches it to the top recommended chart
   type.
 - Turning gridlines off on a radar chart now hides them.

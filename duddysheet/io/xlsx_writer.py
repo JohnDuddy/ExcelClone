@@ -10,12 +10,20 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation as OpenPyxlValidation
+from openpyxl.worksheet.formula import ArrayFormula
 from openpyxl.worksheet.hyperlink import Hyperlink as OpenPyxlHyperlink
 
 from duddysheet.core.cell import BorderStyle, CellFormat
 from duddysheet.core.data_tools import AutoFilter, DataValidation
 from duddysheet.core.workbook import Workbook
-from duddysheet.io.formula_compat import to_xlsx_formula
+from duddysheet.core.refs import CellReference, RangeReference
+from duddysheet.io.dynamic_arrays import mark_dynamic_arrays
+from duddysheet.io.formula_compat import is_dynamic_formula, to_xlsx_formula
+from duddysheet.io.xlsx_features import (
+    write_cell_extras,
+    write_sheet_extras,
+    write_workbook_extras,
+)
 
 
 def write_xlsx(workbook: Workbook, path: str | Path) -> Path:
@@ -24,28 +32,108 @@ def write_xlsx(workbook: Workbook, path: str | Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     package = OpenPyxlWorkbook()
     package.remove(package.active)
+    anchors: dict[str, set[str]] = {}
     for source_sheet in workbook:
         worksheet = package.create_sheet(source_sheet.name)
-        _write_worksheet(source_sheet, worksheet)
+        anchors[source_sheet.name] = _write_worksheet(source_sheet, worksheet)
     package.active = workbook.active_sheet_index
     package.calculation.fullCalcOnLoad = True
     package.calculation.forceFullCalc = True
-    package.calculation.calcMode = "auto"
+    package.calculation.calcMode = {
+        "manual": "manual",
+        "automatic_except_tables": "autoNoTable",
+    }.get(workbook.calculation_mode, "auto")
+    package.calculation.iterate = bool(workbook.iterative_calculation)
+    package.calculation.iterateCount = int(workbook.max_iterations)
+    package.calculation.iterateDelta = float(workbook.max_change)
     _write_defined_names(workbook, package)
+    write_workbook_extras(workbook, package)
     package.save(destination)
     package.close()
+    mark_dynamic_arrays(destination, anchors)
     return destination
 
 
-def _write_worksheet(source: Any, worksheet: Any) -> None:
+def _write_data_table_cell(source: Any, target: Any, row: int, column: int, cell: Any) -> None:
+    """Excel stores a data table as one dataTable formula plus cached values."""
+    from openpyxl.worksheet.formula import DataTableFormula
+
+    from duddysheet.core.data_table import data_table_at
+
+    spec = data_table_at(source, row, column)
+    if spec is None:
+        return
+    top, left, bottom, right = spec.interior
+    if (row, column) != (top, left):
+        target.value = cell.display_value
+        return
+
+    def a1(address: Any) -> str | None:
+        if address is None:
+            return None
+        return CellReference(address[1], address[2]).to_a1(include_sheet=False)
+
+    reference = RangeReference(CellReference(top, left), CellReference(bottom, right)).to_a1()
+    if spec.kind == "two":
+        target.value = DataTableFormula(reference, dt2D=True, r1=a1(spec.row_input), r2=a1(spec.column_input))
+    elif spec.kind == "row":
+        target.value = DataTableFormula(reference, dtr=True, r1=a1(spec.row_input))
+    else:
+        target.value = DataTableFormula(reference, r1=a1(spec.column_input))
+
+
+def _spill_extents(source: Any) -> dict[tuple[int, int], tuple[int, int]]:
+    """Return anchor -> (last row, last column) for every spilled formula."""
+    extents: dict[tuple[int, int], tuple[int, int]] = {}
+    for (row, column), cell in source.iter_populated():
+        if cell.spill_parent is None:
+            continue
+        anchor = cell.spill_parent
+        last_row, last_column = extents.get(anchor, anchor)
+        extents[anchor] = (max(last_row, row), max(last_column, column))
+    return extents
+
+
+def _write_worksheet(source: Any, worksheet: Any) -> set[str]:
+    """Write one sheet and return the A1 addresses of dynamic-array anchors."""
+    extents = _spill_extents(source)
+    anchors: set[str] = set()
     for (row, column), source_cell in source.iter_populated():
         target = worksheet.cell(row=row + 1, column=column + 1)
-        target.value = (
-            to_xlsx_formula(source_cell.raw_input)
-            if source_cell.is_formula
-            else source_cell.display_value
-        )
+        if source_cell.is_spill:
+            # Spilled values belong to their anchor's array formula.
+            continue
+        if source.data_tables and source_cell.is_formula and source_cell.raw_input.upper().startswith("=TABLE("):
+            _write_data_table_cell(source, target, row, column, source_cell)
+            _write_cell_format(target, source_cell.format)
+            continue
+        if source_cell.is_formula:
+            raw_formula = source_cell.raw_input
+            if source.tables and "[" in raw_formula:
+                from duddysheet.core.tables import qualify_structured, table_at
+
+                owner = table_at(source, row, column)
+                if owner is not None:
+                    raw_formula = qualify_structured(raw_formula, owner.name)
+            formula = to_xlsx_formula(raw_formula)
+            extent = extents.get((row, column))
+            if extent is not None or is_dynamic_formula(source_cell.raw_input):
+                start = CellReference(row, column)
+                last_row, last_column = extent or (row, column)
+                reference = (
+                    start.to_a1(include_sheet=False)
+                    if (last_row, last_column) == (row, column)
+                    else RangeReference(start, CellReference(last_row, last_column)).to_a1()
+                )
+                target.value = ArrayFormula(reference, formula)
+                anchors.add(start.to_a1(include_sheet=False))
+            else:
+                target.value = formula
+        else:
+            target.value = source_cell.display_value
         _write_cell_format(target, source_cell.format)
+        if not source_cell.format.is_default:
+            write_cell_extras(target, source_cell.format)
         if source_cell.hyperlink is not None:
             link = source_cell.hyperlink
             target.hyperlink = OpenPyxlHyperlink(
@@ -73,6 +161,8 @@ def _write_worksheet(source: Any, worksheet: Any) -> None:
         worksheet.sheet_properties.tabColor = _argb(source.tab_color)
     _write_validations(source, worksheet)
     _write_filter(source, worksheet)
+    write_sheet_extras(source, worksheet)
+    return anchors
 
 
 def _write_cell_format(cell: Any, cell_format: CellFormat) -> None:
@@ -117,7 +207,11 @@ def _write_border(border: BorderStyle) -> Side:
 
 def _write_defined_names(workbook: Workbook, package: Any) -> None:
     for item in workbook.defined_names:
-        defined_name = DefinedName(item.name, attr_text=item.reference.to_a1())
+        defined_name = DefinedName(
+            item.name,
+            attr_text=to_xlsx_formula(item.refers_to)[1:],
+            comment=item.comment or None,
+        )
         if item.scope is None:
             package.defined_names.add(defined_name)
         else:

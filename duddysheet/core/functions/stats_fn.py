@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import statistics
 from collections import Counter
+from datetime import date, datetime
 from typing import Any
 
 import numpy as np
@@ -16,6 +17,7 @@ from duddysheet.core.functions.common import (
     criteria_match,
     first_error,
     flatten,
+    is_collection,
     number,
     numeric_values,
     rectangular,
@@ -125,30 +127,59 @@ def mode(context: Any, *arguments: Any) -> Any:
 
 @register("COUNT", min_args=1, argument_spec="value1, [value2], ...")
 def count(context: Any, *arguments: Any) -> int:
-    """Count numeric values."""
-    return sum(
-        isinstance(value, (int, float)) and not isinstance(value, bool)
-        for value in flatten(context, *arguments)
-    )
+    """Count numbers and dates; typed arguments also count numeric text and logicals."""
+    total = 0
+    for argument in arguments:
+        if is_collection(argument):
+            total += sum(
+                isinstance(value, (int, float, date, datetime))
+                and not isinstance(value, bool)
+                for value in context.values(argument)
+            )
+            continue
+        value = context.scalar(argument)
+        if is_error(value):
+            continue
+        total += not is_error(number(value)) and not (
+            isinstance(value, str) and not value.strip()
+        )
+    return total
 
 
 @register("COUNTA", min_args=1, argument_spec="value1, [value2], ...")
 def counta(context: Any, *arguments: Any) -> int:
-    """Count nonblank values."""
-    return sum(value is not None and value != "" for value in flatten(context, *arguments))
+    """Count values that are not empty, including errors and empty text."""
+    total = 0
+    for argument in arguments:
+        if is_collection(argument):
+            total += sum(value is not None for value in context.values(argument))
+        else:
+            total += 1
+    return total
 
 
 @register("COUNTBLANK", min_args=1, max_args=1, argument_spec="range")
 def countblank(context: Any, argument: Any) -> int:
-    """Count blank values in a range."""
-    return sum(value is None or value == "" for value in flatten(context, argument))
+    """Count empty cells and cells containing empty text."""
+    values = flatten(context, argument)
+    filled = sum(value is not None and value != "" for value in values)
+    return context.cell_count(argument) - filled
+
+
+def _blank_cells_beyond(context: Any, argument: Any, values: list[Any]) -> int:
+    """Cells of a clipped whole-column reference that were never read."""
+    return max(0, context.cell_count(argument) - len(values))
 
 
 @register("COUNTIF", min_args=2, max_args=2, argument_spec="range, criteria")
 def countif(context: Any, argument: Any, criterion: Any) -> int:
     """Count values meeting one criterion."""
     selected = scalar(context, criterion)
-    return sum(criteria_match(value, selected) for value in flatten(context, argument))
+    values = flatten(context, argument)
+    total = sum(criteria_match(value, selected) for value in values)
+    if criteria_match(None, selected):
+        total += _blank_cells_beyond(context, argument, values)
+    return total
 
 
 @register(
@@ -166,10 +197,13 @@ def countifs(context: Any, *arguments: Any) -> Any:
     ]
     if not pairs or any(len(values) != len(pairs[0][0]) for values, _ in pairs):
         return VALUE_ERROR
-    return sum(
+    total = sum(
         all(criteria_match(values[index], criterion) for values, criterion in pairs)
         for index in range(len(pairs[0][0]))
     )
+    if all(criteria_match(None, criterion) for _, criterion in pairs):
+        total += _blank_cells_beyond(context, arguments[0], pairs[0][0])
+    return total
 
 
 def _extreme(context: Any, arguments: tuple[Any, ...], function: Any) -> Any:
