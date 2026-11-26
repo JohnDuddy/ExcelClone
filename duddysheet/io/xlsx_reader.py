@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings as warnings_module
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -19,10 +20,46 @@ from duddysheet.core.refs import CellReference, parse_a1
 from duddysheet.core.tokenizer import FormulaSyntaxError
 from duddysheet.core.workbook import Workbook
 from duddysheet.io.formula_compat import from_xlsx_formula
+from duddysheet.io.xlsx_charts import read_classic_chart
+from duddysheet.io.xlsx_extras import read_package_extras
+from duddysheet.io.xlsx_package import XlsxPackage
+from duddysheet.io.xlsx_pivots import read_pivot_tables
 from duddysheet.io.xlsx_features import (
     read_cell_extras,
     read_sheet_extras,
     read_workbook_extras,
+)
+
+
+_SOLVER_NAMES: dict[int, dict[str, dict[str, str]]] = {}
+
+
+def _apply_solver_models(workbook: Workbook) -> None:
+    from duddysheet.core.solver import model_from_names
+
+    for sheet_name, names in _SOLVER_NAMES.pop(id(workbook), {}).items():
+        try:
+            model = model_from_names({key: _strip_sheet(value) for key, value in names.items()})
+        except (ValueError, KeyError):
+            model = None
+        if model is not None:
+            workbook.get_sheet(sheet_name).solver = model
+
+
+def _strip_sheet(text: str) -> str:
+    """Drop the sheet qualifier from each part of a solver_* name ('Sheet1'!$B$3 -> $B$3)."""
+    parts = []
+    for part in text.split(","):
+        part = part.strip()
+        if "!" in part:
+            part = part.rsplit("!", 1)[1]
+        parts.append(part)
+    return ",".join(parts)
+
+
+_HANDLED_OPENPYXL_WARNINGS = (
+    "Sparkline Group extension is not supported",
+    "DrawingML support is incomplete",
 )
 
 
@@ -40,13 +77,19 @@ def read_xlsx(path: str | Path) -> WorkbookLoadResult:
     warnings: list[str] = []
     if source.suffix.lower() == ".xlsm":
         warnings.append("VBA macros are not supported and were dropped.")
-    package = load_workbook(
-        source,
-        data_only=False,
-        read_only=False,
-        keep_vba=False,
-        keep_links=False,
-    )
+    with warnings_module.catch_warnings():
+        # Sparklines, Office 2016 charts, and shapes are read from the
+        # package directly by read_package_extras, so openpyxl's notices
+        # that it skips them do not apply.
+        for message in _HANDLED_OPENPYXL_WARNINGS:
+            warnings_module.filterwarnings("ignore", message=message, category=UserWarning)
+        package = load_workbook(
+            source,
+            data_only=False,
+            read_only=False,
+            keep_vba=False,
+            keep_links=False,
+        )
     workbook = Workbook(create_default=False)
     for worksheet in package.worksheets:
         sheet = workbook.add_sheet(worksheet.title)
@@ -58,6 +101,7 @@ def read_xlsx(path: str | Path) -> WorkbookLoadResult:
     workbook.active_sheet = min(package.index(package.active), len(workbook) - 1)
     _read_defined_names(package, workbook, warnings)
     read_workbook_extras(package, workbook)
+    _apply_solver_models(workbook)
     calculation = getattr(package, "calculation", None)
     if calculation is not None:
         workbook.calculation_mode = {
@@ -71,7 +115,9 @@ def read_xlsx(path: str | Path) -> WorkbookLoadResult:
             workbook.max_change = float(calculation.iterateDelta)
     if getattr(package, "_external_links", None):
         warnings.append("External workbook links are not supported and were dropped.")
+    read_pivot_tables(package, workbook, warnings, XlsxPackage(source).number_formats())
     package.close()
+    read_package_extras(source, workbook, warnings)
 
     try:
         FormulaEngine(workbook).recalculate()
@@ -81,6 +127,22 @@ def read_xlsx(path: str | Path) -> WorkbookLoadResult:
             f"recalculated: {error}"
         )
     return WorkbookLoadResult(workbook, tuple(dict.fromkeys(warnings)))
+
+
+def _read_charts(worksheet: Any, sheet: Any, warnings: list[str]) -> None:
+    """Import the worksheet's classic Excel charts as chart specifications."""
+    dropped = 0
+    for index, chart in enumerate(getattr(worksheet, "_charts", None) or []):
+        spec = read_classic_chart(chart, sheet.name, f"xlsx-{sheet.name}-{index + 1}")
+        if spec is None:
+            dropped += 1
+        else:
+            sheet.charts.append(spec)
+    if dropped:
+        warnings.append(
+            f"{dropped} chart(s) on sheet {worksheet.title!r} combine data from several "
+            "sheets or use typed-in values and were dropped."
+        )
 
 
 def _array_formula_cells(worksheet: Any) -> set[tuple[int, int]]:
@@ -198,19 +260,7 @@ def _read_worksheet(worksheet: Any, sheet: Any, warnings: list[str]) -> None:
         )
     sheet.tab_color = _read_color(worksheet.sheet_properties.tabColor, None)
 
-    if getattr(worksheet, "_charts", None):
-        warnings.append(
-            f"Charts on sheet {worksheet.title!r} are not supported and were dropped."
-        )
-    if getattr(worksheet, "_images", None):
-        warnings.append(
-            f"Images on sheet {worksheet.title!r} are not supported and were dropped."
-        )
-    if getattr(worksheet, "_pivots", None):
-        warnings.append(
-            f"PivotTables on sheet {worksheet.title!r} were imported as values. "
-            "Use Insert > PivotTable to rebuild them as refreshable PivotTables."
-        )
+    _read_charts(worksheet, sheet, warnings)
     read_sheet_extras(worksheet, sheet, warnings)
     _read_data_tables(worksheet, sheet)
     _read_validations(worksheet, sheet, warnings)
@@ -303,7 +353,13 @@ def _read_defined_name(
     warnings: list[str],
 ) -> None:
     text = defined_name.attr_text
-    if not text or defined_name.name.startswith("_xlnm."):
+    if defined_name.name.startswith("solver_") and scope is not None:
+        # Excel keeps a sheet's Solver model in hidden solver_* names.
+        _SOLVER_NAMES.setdefault(id(workbook), {}).setdefault(scope, {})[defined_name.name] = text or ""
+        return
+    if not text or defined_name.name.startswith(("_xlnm.", "_xlchart.")):
+        # _xlchart names are Excel's hidden pointers to chart data; the charts
+        # that use them are rebuilt from the cells they name.
         return
     comment = getattr(defined_name, "comment", None) or ""
     try:

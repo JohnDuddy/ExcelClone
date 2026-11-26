@@ -257,9 +257,13 @@ def _holiday_dates(context: Any, holidays: Any) -> set[date]:
         return set()
     selected: set[date] = set()
     for value in flatten(context, holidays):
+        if value is None or value == "":
+            continue
         converted = serial_datetime(value)
-        if not is_error(converted):
-            selected.add(converted.date())
+        if is_error(converted):
+            # Excel rejects a holiday that is not a date.
+            return VALUE_ERROR
+        selected.add(converted.date())
     return selected
 
 
@@ -282,6 +286,8 @@ def networkdays(
         return VALUE_ERROR
     sign = 1 if end_date >= start_date else -1
     holiday_set = _holiday_dates(context, holidays)
+    if is_error(holiday_set):
+        return holiday_set
     current = start_date.date()
     target = end_date.date()
     count_value = 0
@@ -315,6 +321,8 @@ def workday(
     direction = 1 if count_value >= 0 else -1
     current = selected.date()
     holiday_set = _holiday_dates(context, holidays)
+    if is_error(holiday_set):
+        return holiday_set
     while remaining:
         current += timedelta(days=direction)
         if current.weekday() < 5 and current not in holiday_set:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from duddysheet.core.errors import VALUE_ERROR, is_error
+from duddysheet.core.errors import NA_ERROR, VALUE_ERROR, is_error
 from duddysheet.core.functions import register
 from duddysheet.core.functions.common import (
     first_error,
@@ -349,8 +349,11 @@ def _text_before_after(
         return VALUE_ERROR
     positions = [match.start() for match in re.finditer(re.escape(delimiter_text), source_text)]
     index = int(selected) - 1 if selected > 0 else len(positions) + int(selected)
-    if not 0 <= index < len(positions):
+    if abs(int(selected)) > len(source_text):
         return VALUE_ERROR
+    if not 0 <= index < len(positions):
+        # Excel returns #N/A when the delimiter is not found.
+        return NA_ERROR
     position = positions[index]
     return source_text[:position] if before else source_text[position + len(delimiter_text) :]
 

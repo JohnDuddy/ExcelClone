@@ -18,6 +18,8 @@ from duddysheet.core.data_tools import AutoFilter, DataValidation
 from duddysheet.core.workbook import Workbook
 from duddysheet.core.refs import CellReference, RangeReference
 from duddysheet.io.dynamic_arrays import mark_dynamic_arrays
+from duddysheet.io.xlsx_charts import write_charts
+from duddysheet.io.xlsx_extras import write_package_extras
 from duddysheet.io.formula_compat import is_dynamic_formula, to_xlsx_formula
 from duddysheet.io.xlsx_features import (
     write_cell_extras,
@@ -33,9 +35,11 @@ def write_xlsx(workbook: Workbook, path: str | Path) -> Path:
     package = OpenPyxlWorkbook()
     package.remove(package.active)
     anchors: dict[str, set[str]] = {}
+    pending_charts: dict[str, list[Any]] = {}
     for source_sheet in workbook:
         worksheet = package.create_sheet(source_sheet.name)
         anchors[source_sheet.name] = _write_worksheet(source_sheet, worksheet)
+        pending_charts[source_sheet.name] = write_charts(source_sheet, worksheet, workbook)
     package.active = workbook.active_sheet_index
     package.calculation.fullCalcOnLoad = True
     package.calculation.forceFullCalc = True
@@ -47,10 +51,12 @@ def write_xlsx(workbook: Workbook, path: str | Path) -> Path:
     package.calculation.iterateCount = int(workbook.max_iterations)
     package.calculation.iterateDelta = float(workbook.max_change)
     _write_defined_names(workbook, package)
+    _write_solver_models(workbook, package)
     write_workbook_extras(workbook, package)
     package.save(destination)
     package.close()
     mark_dynamic_arrays(destination, anchors)
+    write_package_extras(destination, workbook, pending_charts)
     return destination
 
 
@@ -216,6 +222,23 @@ def _write_defined_names(workbook: Workbook, package: Any) -> None:
             package.defined_names.add(defined_name)
         else:
             package[item.scope].defined_names.add(defined_name)
+
+
+def _write_solver_models(workbook: Workbook, package: Any) -> None:
+    """Store each sheet's Solver model as Excel does: hidden sheet-level solver_* names."""
+    from duddysheet.core.solver import model_to_names
+    from duddysheet.io.xlsx_package import quote_sheet
+
+    for index, sheet in enumerate(workbook):
+        model = getattr(sheet, "solver", None)
+        if model is None:
+            continue
+        for name, value in model_to_names(model).items():
+            text = value
+            if any(character == "$" for character in value) and "!" not in value:
+                text = ",".join(f"{quote_sheet(sheet.name)}!{part}" for part in value.split(","))
+            defined = DefinedName(name, localSheetId=index, hidden=True, attr_text=text)
+            package[sheet.name].defined_names[name] = defined
 
 
 def _write_validations(source: Any, worksheet: Any) -> None:

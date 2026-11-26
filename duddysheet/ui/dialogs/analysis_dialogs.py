@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QMimeData, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from duddysheet.core.pivot import (
@@ -34,8 +35,11 @@ from duddysheet.core.pivot import (
     SHOW_AS_LABELS,
     PivotSpec,
     PivotValueField,
+    all_fields,
     field_items,
+    item_identity,
     source_fields,
+    source_records,
 )
 
 
@@ -173,28 +177,147 @@ class ItemFilterDialog(QDialog):
         )
 
 
-class PivotFieldsDialog(QDialog):
+class CalculatedFieldDialog(QDialog):
+    """Insert Calculated Field: a named formula over other fields' sums."""
+
+    def __init__(self, fields: tuple[str, ...], parent: Any = None, name: str = "", formula: str = "= ") -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Insert Calculated Field")
+        layout = QFormLayout(self)
+        self.name = QLineEdit(name or "Field1")
+        self.name.setObjectName("calculatedFieldName")
+        self.formula = QLineEdit(formula)
+        self.formula.setObjectName("calculatedFieldFormula")
+        self.fields = QListWidget()
+        self.fields.addItems(list(fields))
+        self.fields.itemDoubleClicked.connect(self.insert_field)
+        insert = QPushButton("Insert Field")
+        insert.clicked.connect(lambda: self.insert_field(self.fields.currentItem()))
+        layout.addRow("Name:", self.name)
+        layout.addRow("Formula:", self.formula)
+        layout.addRow("Fields:", self.fields)
+        layout.addRow("", insert)
+        layout.addRow(QLabel("A calculated field works on the sums of the fields it names, as in Excel."))
+        layout.addRow(_buttons(self))
+
+    def insert_field(self, entry: QListWidgetItem | None) -> None:
+        """Insert a field name at the cursor, quoting names that contain spaces."""
+        if entry is None:
+            return
+        name = entry.text()
+        text = name if name.replace("_", "a").isalnum() else f"'{name}'"
+        self.formula.insert(text)
+
+    def value(self) -> tuple[str, str]:
+        """Return the (name, formula) pair."""
+        formula = self.formula.text().strip()
+        return self.name.text().strip(), formula if formula.startswith("=") else "=" + formula
+
+
+FIELD_MIME = "application/x-duddysheet-pivot-field"
+
+
+class AreaList(QListWidget):
+    """One area of the field list: accepts fields dragged from the list or other areas."""
+
+    def __init__(self, panel: PivotFieldsPanel, area: str) -> None:
+        super().__init__()
+        self.panel = panel
+        self.area = area
+        self.setObjectName(f"{area}Area")
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
+        self.setDefaultDropAction(Qt.DropAction.MoveAction)
+
+    def mimeData(self, items: list[QListWidgetItem]) -> QMimeData:
+        data = QMimeData()
+        if items:
+            data.setData(FIELD_MIME, f"{self.area}\t{self.row(items[0])}\t{items[0].data(Qt.ItemDataRole.UserRole)}".encode())
+        return data
+
+    def mimeTypes(self) -> list[str]:
+        return [FIELD_MIME]
+
+    def dragEnterEvent(self, event: Any) -> None:
+        if event.mimeData().hasFormat(FIELD_MIME):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event: Any) -> None:
+        if event.mimeData().hasFormat(FIELD_MIME):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event: Any) -> None:
+        if not event.mimeData().hasFormat(FIELD_MIME):
+            event.ignore()
+            return
+        source, row, name = bytes(event.mimeData().data(FIELD_MIME)).decode().split("\t", 2)
+        target = self.indexAt(event.position().toPoint()).row()
+        self.panel.drop_field(source, int(row), name, self.area, target if target >= 0 else None)
+        event.setDropAction(Qt.DropAction.CopyAction)
+        event.accept()
+
+
+class FieldList(QListWidget):
+    """The field checklist: drag a field into an area, or drop an area's field here to remove it."""
+
+    def __init__(self, panel: PivotFieldsPanel) -> None:
+        super().__init__()
+        self.panel = panel
+        self.setObjectName("pivotFieldList")
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
+
+    def mimeData(self, items: list[QListWidgetItem]) -> QMimeData:
+        data = QMimeData()
+        if items:
+            data.setData(FIELD_MIME, f"fields\t{self.row(items[0])}\t{items[0].text()}".encode())
+        return data
+
+    def mimeTypes(self) -> list[str]:
+        return [FIELD_MIME]
+
+    def dragEnterEvent(self, event: Any) -> None:
+        AreaList.dragEnterEvent(self, event)  # type: ignore[arg-type]
+
+    def dragMoveEvent(self, event: Any) -> None:
+        AreaList.dragMoveEvent(self, event)  # type: ignore[arg-type]
+
+    def dropEvent(self, event: Any) -> None:
+        if not event.mimeData().hasFormat(FIELD_MIME):
+            event.ignore()
+            return
+        source, row, name = bytes(event.mimeData().data(FIELD_MIME)).decode().split("\t", 2)
+        if source != "fields":
+            self.panel.remove_at(source, int(row))
+        event.setDropAction(Qt.DropAction.CopyAction)
+        event.accept()
+
+
+class PivotFieldsPanel(QWidget):
     """The PivotTable Fields list: drag fields between Filters, Columns, Rows, and Values."""
 
     AREAS = (("page_fields", "Filters"), ("columns", "Columns"), ("rows", "Rows"), ("values", "Values"))
+    specChanged = Signal(object)
 
-    def __init__(self, workbook: Any, spec: PivotSpec, parent: Any = None) -> None:
+    def __init__(self, workbook: Any, spec: PivotSpec, parent: Any = None, *, live: bool = False) -> None:
         super().__init__(parent)
-        self.setWindowTitle("PivotTable Fields")
-        self.resize(700, 680)
         self.workbook = workbook
         self.spec = spec
-        self.fields = source_fields(workbook, spec)
+        self.live = live
+        self.fields = all_fields(workbook, spec)
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Choose fields to add to report (check a field, or select it and pick an area):"))
-        self.field_list = QListWidget()
-        self.field_list.setObjectName("pivotFieldList")
-        for name in self.fields:
-            entry = QListWidgetItem(name)
-            entry.setFlags(entry.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            entry.setCheckState(Qt.CheckState.Checked if self._used(name) else Qt.CheckState.Unchecked)
-            self.field_list.addItem(entry)
-        self.field_list.setMinimumHeight(170)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.addWidget(QLabel("Choose fields to add to report (check, drag, or select and pick an area):"))
+        self.field_list = FieldList(self)
+        self.field_list.setMinimumHeight(140)
         self.field_list.itemChanged.connect(self._field_toggled)
         layout.addWidget(self.field_list)
         add_row = QHBoxLayout()
@@ -205,13 +328,11 @@ class PivotFieldsDialog(QDialog):
             add_row.addWidget(button)
         layout.addLayout(add_row)
         grid = QGridLayout()
-        self.area_lists: dict[str, QListWidget] = {}
+        self.area_lists: dict[str, AreaList] = {}
         for index, (key, label) in enumerate(self.AREAS):
             box = QGroupBox(label)
             inner = QVBoxLayout(box)
-            widget = QListWidget()
-            widget.setObjectName(f"{key}Area")
-            widget.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+            widget = AreaList(self, key)
             inner.addWidget(widget)
             buttons = QHBoxLayout()
             for text, handler in (("Up", -1), ("Down", 1)):
@@ -225,7 +346,12 @@ class PivotFieldsDialog(QDialog):
             if key == "values":
                 settings = QPushButton("Value Field Settings...")
                 settings.clicked.connect(self.edit_value)
+                widget.itemDoubleClicked.connect(lambda _item: self.edit_value())
                 inner.addWidget(settings)
+                calculated = QPushButton("Calculated Field...")
+                calculated.setObjectName("calculatedFieldButton")
+                calculated.clicked.connect(self.add_calculated_field)
+                inner.addWidget(calculated)
             else:
                 filter_button = QPushButton("Filter Items...")
                 filter_button.clicked.connect(lambda checked=False, key=key: self.filter_items(key))
@@ -251,35 +377,92 @@ class PivotFieldsDialog(QDialog):
         self.grand_columns.setChecked(spec.grand_total_columns)
         for widget in (QLabel("Report Layout:"), self.layout_choice, self.subtotals, self.grand_rows, self.grand_columns):
             options.addWidget(widget)
+        self.layout_choice.activated.connect(lambda _index: self._changed())
+        for check in (self.subtotals, self.grand_rows, self.grand_columns):
+            check.toggled.connect(lambda _checked: self._changed())
         layout.addLayout(options)
-        layout.addWidget(_buttons(self))
+        defer_row = QHBoxLayout()
+        self.defer = QCheckBox("Defer Layout Update")
+        self.defer.setObjectName("deferLayoutUpdate")
+        self.update_button = QPushButton("Update")
+        self.update_button.setObjectName("pivotUpdateButton")
+        self.update_button.setEnabled(False)
+        self.defer.toggled.connect(self.update_button.setEnabled)
+        self.update_button.clicked.connect(lambda: self.specChanged.emit(self.result_spec()))
+        defer_row.addWidget(self.defer)
+        defer_row.addStretch(1)
+        defer_row.addWidget(self.update_button)
+        self.defer_row = QWidget()
+        self.defer_row.setLayout(defer_row)
+        self.defer_row.setVisible(live)
+        layout.addWidget(self.defer_row)
+        self._populate_fields()
         self._refresh_lists()
 
     # -------------------------------------------------------------- state
+    def set_spec(self, workbook: Any, spec: PivotSpec) -> None:
+        """Show a different (or refreshed) PivotTable without emitting a change."""
+        self.workbook = workbook
+        self.spec = spec
+        self.fields = all_fields(workbook, spec)
+        for widget, value in (
+            (self.subtotals, spec.subtotals),
+            (self.grand_rows, spec.grand_total_rows),
+            (self.grand_columns, spec.grand_total_columns),
+        ):
+            widget.blockSignals(True)
+            widget.setChecked(value)
+            widget.blockSignals(False)
+        self.layout_choice.setCurrentIndex(LAYOUTS.index(spec.layout))
+        self._populate_fields()
+        self._refresh_lists()
+
+    def _populate_fields(self) -> None:
+        self.field_list.blockSignals(True)
+        self.field_list.clear()
+        for name in self.fields:
+            entry = QListWidgetItem(name)
+            entry.setFlags(entry.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsDragEnabled)
+            entry.setCheckState(Qt.CheckState.Checked if self._used(name) else Qt.CheckState.Unchecked)
+            self.field_list.addItem(entry)
+        self.field_list.blockSignals(False)
+
     def _used(self, name: str) -> bool:
         spec = self.spec
         return name in spec.rows + spec.columns + spec.page_fields or any(value.field == name for value in spec.values)
+
+    def _changed(self) -> None:
+        self._refresh_lists()
+        if self.live and not self.defer.isChecked():
+            self.specChanged.emit(self.result_spec())
 
     def _refresh_lists(self) -> None:
         for key, widget in self.area_lists.items():
             widget.clear()
             if key == "values":
                 for value in self.spec.values:
-                    widget.addItem(value.name)
+                    entry = QListWidgetItem(value.name)
+                    entry.setData(Qt.ItemDataRole.UserRole, value.field)
+                    widget.addItem(entry)
             else:
                 for name in getattr(self.spec, key):
                     grouping = self.spec.grouping_for(name)
-                    widget.addItem(name if grouping == "none" else f"{name} ({grouping.title()})")
+                    entry = QListWidgetItem(name if grouping == "none" else f"{name} ({grouping.title()})")
+                    entry.setData(Qt.ItemDataRole.UserRole, name)
+                    widget.addItem(entry)
         self.field_list.blockSignals(True)
         for index in range(self.field_list.count()):
             entry = self.field_list.item(index)
             entry.setCheckState(Qt.CheckState.Checked if self._used(entry.text()) else Qt.CheckState.Unchecked)
         self.field_list.blockSignals(False)
 
-    def _numeric(self, name: str) -> bool:
-        from duddysheet.core.pivot import _records
+    def _is_calculated(self, name: str) -> bool:
+        return any(field.casefold() == name.casefold() for field, _formula in self.spec.calculated_fields)
 
-        fields, records, _ = _records(self.workbook, self.spec)
+    def _numeric(self, name: str) -> bool:
+        if self._is_calculated(name):
+            return True
+        fields, records, _ = source_records(self.workbook, self.spec)
         index = list(fields).index(name)
         values = [record[index] for record in records if record[index] is not None]
         return bool(values) and all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in values)
@@ -291,16 +474,41 @@ class PivotFieldsDialog(QDialog):
         else:
             self.remove_field(name)
 
-    def add_field(self, name: str, area: str) -> None:
+    def add_field(self, name: str, area: str, position: int | None = None) -> None:
         """Place a field in an area (a field lives in one label area at a time)."""
+        if area != "values" and self._is_calculated(name):
+            return  # Excel keeps calculated fields in the Values area.
         spec = self.remove_field_spec(self.spec, name, keep_values=area == "values")
         if area == "values":
             function = "sum" if self._numeric(name) else "count"
-            spec = replace(spec, values=spec.values + (PivotValueField(name, function),))
+            items = list(spec.values)
+            items.insert(len(items) if position is None else position, PivotValueField(name, function))
+            spec = replace(spec, values=tuple(items))
         else:
-            spec = replace(spec, **{area: getattr(spec, area) + (name,)})
+            items = list(getattr(spec, area))
+            items.insert(len(items) if position is None else position, name)
+            spec = replace(spec, **{area: tuple(items)})
         self.spec = spec
-        self._refresh_lists()
+        self._changed()
+
+    def drop_field(self, source: str, row: int, name: str, area: str, position: int | None) -> None:
+        """Handle a drop: reorder within an area, or move a field into ``area``."""
+        if source == area:
+            items = list(self.spec.values if area == "values" else getattr(self.spec, area))
+            if not 0 <= row < len(items):
+                return
+            moved = items.pop(row)
+            target = len(items) if position is None else min(position, len(items))
+            items.insert(target, moved)
+            self.spec = replace(self.spec, **{area: tuple(items)})
+            self._changed()
+            return
+        if source == "values" and area != "values":
+            values = list(self.spec.values)
+            if 0 <= row < len(values):
+                del values[row]
+            self.spec = replace(self.spec, values=tuple(values))
+        self.add_field(name, area, position)
 
     @staticmethod
     def remove_field_spec(spec: PivotSpec, name: str, *, keep_values: bool = False) -> PivotSpec:
@@ -314,7 +522,15 @@ class PivotFieldsDialog(QDialog):
 
     def remove_field(self, name: str) -> None:
         self.spec = self.remove_field_spec(self.spec, name)
-        self._refresh_lists()
+        self._changed()
+
+    def remove_at(self, area: str, row: int) -> None:
+        """Remove the field at ``row`` of an area (dragging it back to the field list)."""
+        items = list(self.spec.values if area == "values" else getattr(self.spec, area))
+        if 0 <= row < len(items):
+            del items[row]
+            self.spec = replace(self.spec, **{area: tuple(items)})
+            self._changed()
 
     def add_selected(self, area: str) -> None:
         entry = self.field_list.currentItem()
@@ -326,17 +542,8 @@ class PivotFieldsDialog(QDialog):
 
     def remove(self, area: str) -> None:
         index = self._selected_index(area)
-        if index < 0:
-            return
-        if area == "values":
-            values = list(self.spec.values)
-            del values[index]
-            self.spec = replace(self.spec, values=tuple(values))
-        else:
-            items = list(getattr(self.spec, area))
-            del items[index]
-            self.spec = replace(self.spec, **{area: tuple(items)})
-        self._refresh_lists()
+        if index >= 0:
+            self.remove_at(area, index)
 
     def move(self, area: str, step: int) -> None:
         index = self._selected_index(area)
@@ -346,7 +553,7 @@ class PivotFieldsDialog(QDialog):
             return
         items[index], items[target] = items[target], items[index]
         self.spec = replace(self.spec, **{area: tuple(items)})
-        self._refresh_lists()
+        self._changed()
         self.area_lists[area].setCurrentRow(target)
 
     def edit_value(self) -> None:
@@ -358,7 +565,26 @@ class PivotFieldsDialog(QDialog):
             values = list(self.spec.values)
             values[index] = dialog.value()
             self.spec = replace(self.spec, values=tuple(values))
-            self._refresh_lists()
+            self._changed()
+
+    def add_calculated_field(self) -> None:
+        """Insert Calculated Field: add a formula field and put it in Values."""
+        dialog = CalculatedFieldDialog(source_fields(self.workbook, self.spec), self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.define_calculated_field(*dialog.value())
+
+    def define_calculated_field(self, name: str, formula: str) -> None:
+        """Add (or replace) a calculated field and show it in the Values area."""
+        if not name or name.casefold() in {field.casefold() for field in source_fields(self.workbook, self.spec)}:
+            return
+        others = tuple(entry for entry in self.spec.calculated_fields if entry[0].casefold() != name.casefold())
+        self.spec = replace(self.spec, calculated_fields=others + ((name, formula),))
+        self.fields = all_fields(self.workbook, self.spec)
+        self._populate_fields()
+        if not any(value.field.casefold() == name.casefold() for value in self.spec.values):
+            self.add_field(name, "values")
+        else:
+            self._changed()
 
     def filter_items(self, area: str) -> None:
         index = self._selected_index(area)
@@ -372,6 +598,7 @@ class PivotFieldsDialog(QDialog):
             others = tuple(entry for entry in self.spec.hidden_items if entry[0].casefold() != name.casefold())
             chosen = dialog.hidden_items()
             self.spec = replace(self.spec, hidden_items=others + (((name, chosen),) if chosen else ()))
+            self._changed()
 
     def set_grouping(self, area: str, grouping: str) -> None:
         index = self._selected_index(area)
@@ -380,7 +607,7 @@ class PivotFieldsDialog(QDialog):
         name = getattr(self.spec, area)[index]
         others = tuple(entry for entry in self.spec.grouping if entry[0].casefold() != name.casefold())
         self.spec = replace(self.spec, grouping=others + (((name, grouping),) if grouping != "none" else ()))
-        self._refresh_lists()
+        self._changed()
 
     def result_spec(self) -> PivotSpec:
         """Return the edited specification."""
@@ -393,10 +620,31 @@ class PivotFieldsDialog(QDialog):
         )
 
 
-def _hidden(spec: PivotSpec, name: str, item: Any) -> bool:
-    from duddysheet.core.pivot import _identity
+class PivotFieldsDialog(QDialog):
+    """The PivotTable Fields list in a dialog (used when creating a PivotTable)."""
 
-    return _identity(item) in spec.hidden_for(name)
+    AREAS = PivotFieldsPanel.AREAS
+    remove_field_spec = staticmethod(PivotFieldsPanel.remove_field_spec)
+
+    def __init__(self, workbook: Any, spec: PivotSpec, parent: Any = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("PivotTable Fields")
+        self.resize(700, 680)
+        layout = QVBoxLayout(self)
+        self.panel = PivotFieldsPanel(workbook, spec, self)
+        layout.addWidget(self.panel)
+        layout.addWidget(_buttons(self))
+
+    def __getattr__(self, name: str) -> Any:
+        # The dialog exposes the panel's lists and actions as its own.
+        panel = self.__dict__.get("panel")
+        if panel is None:
+            raise AttributeError(name)
+        return getattr(panel, name)
+
+
+def _hidden(spec: PivotSpec, name: str, item: Any) -> bool:
+    return item_identity(item) in spec.hidden_for(name)
 
 
 class DataTableDialog(QDialog):

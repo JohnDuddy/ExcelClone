@@ -99,6 +99,8 @@ class PivotSpec:
     source_table: str | None = None
     extent: tuple[int, int, int, int] | None = None
     style: str = "PivotStyleLight16"
+    # Calculated fields: (name, formula over other fields), e.g. ("Margin", "=Profit/Sales").
+    calculated_fields: tuple[tuple[str, str], ...] = ()
     # GETPIVOTDATA reads the last refresh, like Excel's pivot cache.
     cache: Any = field(default=None, compare=False, repr=False)
 
@@ -179,15 +181,22 @@ def _records(workbook: Any, spec: PivotSpec) -> tuple[tuple[str, ...], list[list
     fields = source_fields(workbook, spec)
     formats = [sheet.effective_format(top + 1, column).number_format for column in range(left, right + 1)]
     records: list[list[Any]] = []
-    for row in range(top + 1, bottom + 1):
-        values = [
-            None if sheet.get_cell(row, column).error is not None else sheet.get_cell(row, column).display_value
-            for column in range(left, right + 1)
-        ]
-        if all(value in (None, "") for value in values):
-            continue
-        records.append(values)
+    if bottom > top:
+        for values in sheet.value_rows(top + 1, left, bottom, right):
+            if all(value is None or value == "" for value in values):
+                continue
+            records.append(values)
     return fields, records, formats
+
+
+def item_identity(value: Any) -> Any:
+    """Return the comparison key PivotTables use for an item (text ignores case)."""
+    return _identity(value)
+
+
+def source_records(workbook: Any, spec: PivotSpec) -> tuple[tuple[str, ...], list[list[Any]], list[str]]:
+    """Return the source's field names, its non-blank records, and each field's number format."""
+    return _records(workbook, spec)
 
 
 def _field_index(fields: tuple[str, ...], name: str) -> int:
@@ -280,22 +289,104 @@ def summarize(function: str, values: list[Any]) -> Any:
     return math.sqrt(variance) if function.startswith("stddev") else variance
 
 
+# --------------------------------------------------------- calculated fields
+def calculated_value(formula: str, fields: tuple[str, ...], records: list[list[Any]]) -> Any:
+    """Evaluate a calculated field as Excel does: over the sums of the fields it names."""
+    from duddysheet.core.errors import SpreadsheetError
+    from duddysheet.core.evaluator import FormulaEvaluator
+    from duddysheet.core.workbook import Workbook
+
+    sums: dict[str, float] = {}
+    for index, name in enumerate(fields):
+        numbers = [
+            float(record[index])
+            for record in records
+            if isinstance(record[index], (int, float)) and not isinstance(record[index], bool)
+        ]
+        sums[name] = math.fsum(numbers)
+    expression = substitute_fields(formula, sums)
+    try:
+        result = FormulaEvaluator(Workbook()).evaluate(expression)
+    except ValueError:
+        return "#NAME?"
+    if isinstance(result, SpreadsheetError):
+        return result.literal
+    if isinstance(result, float) and result.is_integer() and abs(result) < 2**53:
+        return int(result)
+    return result
+
+
+def substitute_fields(formula: str, values: dict[str, float]) -> str:
+    """Replace field names (bare, or 'quoted' when they hold spaces) with numbers."""
+    import re
+
+    text = formula.strip()
+    if not text.startswith("="):
+        text = "=" + text
+    pieces = re.split(r'("(?:[^"]|"")*")', text)
+    names = sorted(values, key=len, reverse=True)
+    for position in range(0, len(pieces), 2):
+        piece = pieces[position]
+        for name in names:
+            number = values[name]
+            literal = f"({number!r})" if number < 0 else repr(number)
+            piece = re.sub("'" + re.escape(name) + "'", literal, piece, flags=re.IGNORECASE)
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]*", name):
+                piece = re.sub(
+                    r"(?<![A-Za-z0-9_.'])" + re.escape(name) + r"(?![A-Za-z0-9_.(])",
+                    literal,
+                    piece,
+                    flags=re.IGNORECASE,
+                )
+        pieces[position] = piece
+    return "".join(pieces)
+
+
+def all_fields(workbook: Any, spec: PivotSpec) -> tuple[str, ...]:
+    """Return the source fields followed by the calculated fields."""
+    return source_fields(workbook, spec) + tuple(name for name, _formula in spec.calculated_fields)
+
+
 # ------------------------------------------------------------------ compute
 def compute_pivot(workbook: Any, spec: PivotSpec) -> PivotResult:
     """Compute a PivotTable's output grid (relative to its anchor)."""
     fields, records, formats = _records(workbook, spec)
-    for name in spec.rows + spec.columns + spec.page_fields + tuple(item.field for item in spec.values):
+    calculated = {name.casefold(): formula for name, formula in spec.calculated_fields}
+    for name in spec.rows + spec.columns + spec.page_fields:
         _field_index(fields, name)
+    for item in spec.values:
+        if item.field.casefold() not in calculated:
+            _field_index(fields, item.field)
     hidden = {name: spec.hidden_for(name) for name in fields}
+    # Each field's grouping and each distinct value's item are worked out once,
+    # not once per record: a 100,000-row source has few distinct items.
+    settings = {name: (_field_index(fields, name), spec.grouping_for(name)) for name in fields}
+    memos: dict[str, dict[tuple[bool, Any], tuple[Any, Any, Any]]] = {name: {} for name in fields}
+
+    def classify(record: list[Any], name: str) -> tuple[Any, Any, Any]:
+        index, grouping = settings[name]
+        value = record[index]
+        key = (type(value) is bool, value)
+        memo = memos[name]
+        try:
+            return memo[key]
+        except KeyError:
+            item, sort = _group(value, grouping, formats[index])
+            memo[key] = found = (item, sort, _identity(item))
+            return found
+        except TypeError:
+            item, sort = _group(value, grouping, formats[index])
+            return item, sort, _identity(item)
 
     def item_of(record: list[Any], name: str) -> tuple[Any, Any]:
-        index = _field_index(fields, name)
-        return _group(record[index], spec.grouping_for(name), formats[index])
+        item, sort, _identity_key = classify(record, name)
+        return item, sort
 
+    filtered = [name for name in fields if hidden[name]]
     kept = [
         record
         for record in records
-        if all(_identity(item_of(record, name)[0]) not in hidden[name] for name in fields if hidden[name])
+        if all(classify(record, name)[2] not in hidden[name] for name in filtered)
     ]
     result = PivotResult()
     row = 0
@@ -318,26 +409,38 @@ def compute_pivot(workbook: Any, spec: PivotSpec) -> PivotResult:
         result.width = 3
         return result
     values = list(spec.values)
-    row_keys = _ordered_keys(kept, spec.rows, item_of)
-    column_keys = _ordered_keys(kept, spec.columns, item_of)
     groups: dict[tuple[tuple[Any, ...], tuple[Any, ...]], list[list[Any]]] = {}
+    row_paths: dict[tuple[Any, ...], tuple[tuple[Any, ...], tuple[Any, ...]]] = {}
+    column_paths: dict[tuple[Any, ...], tuple[tuple[Any, ...], tuple[Any, ...]]] = {}
     for record in kept:
-        row_key = tuple(_identity(item_of(record, name)[0]) for name in spec.rows)
-        column_key = tuple(_identity(item_of(record, name)[0]) for name in spec.columns)
+        row_parts = [classify(record, name) for name in spec.rows]
+        column_parts = [classify(record, name) for name in spec.columns]
+        row_key = tuple(part[2] for part in row_parts)
+        column_key = tuple(part[2] for part in column_parts)
+        if row_key not in row_paths:
+            row_paths[row_key] = (tuple(part[0] for part in row_parts), tuple(part[1] for part in row_parts))
+        if column_key not in column_paths:
+            column_paths[column_key] = (tuple(part[0] for part in column_parts), tuple(part[1] for part in column_parts))
         groups.setdefault((row_key, column_key), []).append(record)
+    row_keys = _sorted_paths(row_paths)
+    column_keys = _sorted_paths(column_paths)
     cache: dict[tuple[Any, ...], Any] = {}
 
     def aggregate(value_field: PivotValueField, row_prefix: tuple[Any, ...], column_prefix: tuple[Any, ...]) -> Any:
         key = (value_field.name, row_prefix, column_prefix)
         if key not in cache:
-            index = _field_index(fields, value_field.field)
-            members = [
-                record[index]
+            group_records = [
+                record
                 for (row_key, column_key), records_in_group in groups.items()
                 if row_key[: len(row_prefix)] == row_prefix and column_key[: len(column_prefix)] == column_prefix
                 for record in records_in_group
             ]
-            cache[key] = summarize(value_field.function, members)
+            formula = calculated.get(value_field.field.casefold())
+            if formula is not None:
+                cache[key] = calculated_value(formula, fields, group_records) if group_records else None
+            else:
+                index = _field_index(fields, value_field.field)
+                cache[key] = summarize(value_field.function, [record[index] for record in group_records])
         return cache[key]
 
     # Column entries: (kind, items, identities, value field).
@@ -470,6 +573,14 @@ def compute_pivot(workbook: Any, spec: PivotSpec) -> PivotResult:
     result.height = row
     result.width = label_columns + len(column_entries)
     return result
+
+
+def _sorted_paths(
+    paths: dict[tuple[Any, ...], tuple[tuple[Any, ...], tuple[Any, ...]]],
+) -> list[tuple[tuple[Any, ...], tuple[Any, ...], tuple[Any, ...]]]:
+    """Sort distinct (identities -> items, sort keys) paths level by level."""
+    ordered = sorted(paths.items(), key=lambda entry: entry[1][1])
+    return [(items, identities, keys) for identities, (items, keys) in ordered]
 
 
 def _ordered_keys(
@@ -697,6 +808,91 @@ def getpivotdata(workbook: Any, spec: PivotSpec, data_field: str, pairs: list[tu
     raise KeyError(data_field)
 
 
+# ------------------------------------------------------------------ slicers
+@dataclass(frozen=True, slots=True)
+class PivotSlicer:
+    """A slicer: buttons for one field's items that filter a PivotTable."""
+
+    name: str
+    pivot_sheet: str
+    pivot_name: str
+    field: str
+    caption: str | None = None
+    columns: int = 1
+
+    @property
+    def title(self) -> str:
+        """Return the header shown above the slicer's buttons."""
+        return self.caption or self.field
+
+
+def find_pivot(workbook: Any, sheet_name: str, name: str) -> PivotSpec | None:
+    """Return the PivotTable called ``name`` on ``sheet_name``."""
+    if sheet_name not in workbook.sheet_names:
+        return None
+    return next((spec for spec in workbook.get_sheet(sheet_name).pivots if spec.name == name), None)
+
+
+def slicer_items(workbook: Any, slicer: PivotSlicer) -> list[tuple[Any, bool]]:
+    """Return each item of the slicer's field and whether it is selected (shown)."""
+    spec = find_pivot(workbook, slicer.pivot_sheet, slicer.pivot_name)
+    if spec is None:
+        return []
+    hidden = spec.hidden_for(slicer.field)
+    items = field_items(workbook, replace(spec, hidden_items=()), slicer.field)
+    return [(item, _identity(item) not in hidden) for item in items]
+
+
+def apply_slicer(workbook: Any, slicer: PivotSlicer, selected: list[Any] | None) -> PivotSpec:
+    """Show only ``selected`` items (``None`` clears the filter) and redraw the PivotTable."""
+    spec = find_pivot(workbook, slicer.pivot_sheet, slicer.pivot_name)
+    if spec is None:
+        raise ValueError(f"The PivotTable {slicer.pivot_name!r} no longer exists.")
+    others = tuple(entry for entry in spec.hidden_items if entry[0].casefold() != slicer.field.casefold())
+    hidden: tuple[Any, ...] = ()
+    if selected is not None:
+        chosen = {_identity(item) for item in selected}
+        everything = field_items(workbook, replace(spec, hidden_items=()), slicer.field)
+        hidden = tuple(item for item in everything if _identity(item) not in chosen)
+    updated = replace(spec, hidden_items=others + (((slicer.field, hidden),) if hidden else ()))
+    sheet = workbook.get_sheet(slicer.pivot_sheet)
+    sheet.pivots = [updated if pivot.name == spec.name else pivot for pivot in sheet.pivots]
+    return render_pivot(workbook, slicer.pivot_sheet, updated)
+
+
+def next_slicer_name(workbook: Any, field_name: str) -> str:
+    """Return an unused slicer name such as 'Slicer_Region'."""
+    base = "Slicer_" + "".join(character if character.isalnum() else "_" for character in field_name)
+    used = {slicer.name for sheet in workbook for slicer in sheet.slicers}
+    name, number = base, 1
+    while name in used:
+        number += 1
+        name = f"{base}{number}"
+    return name
+
+
+def slicer_to_dict(slicer: PivotSlicer) -> dict[str, Any]:
+    return {
+        "name": slicer.name,
+        "pivot_sheet": slicer.pivot_sheet,
+        "pivot_name": slicer.pivot_name,
+        "field": slicer.field,
+        "caption": slicer.caption,
+        "columns": slicer.columns,
+    }
+
+
+def slicer_from_dict(data: dict[str, Any]) -> PivotSlicer:
+    return PivotSlicer(
+        name=str(data["name"]),
+        pivot_sheet=str(data["pivot_sheet"]),
+        pivot_name=str(data["pivot_name"]),
+        field=str(data["field"]),
+        caption=data.get("caption"),
+        columns=int(data.get("columns", 1)),
+    )
+
+
 # ---------------------------------------------------------------- persistence
 def pivot_to_dict(spec: PivotSpec) -> dict[str, Any]:
     from duddysheet.io.native import _encode_value
@@ -728,6 +924,7 @@ def pivot_to_dict(spec: PivotSpec) -> dict[str, Any]:
         "source_table": spec.source_table,
         "extent": list(spec.extent) if spec.extent else None,
         "style": spec.style,
+        "calculated_fields": [list(item) for item in spec.calculated_fields],
     }
 
 
@@ -752,4 +949,5 @@ def pivot_from_dict(data: dict[str, Any]) -> PivotSpec:
         source_table=data.get("source_table"),
         extent=tuple(data["extent"]) if data.get("extent") else None,
         style=data.get("style", "PivotStyleLight16"),
+        calculated_fields=tuple((str(name), str(formula)) for name, formula in data.get("calculated_fields", ())),
     )

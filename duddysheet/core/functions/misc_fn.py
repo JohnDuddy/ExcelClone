@@ -203,10 +203,13 @@ def _series(context: Any, values: Any, timeline: Any, completion: Any, aggregati
 
 
 def detect_seasonality(series: list[float]) -> int:
-    """Return the dominant season length by autocorrelation, or 1 when none."""
+    """Return the dominant season length by autocorrelation, or 0 when none.
+
+    As in Excel, a pattern must repeat at least three times to be detected.
+    """
     n = len(series)
     if n < 6:
-        return 1
+        return 0
     # Remove a linear trend before measuring periodicity.
     xs = list(range(n))
     mean_x = (n - 1) / 2
@@ -216,13 +219,13 @@ def detect_seasonality(series: list[float]) -> int:
     residual = [y - (mean_y + slope * (x - mean_x)) for x, y in zip(xs, series)]
     variance = math.fsum(value * value for value in residual)
     if variance == 0:
-        return 1
-    best_lag, best_value = 1, 0.0
-    for lag in range(2, n // 2 + 1):
+        return 0
+    best_lag, best_value = 0, 0.0
+    for lag in range(2, n // 3 + 1):
         value = math.fsum(residual[i] * residual[i + lag] for i in range(n - lag)) / variance
         if value > best_value + 1e-12:
             best_lag, best_value = lag, value
-    return best_lag if best_value > 0.3 else 1
+    return best_lag if best_value > 0.3 else 0
 
 
 def _holt_winters(series: list[float], season: int, alpha: float, beta: float, gamma: float) -> tuple[float, float, list[float], list[float]]:

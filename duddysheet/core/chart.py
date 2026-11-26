@@ -276,6 +276,8 @@ class ChartSpec:
     bin_count: int | None = None
     combo_series_types: tuple[str, ...] | None = None
     secondary_series: tuple[int, ...] = ()
+    # A PivotChart follows this PivotTable's current layout instead of a range.
+    pivot_name: str | None = None
 
     def __post_init__(self) -> None:
         if self.chart_type not in CHART_TYPES:
@@ -458,6 +460,9 @@ class TrendlineFit:
 
 def chart_data(workbook: Workbook, spec: ChartSpec) -> ChartData:
     """Extract current cached range values for a chart."""
+    if spec.pivot_name:
+        data = pivot_chart_data(workbook, spec.sheet_name, spec.pivot_name)
+        return switch_rows_columns(data) if spec.switch_row_column else data
     sheet = workbook.get_sheet(spec.sheet_name)
     target = spec.source_range
     category_column = (
@@ -509,6 +514,66 @@ def chart_data(workbook: Workbook, spec: ChartSpec) -> ChartData:
         series.append(ChartSeries(name, values))
     data = ChartData(categories, tuple(series))
     return switch_rows_columns(data) if spec.switch_row_column else data
+
+
+def pivot_chart_data(workbook: Workbook, sheet_name: str, pivot_name: str) -> ChartData:
+    """Read a PivotChart's data from its PivotTable: one category per row item.
+
+    Subtotal and grand-total rows and columns are left out, as in an Excel
+    PivotChart; each remaining value column becomes a series.
+    """
+    from duddysheet.core.pivot import compute_pivot
+
+    pivot = next(
+        (item for sheet in workbook for item in sheet.pivots if item.name == pivot_name and sheet.name == sheet_name),
+        None,
+    ) or next((item for sheet in workbook for item in sheet.pivots if item.name == pivot_name), None)
+    if pivot is None:
+        raise ValueError(f"The PivotTable {pivot_name!r} no longer exists")
+    result = compute_pivot(workbook, pivot)
+    cells = result.cells
+    leaf_rows = sorted({row for (row, _column), cell in cells.items() if cell.role == "row_label"})
+    label_columns = max(1, len(pivot.rows)) if pivot.layout == "tabular" else 1
+    if not leaf_rows:
+        grand = [row for (row, column), cell in cells.items() if column == 0 and cell.role == "grand_total"]
+        leaf_rows = grand[:1]
+    first_data_row = min(leaf_rows + [row for (row, column), cell in cells.items() if cell.role == "group"], default=result.table_top + 1)
+    header_rows = range(result.table_top, first_data_row)
+    series: list[ChartSeries] = []
+    for column in range(label_columns, result.width):
+        parts = [
+            str(cells[(row, column)].value)
+            for row in header_rows
+            if (row, column) in cells and cells[(row, column)].value not in (None, "", "Column Labels")
+        ]
+        name = " - ".join(parts)
+        if name == "Grand Total" or name.endswith(" Total") or any(
+            (row, column) in cells and cells[(row, column)].role == "grand_column" for row in leaf_rows
+        ):
+            continue
+        values = tuple(
+            _numeric_value(cells[(row, column)].value) if (row, column) in cells else math.nan
+            for row in leaf_rows
+        )
+        series.append(ChartSeries(name or f"Series {len(series) + 1}", values))
+    # Nested row items are labelled with their outer items, "East / Apple".
+    labels_by_row: dict[int, str] = {}
+    path: list[str] = []
+    for row in range(first_data_row, result.height):
+        if label_columns > 1:
+            for column in range(label_columns):
+                cell = cells.get((row, column))
+                if cell is not None and cell.role == "row_label" and cell.value not in (None, ""):
+                    path[column:] = [str(cell.value)]
+            labels_by_row[row] = " / ".join(path)
+            continue
+        cell = cells.get((row, 0))
+        if cell is None or cell.role not in ("group", "row_label"):
+            continue
+        path[cell.indent:] = [str(cell.value)]
+        labels_by_row[row] = " / ".join(path[: cell.indent + 1])
+    categories = tuple(labels_by_row.get(row) or "Total" for row in leaf_rows)
+    return ChartData(categories, tuple(series))
 
 
 def switch_rows_columns(data: ChartData) -> ChartData:

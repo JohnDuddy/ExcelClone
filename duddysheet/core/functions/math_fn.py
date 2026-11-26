@@ -185,8 +185,11 @@ def _multiple_round(context: Any, value: Any, significance: Any, *, upward: bool
     if is_error(converted) or is_error(step):
         return VALUE_ERROR
     if step == 0:
-        return 0
-    if converted * step < 0:
+        return 0 if upward or converted == 0 else DIV_ZERO_ERROR
+    # A negative number with a positive significance rounds toward +infinity
+    # (CEILING) or -infinity (FLOOR); only a positive number with a negative
+    # significance is an error, as in Excel.
+    if converted > 0 and step < 0:
         return NUM_ERROR
     quotient = converted / step
     rounded = math.ceil(quotient) if upward else math.floor(quotient)
@@ -274,8 +277,10 @@ def _log(context: Any, value: Any, base: float) -> Any:
     converted = _one_number(context, value)
     if is_error(converted):
         return converted
-    if converted <= 0 or base <= 0 or base == 1:
+    if converted <= 0 or base <= 0:
         return NUM_ERROR
+    if base == 1:
+        return DIV_ZERO_ERROR
     return math.log(converted, base)
 
 

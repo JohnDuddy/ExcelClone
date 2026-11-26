@@ -56,6 +56,7 @@ class GridView(QTableView):
     internalHyperlinkRequested = Signal(str)
     #: Ctrl+PgUp / Ctrl+PgDn ask the window to step to the previous/next sheet.
     sheetStepRequested = Signal(int)
+    metadataSynced = Signal()
 
     def __init__(self, parent: Any = None) -> None:
         super().__init__(parent)
@@ -725,6 +726,7 @@ class GridView(QTableView):
                 merged.max_column - merged.min_column + 1,
             )
         self._sync_frozen_views()
+        self.metadataSynced.emit()
 
     def paintEvent(self, event: QPaintEvent) -> None:
         """Paint the Excel-style fill handle and active drag outline."""
@@ -765,8 +767,11 @@ class GridView(QTableView):
         painter.end()
 
     def _paint_note_markers(self, painter: QPainter) -> None:
-        """Draw Excel's red triangle in the corner of cells that carry a note."""
-        notes = self.grid_model.sheet.notes
+        """Draw Excel's red triangle for notes and purple triangle for comment threads."""
+        self._paint_corner_markers(painter, self.grid_model.sheet.notes, "#c00000")
+        self._paint_corner_markers(painter, self.grid_model.sheet.comments, "#7030a0")
+
+    def _paint_corner_markers(self, painter: QPainter, notes: Any, color: str) -> None:
         if not notes:
             return
         viewport = self.viewport().rect()
@@ -777,7 +782,7 @@ class GridView(QTableView):
         bottom = MAX_ROWS - 1 if bottom < 0 else bottom
         right = MAX_COLUMNS - 1 if right < 0 else right
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QBrush(QColor("#c00000")))
+        painter.setBrush(QBrush(QColor(color)))
         for row, column in notes:
             if not (top <= row <= bottom and left <= column <= right):
                 continue

@@ -872,6 +872,9 @@ def aggregate(context: Any, function_number: Any, options: Any, *arguments: Any)
         k = _num(context, sources.pop())
         if is_error(k):
             return k
+    elif any(not hasattr(source, "areas") for source in sources):
+        # Functions 1-13 use AGGREGATE's reference form, which needs ranges.
+        return VALUE_ERROR
     values: list[Any] = []
     for source in sources:
         if is_collection(source):

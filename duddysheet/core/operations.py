@@ -90,6 +90,14 @@ def edit_structure(
 
     _translate_tables(target, axis=axis, index=index, count=count, delete=delete)
     _translate_pivot_sources(workbook, target.name, axis=axis, index=index, count=count, delete=delete)
+    if target.drawings:
+        from duddysheet.core.drawings import shift_drawings
+
+        target.drawings = shift_drawings(target.drawings, axis, index, count, delete)
+    if target.comments:
+        from duddysheet.core.comments import shift_comments
+
+        target.comments = shift_comments(target.comments, axis, index, count, delete)
     _translate_defined_names(
         workbook,
         target_name=target.name,

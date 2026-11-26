@@ -26,7 +26,7 @@ def _number(context: Any, value: Any) -> Any:
 
 def _payment(rate: float, periods: float, present: float, future: float, due: float) -> Any:
     if periods == 0:
-        return DIV_ZERO_ERROR
+        return NUM_ERROR
     if rate == 0:
         return -(present + future) / periods
     factor = (1 + rate) ** periods
@@ -174,8 +174,10 @@ def npv(context: Any, rate: Any, *cash_flows: Any) -> Any:
     """Return net present value with first cash flow at period one."""
     rate_value = _number(context, rate)
     values = numeric_values(context, *cash_flows, ignore_non_numeric=False)
-    if is_error(rate_value) or is_error(values) or rate_value == -1:
+    if is_error(rate_value) or is_error(values):
         return VALUE_ERROR
+    if rate_value == -1:
+        return DIV_ZERO_ERROR
     return sum(value / (1 + rate_value) ** period for period, value in enumerate(values, 1))
 
 
@@ -332,11 +334,6 @@ def nper(
     rate_value, payment_value, present_value, future_value, due_value = values
     if rate_value == 0:
         return DIV_ZERO_ERROR if payment_value == 0 else -(present_value + future_value) / payment_value
-    cash_flows = (payment_value, present_value, future_value)
-    if all(value >= 0 for value in cash_flows) or all(
-        value <= 0 for value in cash_flows
-    ):
-        return NUM_ERROR
     numerator = payment_value * (1 + rate_value * due_value) - future_value * rate_value
     denominator = present_value * rate_value + payment_value * (1 + rate_value * due_value)
     if denominator == 0 or rate_value <= -1:
@@ -370,10 +367,11 @@ def mirr(context: Any, values: Any, finance_rate: Any, reinvest_rate: Any) -> An
         or len(cash_flows) < 2
         or finance <= -1
         or reinvest <= -1
-        or not any(value > 0 for value in cash_flows)
-        or not any(value < 0 for value in cash_flows)
     ):
         return NUM_ERROR
+    if not any(value > 0 for value in cash_flows) or not any(value < 0 for value in cash_flows):
+        # Excel divides by the discounted negative (or positive) flows.
+        return DIV_ZERO_ERROR
     periods = len(cash_flows) - 1
     positive_future = sum(
         value * (1 + reinvest) ** (periods - period)
@@ -1301,10 +1299,54 @@ def accrint(
         or par_value <= 0
     ):
         return NUM_ERROR
-    start = issue_date if bool(scalar(context, calc_method)) else first_date
-    if start >= settlement_date:
-        return 0
-    return par_value * rate_value * _year_fraction(start, settlement_date, basis_value)
+    # Excel accrues from the issue date in every case it was checked against,
+    # whatever calc_method says, so calc_method is accepted and ignored.
+    scalar(context, calc_method)
+    periods = _accrual_periods(issue_date, first_date, settlement_date, frequency_value, basis_value)
+    return par_value * rate_value / frequency_value * periods
+
+
+def _accrual_periods(issue: date, first: date, settlement: date, frequency: int, basis: int) -> float:
+    """Count coupon periods from issue to settlement the way Excel's ACCRINT does.
+
+    Coupon dates step from the first interest date. Each period contributes
+    its accrued days over a normal period length; a whole period before the
+    first interest date counts as exactly one. Excel measures a period after
+    the first interest date against the length of the period before it
+    (actual/actual) or against 360 or 365 divided by the frequency.
+    """
+    months = 12 // frequency
+    boundaries = [first]
+    while boundaries[0] > issue:
+        boundaries.insert(0, _coupon_shift(first, -months * len(boundaries)))
+    step = 1
+    while boundaries[-1] < settlement:
+        boundaries.append(_coupon_shift(first, months * step))
+        step += 1
+    normal = {0: 360 / frequency, 2: 360 / frequency, 3: 365 / frequency, 4: 360 / frequency}
+    total = 0.0
+    for index in range(len(boundaries) - 1):
+        start, end = boundaries[index], boundaries[index + 1]
+        low, high = max(issue, start), min(settlement, end)
+        if high <= low:
+            continue
+        accrued = _days_between(low, high, basis)
+        if end <= first:
+            if (low, high) == (start, end):
+                total += 1
+                continue
+            if basis == 1:
+                length = (end - start).days
+            elif basis == 4:
+                length = _days_between(start, end, 4)
+            else:
+                length = normal[basis]
+        elif basis == 1:
+            length = (start - boundaries[index - 1]).days
+        else:
+            length = normal[basis]
+        total += accrued / length
+    return total
 
 
 def _discount_security_values(
@@ -1427,8 +1469,8 @@ def pricedisc(
     if is_error(values):
         return values
     _, _, discount_value, redemption_value, _, fraction = values
-    result = redemption_value * (1 - discount_value * fraction)
-    return NUM_ERROR if result <= 0 else result
+    # Excel returns a negative price for a very large discount.
+    return redemption_value * (1 - discount_value * fraction)
 
 
 @register(

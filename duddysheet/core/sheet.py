@@ -45,6 +45,10 @@ class Sheet:
         "tables",
         "pivots",
         "data_tables",
+        "slicers",
+        "solver",
+        "drawings",
+        "comments",
     )
 
     def __init__(self, name: str) -> None:
@@ -88,6 +92,10 @@ class Sheet:
         self.tables: list[Any] = []
         self.pivots: list[Any] = []
         self.data_tables: list[Any] = []
+        self.slicers: list[Any] = []
+        self.solver: Any = None
+        self.drawings: list[Any] = []
+        self.comments: dict[tuple[int, int], Any] = {}
 
     @property
     def populated_count(self) -> int:
@@ -221,6 +229,26 @@ class Sheet:
         """Iterate allocated cells without sorting (fast scans)."""
         return iter(list(self._cells.items()))
 
+    def value_rows(self, top: int, left: int, bottom: int, right: int) -> list[list[Any]]:
+        """Return a block's displayed values row by row (None for blanks and errors).
+
+        This reads the sparse store directly, which keeps large summaries
+        (a PivotTable over 100,000 rows) fast.
+        """
+        self._validate_coordinate(top, left)
+        self._validate_coordinate(bottom, right)
+        cells = self._cells
+        empty = EMPTY_CELL
+        rows: list[list[Any]] = []
+        columns = range(left, right + 1)
+        for row in range(top, bottom + 1):
+            values = []
+            for column in columns:
+                cell = cells.get((row, column), empty)
+                values.append(None if cell.error is not None else cell.display_value)
+            rows.append(values)
+        return rows
+
     def iter_populated(self) -> Iterator[tuple[tuple[int, int], Cell]]:
         """Iterate allocated cells in deterministic row-major order."""
         for coordinate in sorted(self._cells):
@@ -257,6 +285,10 @@ class Sheet:
         duplicate.tables = list(self.tables)
         duplicate.pivots = list(self.pivots)
         duplicate.data_tables = list(self.data_tables)
+        duplicate.slicers = list(self.slicers)
+        duplicate.solver = self.solver
+        duplicate.drawings = list(self.drawings)
+        duplicate.comments = dict(self.comments)
         return duplicate
 
     def restore_from(self, snapshot: Sheet) -> None:
@@ -290,6 +322,10 @@ class Sheet:
         self.tables = restored.tables
         self.pivots = restored.pivots
         self.data_tables = restored.data_tables
+        self.slicers = restored.slicers
+        self.solver = restored.solver
+        self.drawings = restored.drawings
+        self.comments = restored.comments
 
     def _shrink_extent(self, row: int, column: int) -> None:
         """Invalidate the cached extent only when a boundary cell was removed."""

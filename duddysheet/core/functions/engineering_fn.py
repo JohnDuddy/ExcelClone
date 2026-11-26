@@ -360,21 +360,27 @@ def _parse_complex(value: Any) -> Any:
 
 
 def format_complex(value: complex, suffix: str = "i") -> str:
-    """Render a complex number as Excel complex text."""
+    """Render a complex number as Excel complex text (15 significant digits)."""
     real = _clean(value.real)
     imaginary = _clean(value.imag)
     if imaginary == 0:
-        return number_text(real)
+        return _component_text(real)
     if imaginary == 1:
         imag_text = suffix
     elif imaginary == -1:
         imag_text = "-" + suffix
     else:
-        imag_text = number_text(imaginary) + suffix
+        imag_text = _component_text(imaginary) + suffix
     if real == 0:
         return imag_text
     sign = "" if imag_text.startswith("-") else "+"
-    return f"{number_text(real)}{sign}{imag_text}"
+    return f"{_component_text(real)}{sign}{imag_text}"
+
+
+def _component_text(component: float) -> str:
+    if isinstance(component, int):
+        return str(component)
+    return format(component, ".15g").replace("e", "E")
 
 
 def _clean(component: float) -> float:

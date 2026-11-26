@@ -148,7 +148,7 @@ def sheet_function(context: Any, value: Any = None) -> Any:
         if is_error(selected):
             return selected
         if not isinstance(selected, str):
-            return VALUE_ERROR
+            return NA_ERROR
         sheet_name = selected
     try:
         return workbook.index_of(sheet_name) + 1

@@ -88,6 +88,22 @@ complete.
 - [x] Step-by-step tutorial for every Financial menu command, each with a worked example verified against a built-in model (`test_financial_tutorials.py`)
 - [x] Hover bubbles and status-bar text on every Financial menu command and ribbon button, with worked examples (`test_financial_tool_help.py`)
 
+## M15 Excel Interoperability and Analysis
+
+- [x] Charts save to `.xlsx` as native Excel charts (classic types through openpyxl, Office 2016 types as chartEx parts with their style parts) and are read back, including charts Excel saves with hidden `_xlchart` names (`test_xlsx_objects.py`)
+- [x] Sparklines save to and load from `.xlsx` as Excel sparkline groups (`test_xlsx_objects.py`)
+- [x] PivotTables save to `.xlsx` as refreshable Excel PivotTables (cache definition, records, layout, filters, hidden items, date grouping, Show Values As, number formats, calculated fields) and load back as PivotTables (`test_xlsx_objects.py`, `test_pivot_extras.py`)
+- [x] A workbook saved by Microsoft Excel loads its charts, sparklines, and PivotTables (`fixtures/excel_objects.xlsx`, `test_xlsx_objects.py`)
+- [x] About 1,000 formulas cross-checked against results recorded from Microsoft Excel, with Excel's formula-entry rules (argument counts, array constants, range-only arguments) (`fixtures/excel_function_results.json`, `test_excel_cross_check.py`, `test_entry_rules.py`)
+- [x] Packaged-build self-test covers Excel parity, Excel objects, Tables, PivotTables, and data tables (`test_selftest.py`)
+- [x] Text rotation (including stacked), indent, and shrink-to-fit drawn in cells; outline bar with level buttons and +/- boxes; Font and Font Size boxes on the Home ribbon (`test_grid_display.py`)
+- [x] Docked PivotTable Fields pane with drag and drop and Defer Layout Update; calculated fields; slicers; PivotCharts (`test_pivot_extras.py`)
+- [x] Solver with Simplex LP (and branch and bound for integer/binary constraints), GRG Nonlinear, and Evolutionary methods; models persist in `.dsheet` and as Excel's `solver_*` names in `.xlsx` (`test_solver.py`)
+- [x] Pictures, shapes, and text boxes: insert, move, resize, edit, delete, structural moves, and `.dsheet`/`.xlsx` round trips (`test_illustrations.py`)
+- [x] PivotTables over 100,000 rows and 400-cell data tables over formula chains stay fast (`test_performance.py`)
+- [x] Quick Analysis (Ctrl+Q), Forecast Sheet, and threaded comments with replies and resolve, saved to `.xlsx` as Excel threaded comments (`test_extras.py`)
+- [x] Native schema 6 with a migration from schema 5 (`test_native_io.py`)
+
 ## M14 Excel Functional Parity
 
 - [x] Excel 365 calculation semantics: array broadcasting, spilling ranges, `@` implicit intersection, `A1#` spill references, LET, LAMBDA, named formulas, 3-D references, and dynamic range operators (`test_excel365_semantics.py`)
@@ -100,7 +116,7 @@ complete.
 - [x] PivotTables: Rows/Columns/Values/Filters areas, 11 summary functions, Show Values As, item filters, date grouping, compact/outline/tabular layouts, subtotals and grand totals, refresh, change source, Show Details, GETPIVOTDATA, table sources that grow (`test_pivot.py`, `test_analysis_ui.py`)
 - [x] What-If data tables: one-variable (row or column) and two-variable `{=TABLE()}` tables evaluated without touching the real inputs, live recalculation, and Automatic Except for Data Tables (`test_data_table.py`)
 - [x] Tables and data tables round-trip through `.xlsx` as Excel objects; PivotTables, tables, and data tables persist in native schema 5 (`test_tables.py`, `test_pivot.py`, `test_data_table.py`, `test_xlsx_excel365.py`)
-- [x] Help > PivotTables, Tables, and What-If Tutorial with 16 searchable lessons and a practice workbook (`test_analysis_ui.py`)
+- [x] Help > PivotTables, Tables, and What-If Tutorial with 21 searchable lessons and a practice workbook (`test_analysis_ui.py`)
 
 ## M13 Excel Charting Parity
 

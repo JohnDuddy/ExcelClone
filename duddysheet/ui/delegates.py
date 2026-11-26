@@ -6,8 +6,8 @@ import math
 from typing import Any
 
 from PySide6.QtCore import QEvent, QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QKeyEvent, QPainter, QPen, QPolygonF
-from PySide6.QtWidgets import QLineEdit, QStyledItemDelegate, QStyleOptionViewItem, QWidget
+from PySide6.QtGui import QColor, QFont, QFontMetricsF, QKeyEvent, QPainter, QPen, QPolygonF
+from PySide6.QtWidgets import QApplication, QLineEdit, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QWidget
 
 from duddysheet.core.cell import BorderStyle, CellFormat
 from duddysheet.ui.completer import FunctionCompleter
@@ -218,7 +218,10 @@ class CellDelegate(QStyledItemDelegate):
         painted_option = QStyleOptionViewItem(option)
         if icon:
             painted_option.rect.adjust(16, 0, 0, 0)
-        super().paint(painter, painted_option, index)
+        if isinstance(cell_format, CellFormat) and needs_custom_text(cell_format):
+            self._paint_formatted_text(painter, painted_option, index, cell_format)
+        else:
+            super().paint(painter, painted_option, index)
 
         if icon:
             self._paint_icon(painter, option.rect, str(icon))
@@ -227,6 +230,47 @@ class CellDelegate(QStyledItemDelegate):
             paint_sparkline(painter, QRectF(option.rect), *sparkline)
         if isinstance(cell_format, CellFormat):
             self._paint_borders(painter, option.rect, cell_format)
+
+    def _paint_formatted_text(
+        self,
+        painter: QPainter,
+        option: QStyleOptionViewItem,
+        index: Any,
+        cell_format: CellFormat,
+    ) -> None:
+        """Paint a cell whose text is indented, rotated, stacked, or shrunk to fit."""
+        styled = QStyleOptionViewItem(option)
+        self.initStyleOption(styled, index)
+        text = styled.text
+        styled.text = ""
+        widget = option.widget
+        style = widget.style() if widget is not None else QApplication.style()
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, styled, painter, widget)
+        if not text:
+            return
+        painter.save()
+        painter.setClipRect(option.rect)
+        foreground = index.data(Qt.ItemDataRole.ForegroundRole)
+        color = foreground.color() if hasattr(foreground, "color") else styled.palette.text().color()
+        if option.state & QStyle.StateFlag.State_Selected and not foreground:
+            color = styled.palette.highlightedText().color()
+        painter.setPen(color)
+        font = QFont(styled.font)
+        alignment = index.data(Qt.ItemDataRole.TextAlignmentRole)
+        alignment = Qt.AlignmentFlag(int(alignment)) if alignment is not None else Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom
+        rect = QRectF(option.rect).adjusted(2, 1, -2, -1)
+        layout = text_layout(cell_format, rect, font, text)
+        painter.setFont(layout.font)
+        if layout.stacked:
+            painter.drawText(layout.rect, int(Qt.AlignmentFlag.AlignHCenter | (alignment & Qt.AlignmentFlag.AlignVertical_Mask)), "\n".join(text))
+        elif layout.angle:
+            painter.translate(layout.rect.center())
+            painter.rotate(-layout.angle)
+            box = QRectF(-layout.extent / 2, -layout.thickness / 2, layout.extent, layout.thickness)
+            painter.drawText(box, int(Qt.AlignmentFlag.AlignCenter), text)
+        else:
+            painter.drawText(layout.rect, int(alignment | Qt.TextFlag.TextSingleLine), text)
+        painter.restore()
 
     @staticmethod
     def _paint_icon(painter: QPainter, rect: Any, icon: str) -> None:
@@ -290,6 +334,53 @@ class CellDelegate(QStyledItemDelegate):
                 else:
                     painter.drawLine(start.x() - offset, start.y(), end.x() - offset, end.y())
         painter.restore()
+
+
+INDENT_PIXELS = 9
+
+
+def needs_custom_text(cell_format: CellFormat) -> bool:
+    """Whether a cell's text needs indent, rotation, stacking, or shrink-to-fit painting."""
+    return bool(cell_format.indent or cell_format.text_rotation or cell_format.shrink_to_fit)
+
+
+class TextLayout:
+    """Where and how a cell's text is drawn."""
+
+    def __init__(self, rect: QRectF, font: QFont, angle: int = 0, stacked: bool = False, extent: float = 0.0, thickness: float = 0.0) -> None:
+        self.rect = rect
+        self.font = font
+        self.angle = angle
+        self.stacked = stacked
+        self.extent = extent
+        self.thickness = thickness
+
+
+def text_layout(cell_format: CellFormat, rect: QRectF, font: QFont, text: str) -> TextLayout:
+    """Lay out a cell's text for Excel's indent, rotation (-90..90, 255 stacked), and shrink-to-fit."""
+    area = QRectF(rect)
+    if cell_format.indent:
+        shift = cell_format.indent * INDENT_PIXELS
+        if cell_format.horizontal_alignment == "right":
+            area.adjust(0, 0, -shift, 0)
+        else:
+            area.adjust(shift, 0, 0, 0)
+    used = QFont(font)
+    rotation = cell_format.text_rotation
+    if rotation == 255:
+        return TextLayout(area, used, stacked=True)
+    angle = rotation if rotation <= 90 else 90 - rotation
+    if cell_format.shrink_to_fit and not cell_format.wrap_text and not angle:
+        metrics = QFontMetricsF(used)
+        width = metrics.horizontalAdvance(text)
+        if width > area.width() > 0:
+            ratio = area.width() / width
+            if used.pointSizeF() > 0:
+                used.setPointSizeF(max(1.0, used.pointSizeF() * ratio))
+            else:
+                used.setPixelSize(max(1, int(used.pixelSize() * ratio)))
+    metrics = QFontMetricsF(used)
+    return TextLayout(area, used, angle=angle, extent=metrics.horizontalAdvance(text) + 2, thickness=metrics.height())
 
 
 def paint_sparkline(

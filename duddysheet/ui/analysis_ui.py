@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from PySide6.QtWidgets import QDialog, QInputDialog, QMenu, QMessageBox
+from PySide6.QtWidgets import QDialog, QDockWidget, QInputDialog, QMenu, QMessageBox
 
 from duddysheet.commands.analysis import (
     CreateTableCommand,
@@ -68,6 +68,10 @@ class AnalysisFeaturesMixin:
         a("pivotSource", "Change Data Source...", self.change_pivot_source)
         a("pivotDetails", "Show Details", self.show_pivot_details)
         a("deletePivot", "Delete PivotTable", self.delete_pivot_at_cell)
+        a("insertSlicer", "Insert Slicer...", self.insert_slicer_dialog, tip="Add buttons that filter the PivotTable by a field")
+        a("pivotChart", "PivotChart", lambda: self.insert_pivot_chart(), tip="Chart the PivotTable; the chart follows its layout")
+        a("calculatedField", "Calculated Field...", self.calculated_field_dialog, tip="Add a field calculated from other fields")
+        a("solver", "Solver...", self.solver_dialog, tip="Find the best value for a formula by changing several cells under constraints")
         a("dataTable", "Data Table...", self.data_table_dialog, tip="Show results of a formula for many input values")
         a("deleteDataTable", "Delete Data Table", self.delete_data_table_at_cell)
         a("tableName", "Table Name...", self.rename_table_dialog)
@@ -85,9 +89,17 @@ class AnalysisFeaturesMixin:
         handlers["Refresh All"] = self.refresh_all
         handlers["Data Table"] = self.data_table_dialog
         handlers["Analysis Help"] = lambda: self.show_analysis_help()
+        handlers["Slicer"] = self.insert_slicer_dialog
+        handlers["Solver"] = self.solver_dialog
+        handlers["PivotChart"] = lambda: self.insert_pivot_chart()
+        self._slicer_panels: dict[str, Any] = {}
+        self.history.add_listener(lambda history: self._sync_slicers())
         self._extend_analysis_menus()
+        self.pivot_fields_dock: QDockWidget | None = None
         self.grid.currentCellChanged.connect(lambda *_: self._update_table_actions())
+        self.grid.currentCellChanged.connect(lambda *_: self._sync_pivot_pane())
         self.history.add_listener(lambda history: self._update_table_actions())
+        self.history.add_listener(lambda history: self._sync_pivot_pane())
         self._update_table_actions()
 
     def _extend_analysis_menus(self) -> None:
@@ -118,7 +130,8 @@ class AnalysisFeaturesMixin:
         self._add(table, "-", "summarizeWithPivot")
         pivot = data.addMenu("PivotTable")
         pivot.setObjectName("pivotMenu")
-        self._add(pivot, "insertPivot", "pivotFields", "-", "refreshPivot", "refreshAll", "pivotSource", "-", "pivotDetails", "deletePivot")
+        self._add(pivot, "insertPivot", "pivotFields", "calculatedField", "-", "insertSlicer", "pivotChart", "-", "refreshPivot", "refreshAll", "pivotSource", "-", "pivotDetails", "deletePivot")
+        self._add(data, "solver")
         what_if = data.addMenu("What-If Analysis")
         what_if.setObjectName("whatIfMenu")
         what_if.addAction(self.scenarios_action)
@@ -446,15 +459,238 @@ class AnalysisFeaturesMixin:
         return spec
 
     def edit_pivot_fields(self) -> None:
-        """Open the PivotTable Fields list for the active PivotTable."""
-        from duddysheet.ui.dialogs.analysis_dialogs import PivotFieldsDialog
+        """Show the PivotTable Fields pane for the active PivotTable."""
+        if self._active_pivot() is None:
+            return
+        self._sync_pivot_pane(force=True)
+
+    def _pivot_pane(self) -> Any:
+        """Create the docked PivotTable Fields pane on first use."""
+        from PySide6.QtCore import Qt
+
+        from duddysheet.ui.dialogs.analysis_dialogs import PivotFieldsPanel
+
+        if self.pivot_fields_dock is None:
+            dock = QDockWidget("PivotTable Fields", self)
+            dock.setObjectName("pivotFieldsDock")
+            spec = self._active_pivot(warn=False)
+            panel = PivotFieldsPanel(self.engine.workbook, spec, dock, live=True)
+            panel.specChanged.connect(self._apply_pane_spec)
+            dock.setWidget(panel)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            self.pivot_fields_dock = dock
+        return self.pivot_fields_dock
+
+    def _sync_pivot_pane(self, *, force: bool = False) -> None:
+        """Excel shows the field list while the active cell is in a PivotTable."""
+        spec = self._active_pivot(warn=False)
+        dock = self.pivot_fields_dock
+        if spec is None:
+            if dock is not None:
+                dock.hide()
+            return
+        if dock is None and not force and not self._pivot_pane_wanted():
+            return
+        dock = self._pivot_pane()
+        panel = dock.widget()
+        if replace(panel.spec, cache=None, extent=None) != replace(spec, cache=None, extent=None) or panel.spec.name != spec.name:
+            panel.set_spec(self.engine.workbook, spec)
+        self._pane_pivot = (self._sheet_name(), spec.name)
+        dock.show()
+
+    def _pivot_pane_wanted(self) -> bool:
+        return bool(getattr(self, "show_pivot_pane_automatically", True))
+
+    def _apply_pane_spec(self, spec: PivotSpec) -> None:
+        sheet_name, _name = getattr(self, "_pane_pivot", (self._sheet_name(), spec.name))
+        self._mutate("PivotTable fields", lambda: update_pivot(self.engine.workbook, sheet_name, spec))
+
+    # ------------------------------------------------------- slicers and charts
+    def insert_slicer_dialog(self) -> None:
+        """Insert > Slicer: pick fields of the active PivotTable to slice by."""
+        from duddysheet.core.pivot import source_fields
+        from duddysheet.ui.slicers import InsertSlicersDialog
 
         spec = self._active_pivot()
         if spec is None:
             return
-        dialog = PivotFieldsDialog(self.engine.workbook, spec, self)
+        dialog = InsertSlicersDialog(source_fields(self.engine.workbook, spec), self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.chosen():
+            self.insert_slicers(dialog.chosen())
+
+    def insert_slicers(self, field_names: list[str]) -> list[Any]:
+        """Add a slicer for each field of the active PivotTable."""
+        from duddysheet.core.pivot import PivotSlicer, next_slicer_name
+
+        spec = self._active_pivot()
+        if spec is None:
+            return []
+        sheet_name = self._sheet_name()
+        created: list[Any] = []
+
+        def mutate() -> None:
+            sheet = self.engine.workbook.get_sheet(sheet_name)
+            for field_name in field_names:
+                slicer = PivotSlicer(next_slicer_name(self.engine.workbook, field_name), sheet_name, spec.name, field_name)
+                sheet.slicers.append(slicer)
+                created.append(slicer)
+
+        self._mutate("Insert Slicer", mutate)
+        return created
+
+    def apply_slicer_selection(self, name: str, selected: Any) -> bool:
+        """A slicer was clicked: filter its PivotTable to the selected items."""
+        from duddysheet.core.pivot import apply_slicer
+
+        slicer = next((item for sheet in self.engine.workbook for item in sheet.slicers if item.name == name), None)
+        if slicer is None:
+            return False
+        return self._mutate("Slicer", lambda: apply_slicer(self.engine.workbook, slicer, selected))
+
+    def remove_slicer(self, name: str) -> bool:
+        """Delete a slicer (its PivotTable keeps its current filter, as in Excel)."""
+
+        def mutate() -> None:
+            for sheet in self.engine.workbook:
+                sheet.slicers = [item for item in sheet.slicers if item.name != name]
+
+        return self._mutate("Delete Slicer", mutate)
+
+    def _sync_slicers(self) -> None:
+        """Show the active sheet's slicers and refresh their selections."""
+        from PySide6.QtCore import Qt
+
+        from duddysheet.ui.slicers import SlicerPanel
+
+        workbook = self.engine.workbook
+        active = {slicer.name: slicer for slicer in workbook.active_sheet.slicers}
+        for name, panel in tuple(self._slicer_panels.items()):
+            if name not in active or panel.workbook is not workbook:
+                self.removeDockWidget(panel)
+                panel.setParent(None)
+                panel.deleteLater()
+                del self._slicer_panels[name]
+        for name, slicer in active.items():
+            panel = self._slicer_panels.get(name)
+            if panel is None:
+                panel = SlicerPanel(workbook, slicer, self)
+                panel.selectionApplied.connect(self.apply_slicer_selection)
+                panel.closeRequested.connect(self.remove_slicer)
+                self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, panel)
+                panel.setFloating(True)
+                panel.resize(220, 260)
+                panel.show()
+                self._slicer_panels[name] = panel
+            else:
+                panel.slicer = slicer
+                panel.refresh(workbook)
+
+    def insert_pivot_chart(self, chart_type: str = "column") -> Any:
+        """PivotChart: a chart that follows the active PivotTable's layout."""
+        from uuid import uuid4
+
+        from duddysheet.commands.edits import AddChartCommand
+        from duddysheet.core.chart import ChartSpec
+
+        spec = self._active_pivot()
+        if spec is None or spec.extent is None:
+            return None
+        if not spec.values:
+            self._warn("Add a field to the Values area before making a PivotChart.")
+            return None
+        top, left, bottom, right = spec.extent
+        source = RangeReference(CellReference(top, left), CellReference(bottom, right))
+        chart = ChartSpec(uuid4().hex, self._sheet_name(), source, chart_type, title=spec.name, pivot_name=spec.name)
+        self._run(AddChartCommand(self.engine, self._sheet_name(), chart))
+        return chart
+
+    def calculated_field_dialog(self) -> None:
+        """PivotTable > Calculated Field: add a field computed from other fields."""
+        from duddysheet.core.pivot import source_fields
+        from duddysheet.ui.dialogs.analysis_dialogs import CalculatedFieldDialog
+
+        spec = self._active_pivot()
+        if spec is None:
+            return
+        dialog = CalculatedFieldDialog(source_fields(self.engine.workbook, spec), self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.apply_pivot(dialog.result_spec())
+            self.add_calculated_field(*dialog.value())
+
+    def add_calculated_field(self, name: str, formula: str) -> bool:
+        """Add a calculated field to the active PivotTable and show it in Values."""
+        from duddysheet.core.pivot import PivotValueField, source_fields
+
+        spec = self._active_pivot()
+        if spec is None or not name:
+            return False
+        if name.casefold() in {field.casefold() for field in source_fields(self.engine.workbook, spec)}:
+            self._warn("A calculated field needs a name that isn't already a field.")
+            return False
+        others = tuple(entry for entry in spec.calculated_fields if entry[0].casefold() != name.casefold())
+        values = spec.values
+        if not any(value.field.casefold() == name.casefold() for value in values):
+            values = values + (PivotValueField(name),)
+        return self.apply_pivot(replace(spec, calculated_fields=others + ((name, formula),), values=values))
+
+    # ---------------------------------------------------------------- Solver
+    def solver_dialog(self) -> None:
+        """Data > Solver: set up, run, and keep or discard a Solver solution."""
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QApplication
+
+        from duddysheet.ui.dialogs.solver_dialog import SolverDialog
+
+        row, column = self._active()
+        dialog = SolverDialog(self._sheet().solver, CellReference(row, column, None, True, True).to_a1(), self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            model = dialog.model()
+        except ValueError as error:
+            self._warn(str(error))
+            return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            result = self.run_solver(model, keep=None)
+        finally:
+            QApplication.restoreOverrideCursor()
+        if result is None:
+            return
+        box = QMessageBox(self)
+        box.setWindowTitle("Solver Results")
+        box.setText(result.message)
+        if result.objective is not None:
+            box.setInformativeText(f"Objective cell value: {result.objective:,.10g}")
+        keep = box.addButton("Keep Solver Solution", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Restore Original Values", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        if box.clickedButton() is keep and result.values:
+            self.keep_solver_solution(result)
+
+    def run_solver(self, model: Any, *, keep: bool | None = True) -> Any:
+        """Save the model with the sheet and solve it; keep the solution when ``keep``."""
+        from duddysheet.core.solver import SolverError, solve
+
+        sheet_name = self._sheet_name()
+        self._mutate("Solver model", lambda: setattr(self.engine.workbook.get_sheet(sheet_name), "solver", model))
+        try:
+            result = solve(self.engine.workbook, model, sheet_name)
+        except SolverError as error:
+            self._warn(str(error))
+            return None
+        if keep and result.values:
+            self.keep_solver_solution(result)
+        return result
+
+    def keep_solver_solution(self, result: Any) -> bool:
+        """Write the solution into the variable cells (one undoable step)."""
+
+        def mutate() -> None:
+            for (sheet, row, column), value in result.values.items():
+                number = int(value) if float(value).is_integer() and abs(value) < 2**53 else float(value)
+                self.engine.set_cell(sheet, row, column, number)
+
+        return self._mutate("Solver", mutate)
 
     def apply_pivot(self, spec: PivotSpec) -> bool:
         """Replace a PivotTable's layout and redraw it."""

@@ -82,6 +82,9 @@ class GridModel(QAbstractTableModel):
                 return ""
             return "" if cell.raw_input is None else str(cell.raw_input)
         if role == Qt.ItemDataRole.ToolTipRole:
+            thread = self.sheet.comments.get((index.row(), index.column()))
+            if thread is not None:
+                return thread.summary()
             if cell.error is not None:
                 return cell.error
             if cell.hyperlink is not None:
@@ -168,6 +171,15 @@ class GridModel(QAbstractTableModel):
             self.editRejected.emit(self.last_error)
             return False
         parsed_value = _parse_user_input(value)
+        if isinstance(parsed_value, str) and parsed_value.startswith("=") and len(parsed_value) > 1:
+            from duddysheet.core.entry_rules import validate_entry
+
+            try:
+                validate_entry(parsed_value)
+            except FormulaSyntaxError as error:
+                self.last_error = str(error).split(" at position")[0]
+                self.editRejected.emit(self.last_error)
+                return False
         validation = validation_for_cell(self.sheet, index.row(), index.column())
         if validation is not None:
             result = validate_value(

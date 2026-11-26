@@ -6,6 +6,38 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Added
 
+- `.xlsx` files keep charts, sparklines, and PivotTables. Charts become
+  native Excel charts, including histogram, Pareto, box and whisker,
+  waterfall, funnel, treemap, and sunburst; PivotTables become real Excel
+  PivotTables that refresh when the file opens. Charts, sparklines, and
+  PivotTables in files saved by Excel are imported. Excel has no heatmap or
+  step chart: a heatmap is left out of `.xlsx` and a step chart saved as a
+  line chart, and the status bar says so.
+- Formula results checked against Microsoft Excel itself: about 1,000
+  formulas were entered in Excel and its answers recorded as a test fixture.
+- Formulas Excel refuses when typed are refused with Excel's message: the
+  wrong number of arguments, anything but constants inside `{...}`, and a
+  value where a function needs a range, such as `=COUNTIF({1,2,3},">1")`.
+  Formulas already in a workbook keep working.
+- Cells draw rotated, stacked, indented, and shrink-to-fit text. Grouped rows
+  and columns get Excel's outline bar with level buttons and +/- boxes. The
+  Home ribbon has Font and Font Size boxes.
+- The PivotTable Fields pane docks beside the sheet while a PivotTable is
+  selected, with drag and drop between areas and Defer Layout Update.
+  PivotTables gain calculated fields, slicers, and PivotCharts.
+- Data > Solver with Simplex LP, GRG Nonlinear, and Evolutionary methods,
+  integer and binary constraints, and Keep Solver Solution. The model is
+  saved with the sheet and in `.xlsx` the way Excel's Solver stores it.
+- Insert > Pictures, Shapes, and Text Box: floating objects that can be
+  moved, resized, edited, and deleted, saved in `.dsheet` and `.xlsx`.
+- Quick Analysis (Ctrl+Q): formatting, charts, totals, tables, and
+  sparklines for the selection. Data > Forecast Sheet builds a forecast with
+  confidence bounds and a chart. Review > New Comment (Ctrl+Alt+M) starts a
+  threaded comment with replies and resolve, saved to `.xlsx` as an Excel
+  threaded comment.
+- The packaged-build self-test checks Excel parity, Excel objects, Tables,
+  PivotTables, and data tables.
+
 - Excel Tables. Ctrl+T (or Insert > Table) turns a list into a named table
   with a styled header and banded rows. Formulas can refer to it by name:
   `Table1[Qty]`, `[@Qty]` for the same row, `Table1[#Headers]`,
@@ -118,6 +150,13 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Changed
 
+- Native schema 6 stores slicers, Solver models, pictures and shapes, and
+  comment threads. Schema 5 files migrate on open.
+- PivotTables over 100,000 rows compute in under a second (from about nine),
+  and large data tables recalculate in under a second (from minutes).
+  Editing a cell that ranges depend on is faster in every workbook.
+- The PivotTable tutorial grows to 21 lessons, covering calculated fields,
+  slicers, PivotCharts, Solver, and Forecast Sheet.
 - Native schema 5 stores notes, outlines, protection, row and column formats,
   workbook calculation options, tables, PivotTables, and data tables. Schema 4
   files migrate on open.
@@ -131,6 +170,18 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Fixed
 
+- Results now match Excel for `CEILING` and `FLOOR` with negative numbers,
+  `LOG` with base 1, `FORECAST` with one point, `TREND` with mismatched
+  sizes, `TEXTBEFORE`/`TEXTAFTER` when the delimiter is missing, `VLOOKUP`
+  and `HLOOKUP` with a missing value, `XLOOKUP` with mismatched arrays,
+  `LOOKUP` with a shorter result vector, `MATCH` with any positive or
+  negative match type, `FILTER` with a single include value, `PMT` with zero
+  periods, `NPV` at -100%, `NPER` with all-positive cash flows, `MIRR`
+  without both signs, `PRICEDISC` with large discounts, `AGGREGATE` reference
+  functions given arrays, `NETWORKDAYS` with a text holiday, `SHEET` of a
+  value, `FORECAST.ETS.SEASONALITY` when no season repeats three times, and
+  `ACCRINT`, which now sums coupon periods the way Excel does.
+- Complex-number text uses 15 significant digits, as in Excel.
 - The Data menu no longer appears twice in the menu bar.
 - Editing a chart no longer silently switches it to the top recommended chart
   type.

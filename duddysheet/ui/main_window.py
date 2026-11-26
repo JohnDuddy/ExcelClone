@@ -124,6 +124,9 @@ from duddysheet.ui.formula_bar import FormulaBar
 from duddysheet.ui.grid_model import GridModel
 from duddysheet.ui.excel_ui import ExcelFeaturesMixin
 from duddysheet.ui.grid_view import GridView
+from duddysheet.ui.outline_bar import OutlineFrame
+from duddysheet.ui.illustrations_ui import IllustrationsMixin
+from duddysheet.ui.extras_ui import ExtrasMixin
 from duddysheet.ui.analysis_ui import AnalysisFeaturesMixin
 from duddysheet.ui.ribbon import Ribbon, chart_menu_entries, sparkline_menu_entries
 from duddysheet.ui.sheet_tabs import SheetTabs
@@ -134,7 +137,7 @@ from duddysheet.util.autosave import AutosaveManager, RecoveryCandidate
 from duddysheet.util.logging_setup import configure_logging
 
 
-class MainWindow(AnalysisFeaturesMixin, ExcelFeaturesMixin, QMainWindow):
+class MainWindow(ExtrasMixin, IllustrationsMixin, AnalysisFeaturesMixin, ExcelFeaturesMixin, QMainWindow):
     """Top-level Duddy Spreadsheet window using command-driven workbook mutations."""
 
     def __init__(
@@ -156,6 +159,7 @@ class MainWindow(AnalysisFeaturesMixin, ExcelFeaturesMixin, QMainWindow):
         self.logger = configure_logging()
         self._hyperlink_opener = hyperlink_opener or QDesktopServices.openUrl
         self.current_path: Path | None = None
+        self.last_save_warnings: tuple[str, ...] = ()
         self.dirty = False
         self._suppress_dirty = False
         self._chart_panels: dict[str, Any] = {}
@@ -181,7 +185,12 @@ class MainWindow(AnalysisFeaturesMixin, ExcelFeaturesMixin, QMainWindow):
         layout.setSpacing(0)
         layout.addWidget(self.ribbon)
         layout.addWidget(self.formula_bar)
-        layout.addWidget(self.grid_splitter, 1)
+        self.outline_frame = OutlineFrame(self.grid, self.grid_splitter)
+        self.outline_frame.rows.groupToggled.connect(self._toggle_outline_group)
+        self.outline_frame.columns.groupToggled.connect(self._toggle_outline_group)
+        self.outline_frame.rows.levelRequested.connect(self._show_outline_level)
+        self.outline_frame.columns.levelRequested.connect(self._show_outline_level)
+        layout.addWidget(self.outline_frame, 1)
         layout.addWidget(self.sheet_tabs)
         self.setCentralWidget(container)
 
@@ -195,6 +204,8 @@ class MainWindow(AnalysisFeaturesMixin, ExcelFeaturesMixin, QMainWindow):
         self._connect_signals()
         self._install_excel_features()
         self._install_analysis_features()
+        self._install_illustrations()
+        self._install_extras()
         self.autosave_timer = QTimer(self)
         self.autosave_timer.setInterval(5 * 60 * 1000)
         self.autosave_timer.timeout.connect(self.autosave_now)
@@ -472,6 +483,18 @@ class MainWindow(AnalysisFeaturesMixin, ExcelFeaturesMixin, QMainWindow):
         except (OSError, ValueError) as error:
             QMessageBox.critical(self, "Save Failed", str(error))
 
+    def _toggle_outline_group(self, axis: str, level: int, indexes: tuple, expand: bool) -> None:
+        """Click on an outline +/- box: show or hide that group's detail."""
+        from duddysheet.commands.editing import CollapseOutlineCommand
+
+        self._run(CollapseOutlineCommand(self.engine, self.grid_model.active_sheet_name, axis, level, tuple(indexes), expand))
+
+    def _show_outline_level(self, axis: str, level: int) -> None:
+        """Click on an outline level button: show levels up to ``level``."""
+        from duddysheet.commands.editing import CollapseOutlineCommand
+
+        self._run(CollapseOutlineCommand(self.engine, self.grid_model.active_sheet_name, axis, level))
+
     def save_path(self, path: str | Path) -> Path:
         """Save the current workbook using extension-based dispatch."""
         destination = Path(path)
@@ -480,9 +503,11 @@ class MainWindow(AnalysisFeaturesMixin, ExcelFeaturesMixin, QMainWindow):
         if suffix == ".dsheet":
             save_native(self.engine.workbook, destination)
         elif suffix == ".xlsx":
+            from duddysheet.io.xlsx_charts import xlsx_chart_warnings
             from duddysheet.io.xlsx_writer import write_xlsx
 
             write_xlsx(self.engine.workbook, destination)
+            self.last_save_warnings = xlsx_chart_warnings(self.engine.workbook)
         elif suffix in (".csv", ".tsv"):
             write_delimited(self.engine.workbook, destination)
         else:
@@ -497,7 +522,11 @@ class MainWindow(AnalysisFeaturesMixin, ExcelFeaturesMixin, QMainWindow):
         self.settings.add_recent_file(destination)
         self._refresh_recent_menu()
         self._update_title()
-        self.statusBar().showMessage(f"Saved {destination.name}", 3000)
+        notes = self.last_save_warnings if suffix == ".xlsx" else ()
+        if notes:
+            self.statusBar().showMessage(f"Saved {destination.name}. " + " ".join(notes), 10000)
+        else:
+            self.statusBar().showMessage(f"Saved {destination.name}", 3000)
         return destination
 
     def autosave_now(self) -> RecoveryCandidate | None:
@@ -648,6 +677,8 @@ class MainWindow(AnalysisFeaturesMixin, ExcelFeaturesMixin, QMainWindow):
         reference = CellReference(index.row(), index.column()).to_a1()
         cell = self.grid_model.sheet.get_cell(index.row(), index.column())
         self.formula_bar.set_cell(reference, cell.raw_input)
+        effective = self.grid_model.sheet.effective_format(index.row(), index.column())
+        self.ribbon.show_font(effective.font_family, effective.font_size)
 
     def commit_formula_bar(self) -> None:
         """Commit formula-bar text to the current cell through the model."""

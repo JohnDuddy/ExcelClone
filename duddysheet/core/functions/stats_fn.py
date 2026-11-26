@@ -10,7 +10,7 @@ from typing import Any
 
 import numpy as np
 
-from duddysheet.core.errors import DIV_ZERO_ERROR, NA_ERROR, NUM_ERROR, VALUE_ERROR, is_error
+from duddysheet.core.errors import DIV_ZERO_ERROR, NA_ERROR, NUM_ERROR, REF_ERROR, VALUE_ERROR, is_error
 from duddysheet.core.functions import register
 from duddysheet.core.functions.common import (
     clean_number,
@@ -375,8 +375,11 @@ def _paired_numbers(context: Any, known_y: Any, known_x: Any) -> Any:
     x_values = _numbers(context, known_x)
     if is_error(y_values) or is_error(x_values):
         return VALUE_ERROR
-    if len(y_values) != len(x_values) or len(y_values) < 2:
+    if len(y_values) != len(x_values):
         return NA_ERROR
+    if len(y_values) < 2:
+        # One point has no spread, so Excel divides by zero.
+        return DIV_ZERO_ERROR
     return np.asarray(x_values, dtype=float), np.asarray(y_values, dtype=float)
 
 
@@ -397,7 +400,7 @@ def _linear_fit(context: Any, known_y: Any, known_x: Any) -> Any:
     if is_error(paired):
         return paired
     x_values, y_values = paired
-    if np.std(x_values) == 0:
+    if len(x_values) < 2 or np.std(x_values) == 0:
         return DIV_ZERO_ERROR
     slope_value, intercept_value = np.polyfit(x_values, y_values, 1)
     return float(slope_value), float(intercept_value)
@@ -444,8 +447,10 @@ def trend(
         if known_x is None
         else _numbers(context, known_x)
     )
-    if is_error(x_values) or len(x_values) != len(y_values):
+    if is_error(x_values):
         return NA_ERROR
+    if len(x_values) != len(y_values):
+        return REF_ERROR
     include_intercept = bool(scalar(context, constant))
     if include_intercept:
         slope_value, intercept_value = np.polyfit(x_values, y_values, 1)

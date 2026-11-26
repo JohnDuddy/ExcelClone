@@ -98,11 +98,19 @@ def _dimension_style(dimension: Any, cell_format: CellFormat) -> None:
 
 def write_sheet_extras(source: Any, worksheet: Any) -> None:
     """Write notes, outlines, axis formats, protection, and conditional rules."""
+    threads = getattr(source, "comments", {}) or {}
     for (row, column), note in source.notes.items():
+        if (row, column) in threads:
+            continue  # Excel keeps one comment per cell; the thread wins.
         comment = Comment(note.text, note.author or "Author")
         comment.width = 200
         comment.height = 100
         worksheet.cell(row=row + 1, column=column + 1).comment = comment
+    if threads:
+        from duddysheet.io.xlsx_comments import legacy_comment
+
+        for (row, column), thread in threads.items():
+            worksheet.cell(row=row + 1, column=column + 1).comment = legacy_comment(source.name, row, column, thread)
     for row, level in source.row_outline.items():
         worksheet.row_dimensions[row + 1].outlineLevel = level
     for column, level in source.column_outline.items():

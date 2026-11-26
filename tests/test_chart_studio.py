@@ -323,7 +323,7 @@ def test_insert_menu_offers_every_family_and_inserts_the_chosen_type() -> None:
     families = [
         action.text()
         for action in window.insert_menu.actions()
-        if action.menu() is not None
+        if action.menu() is not None and action.text() != "Shapes"
     ]
 
     column_menu = next(

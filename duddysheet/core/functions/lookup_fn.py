@@ -173,18 +173,24 @@ def vlookup(
     """Look down the first table column and return a selected column."""
     rows = matrix(context, table_array)
     selected_column = number(scalar(context, column_index))
-    if is_error(selected_column) or selected_column < 1:
+    if is_error(selected_column):
         return VALUE_ERROR
-    selected_column = int(selected_column) - 1
-    if not rows or selected_column >= max(len(row) for row in rows):
-        return REF_ERROR
     lookup = scalar(context, lookup_value)
     first_column = [row[0] if row else None for row in rows]
     if bool(scalar(context, approximate)):
         index = _lookup_index(lookup, first_column, match_mode=-1, search_mode=2)
     else:
         index = _lookup_index(lookup, first_column, wildcards=True)
-    if index is None or selected_column >= len(rows[index]):
+    # Excel looks the value up first: a missing value is #N/A even when the
+    # column number is also out of range.
+    if index is None:
+        return NA_ERROR
+    if selected_column < 1:
+        return VALUE_ERROR
+    selected_column = int(selected_column) - 1
+    if selected_column >= max(len(row) for row in rows):
+        return REF_ERROR
+    if selected_column >= len(rows[index]):
         return NA_ERROR
     return rows[index][selected_column]
 
@@ -205,21 +211,25 @@ def hlookup(
     """Look across the first table row and return a selected row."""
     rows = matrix(context, table_array)
     selected_row = number(scalar(context, row_index))
-    if is_error(selected_row) or selected_row < 1:
+    if is_error(selected_row):
         return VALUE_ERROR
-    selected_row = int(selected_row) - 1
-    if not rows or selected_row >= len(rows):
-        return REF_ERROR
     lookup = scalar(context, lookup_value)
     approximate_match = bool(scalar(context, approximate))
     index = _lookup_index(
         lookup,
-        rows[0],
+        rows[0] if rows else [],
         match_mode=-1 if approximate_match else 0,
         search_mode=2 if approximate_match else 1,
         wildcards=not approximate_match,
     )
-    if index is None or index >= len(rows[selected_row]):
+    if index is None:
+        return NA_ERROR
+    if selected_row < 1:
+        return VALUE_ERROR
+    selected_row = int(selected_row) - 1
+    if selected_row >= len(rows):
+        return REF_ERROR
+    if index >= len(rows[selected_row]):
         return NA_ERROR
     return rows[selected_row][index]
 
@@ -246,6 +256,11 @@ def xlookup(
     selected_search_mode = number(scalar(context, search_mode))
     if is_error(selected_match_mode) or is_error(selected_search_mode):
         return VALUE_ERROR
+    return_rows = matrix(context, return_array)
+    count = len(lookup_values)
+    # The return array must line up with the lookup array, as in Excel.
+    if not (len(return_rows) == count or (return_rows and len(return_rows[0]) == count)):
+        return VALUE_ERROR
     index = _lookup_index(
         lookup,
         lookup_values,
@@ -254,7 +269,6 @@ def xlookup(
     )
     if index is None:
         return scalar(context, if_not_found)
-    return_rows = matrix(context, return_array)
     if len(return_rows) == len(lookup_values):
         selected = return_rows[index]
         return selected[0] if len(selected) == 1 else rectangular([selected])
@@ -279,15 +293,15 @@ def lookup(
     """Return the last value less than or equal to a lookup value."""
     lookup_values = flatten(context, lookup_vector)
     results = lookup_values if result_vector is None else flatten(context, result_vector)
-    if len(results) != len(lookup_values):
-        return NA_ERROR
     index = _lookup_index(
         scalar(context, lookup_value),
         lookup_values,
         match_mode=-1,
         search_mode=2,
     )
-    return NA_ERROR if index is None else results[index]
+    # Excel reads the result vector by position, so it may be shorter or
+    # longer than the lookup vector.
+    return NA_ERROR if index is None or index >= len(results) else results[index]
 
 
 @register(
@@ -401,9 +415,10 @@ def match(
 ) -> Any:
     """Return the one-based position of a lookup value."""
     selected_match = number(scalar(context, match_type))
-    if is_error(selected_match) or int(selected_match) not in (-1, 0, 1):
+    if is_error(selected_match):
         return NA_ERROR
-    selected_match = int(selected_match)
+    # Only the sign matters: any positive type means 1, any negative -1.
+    selected_match = (selected_match > 0) - (selected_match < 0)
     mode = 0 if selected_match == 0 else (-1 if selected_match == 1 else 1)
     index_value = _lookup_index(
         scalar(context, lookup_value),
@@ -622,6 +637,10 @@ def filter_function(
     elif include_height == 1 and include_width == width and (width > 1 or height == 1):
         by_columns = True
         flags = include_rows[0]
+    elif include_height == 1 and include_width == 1:
+        # A single include value applies to every row, as in Excel.
+        by_columns = False
+        flags = [include_rows[0][0]] * height
     else:
         return VALUE_ERROR
     keep: list[bool] = []

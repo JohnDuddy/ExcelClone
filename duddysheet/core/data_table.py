@@ -90,11 +90,13 @@ def dependency_ranges(spec: DataTableSpec, sheet_name: str) -> list[RangeReferen
 class WhatIfEvaluator(FormulaEvaluator):
     """Evaluate formulas as if some cells held other values."""
 
-    def __init__(self, engine: Any, overrides: dict[CellAddress, Any]) -> None:
+    def __init__(self, engine: Any, overrides: dict[CellAddress, Any], affected: set[CellAddress] | None = None) -> None:
         super().__init__(engine.workbook)
         self.engine = engine
         self.overrides = overrides
-        self.affected = engine._affected_formulas(set(overrides)) - set(overrides)
+        if affected is None:
+            affected = engine._affected_formulas(set(overrides)) - set(overrides)
+        self.affected = affected
         self.memo: dict[CellAddress, Any] = {}
         self.active: set[CellAddress] = set()
 
@@ -174,9 +176,18 @@ class WhatIfEvaluator(FormulaEvaluator):
         return block
 
 
-def evaluate_with(engine: Any, formula_address: CellAddress, overrides: dict[CellAddress, Any]) -> Any:
-    """Return a formula cell's value with some inputs replaced."""
-    evaluator = WhatIfEvaluator(engine, overrides)
+def evaluate_with(
+    engine: Any,
+    formula_address: CellAddress,
+    overrides: dict[CellAddress, Any],
+    affected: set[CellAddress] | None = None,
+) -> Any:
+    """Return a formula cell's value with some inputs replaced.
+
+    ``affected`` (the formulas that depend on the overridden cells) can be
+    passed in when many cells share the same inputs, as a data table's do.
+    """
+    evaluator = WhatIfEvaluator(engine, overrides, affected)
     if formula_address in overrides:
         return overrides[formula_address]
     ast = engine._asts.get(formula_address)
@@ -200,6 +211,16 @@ def compute_data_table(engine: Any, sheet_name: str, spec: DataTableSpec) -> dic
 
     top, left, bottom, right = spec.interior
     results: dict[tuple[int, int], Any] = {}
+    # Every interior cell overrides the same input cells, so the formulas
+    # that depend on them are found once for the whole table (the table's own
+    # cells are left out: they never feed their own inputs).
+    inputs = {address(item) for item in (spec.row_input, spec.column_input) if item is not None}
+    own = {
+        CellAddress(sheet.name, row, column)
+        for row in range(top, bottom + 1)
+        for column in range(left, right + 1)
+    }
+    affected = engine._affected_formulas(inputs) - inputs - own
     for row in range(top, bottom + 1):
         for column in range(left, right + 1):
             overrides: dict[CellAddress, Any] = {}
@@ -214,7 +235,7 @@ def compute_data_table(engine: Any, sheet_name: str, spec: DataTableSpec) -> dic
                 formula = CellAddress(sheet.name, row, spec.left)
                 overrides[address(spec.row_input)] = sheet.get_cell(spec.top, column).display_value
             try:
-                value = evaluate_with(engine, formula, overrides)
+                value = evaluate_with(engine, formula, overrides, affected)
             except RecursionError:
                 value = CIRC_ERROR
             results[(row, column)] = value

@@ -52,6 +52,7 @@ class FormulaEngine:
         self.calc_generation = 0
         self._asts: dict[CellAddress, Node] = {}
         self._range_precedents: dict[CellAddress, tuple[RangeReference, ...]] = {}
+        self._range_version = 0
         self._volatile: set[CellAddress] = set()
         self._spill_cells: dict[CellAddress, set[CellAddress]] = {}
         self._spill_owners: dict[CellAddress, CellAddress] = {}
@@ -99,6 +100,7 @@ class FormulaEngine:
         if ast is None:
             self._asts.pop(address, None)
             self._range_precedents.pop(address, None)
+            self._range_version += 1
             self._volatile.discard(address)
             self.graph.set_precedents(address, set())
         else:
@@ -145,6 +147,7 @@ class FormulaEngine:
         self.graph = DependencyGraph()
         self._asts.clear()
         self._range_precedents.clear()
+        self._range_version += 1
         self._volatile.clear()
         self._spill_cells.clear()
         self._spill_owners.clear()
@@ -197,8 +200,10 @@ class FormulaEngine:
             self._volatile.discard(address)
         if ranges:
             self._range_precedents[address] = tuple(ranges)
+            self._range_version += 1
         else:
             self._range_precedents.pop(address, None)
+            self._range_version += 1
 
     def _is_table_formula(self, address: CellAddress) -> bool:
         from duddysheet.core.parser import FunctionNode
@@ -343,17 +348,29 @@ class FormulaEngine:
         return affected & self._asts.keys()
 
     def _range_dependents(self, address: CellAddress) -> set[CellAddress]:
+        index = self._range_index()
         dependents: set[CellAddress] = set()
+        row, column = address.row, address.column
+        for min_row, max_row, min_column, max_column, formula in index.get(address.sheet.casefold(), ()):
+            if min_row <= row <= max_row and min_column <= column <= max_column:
+                dependents.add(formula)
+        return dependents
+
+    def _range_index(self) -> dict[str, list[tuple[int, int, int, int, CellAddress]]]:
+        """Range precedents as plain bounds grouped by sheet, rebuilt when they change."""
+        signature = (id(self._range_precedents), len(self._range_precedents), self._range_version)
+        cached = getattr(self, "_range_index_cache", None)
+        if cached is not None and cached[0] == signature:
+            return cached[1]
+        index: dict[str, list[tuple[int, int, int, int, CellAddress]]] = {}
         for formula, ranges in self._range_precedents.items():
             for reference in ranges:
-                sheet_name = reference.sheet or formula.sheet
-                if (
-                    sheet_name.casefold() == address.sheet.casefold()
-                    and reference.contains(address.row, address.column)
-                ):
-                    dependents.add(formula)
-                    break
-        return dependents
+                sheet_name = (reference.sheet or formula.sheet).casefold()
+                index.setdefault(sheet_name, []).append(
+                    (reference.min_row, reference.max_row, reference.min_column, reference.max_column, formula)
+                )
+        self._range_index_cache = (signature, index)
+        return index
 
     def _calculate_nodes(
         self,

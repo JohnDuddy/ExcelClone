@@ -24,11 +24,14 @@ from duddysheet.core.printing import setup_from_dict, setup_to_dict
 from duddysheet.core.refs import RangeReference, parse_a1
 from duddysheet.core.sparkline import Sparkline
 from duddysheet.core.data_table import data_table_from_dict, data_table_to_dict
-from duddysheet.core.pivot import pivot_from_dict, pivot_to_dict
+from duddysheet.core.pivot import pivot_from_dict, pivot_to_dict, slicer_from_dict, slicer_to_dict
+from duddysheet.core.solver import model_from_dict, model_to_dict
+from duddysheet.core.drawings import drawing_from_dict, drawing_to_dict
+from duddysheet.core.comments import thread_from_dict, thread_to_dict
 from duddysheet.core.tables import table_from_dict, table_to_dict
 from duddysheet.core.workbook import WORKBOOK_OPTIONS, Workbook
 
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 6
 Migration = Callable[[dict[str, Any], dict[str, dict[str, Any]]], None]
 
 
@@ -64,11 +67,20 @@ def _migrate_v4_to_v5(
     del manifest, sheet_data
 
 
+def _migrate_v5_to_v6(
+    manifest: dict[str, Any],
+    sheet_data: dict[str, dict[str, Any]],
+) -> None:
+    """Accept v5 sheets: no slicers, Solver models, drawings, or comment threads."""
+    del manifest, sheet_data
+
+
 MIGRATIONS: dict[int, Migration] = {
     1: _migrate_v1_to_v2,
     2: _migrate_v2_to_v3,
     3: _migrate_v3_to_v4,
     4: _migrate_v4_to_v5,
+    5: _migrate_v5_to_v6,
 }
 
 
@@ -242,6 +254,10 @@ def _sheet_to_data(sheet: Any) -> dict[str, Any]:
         "default_row_height": sheet.default_row_height,
         "tables": [table_to_dict(item) for item in sheet.tables],
         "pivots": [pivot_to_dict(item) for item in sheet.pivots],
+        "slicers": [slicer_to_dict(item) for item in sheet.slicers],
+        "drawings": [drawing_to_dict(item) for item in sheet.drawings],
+        "comments": [[row, column, thread_to_dict(thread)] for (row, column), thread in sorted(sheet.comments.items())],
+        "solver": model_to_dict(sheet.solver) if sheet.solver is not None else None,
         "data_tables": [data_table_to_dict(item) for item in sheet.data_tables],
     }
 
@@ -342,6 +358,10 @@ def _restore_sheet(sheet: Any, data: dict[str, Any]) -> None:
     sheet.default_row_height = data.get("default_row_height")
     sheet.tables = [table_from_dict(item) for item in data.get("tables", ())]
     sheet.pivots = [pivot_from_dict(item) for item in data.get("pivots", ())]
+    sheet.slicers = [slicer_from_dict(item) for item in data.get("slicers", ())]
+    sheet.drawings = [drawing_from_dict(item) for item in data.get("drawings", ())]
+    sheet.comments = {(int(row), int(column)): thread_from_dict(thread) for row, column, thread in data.get("comments", ())}
+    sheet.solver = model_from_dict(data["solver"]) if data.get("solver") else None
     sheet.data_tables = [data_table_from_dict(item) for item in data.get("data_tables", ())]
 
 
