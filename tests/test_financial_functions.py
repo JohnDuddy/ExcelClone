@@ -129,7 +129,7 @@ def test_security_functions_support_every_documented_day_count_basis(
 @pytest.mark.parametrize(
     ("formula", "expected"),
     [
-        ("=MIRR({1,2,3},0.1,0.1)", NUM_ERROR),
+        ("=MIRR({1,2,3},0.1,0.1)", DIV_ZERO_ERROR),
         ("=NOMINAL(0.05,0)", NUM_ERROR),
         ("=FVSCHEDULE(100,{0,-1,0.5})", 0),
         ("=CUMPRINC(0.01,12,1000,1,6,2)", NUM_ERROR),
@@ -141,7 +141,7 @@ def test_security_functions_support_every_documented_day_count_basis(
         ("=PRICE(DATE(2030,1,1),DATE(2025,1,1),0.05,0.06,100,2)", NUM_ERROR),
         ("=YIELD(DATE(2025,1,1),DATE(2030,1,1),0.05,-1,100,2)", NUM_ERROR),
         ("=RECEIVED(DATE(2025,1,1),DATE(2025,7,1),100,3)", NUM_ERROR),
-        ("=PRICEDISC(DATE(2025,1,1),DATE(2025,7,1),3,100)", NUM_ERROR),
+        ("=PRICEDISC(DATE(2025,1,1),DATE(2025,7,1),3,100)", -50),
         ("=TBILLYIELD(DATE(2025,7,1),DATE(2025,1,1),97)", NUM_ERROR),
         ("=COUPNUM(DATE(2025,1,1),DATE(2030,1,1),3)", NUM_ERROR),
     ],
@@ -167,7 +167,8 @@ def test_depreciation_switches_and_accrual_modes_are_calculated() -> None:
 
     assert switched > 0
     assert declining_only > 0
-    assert from_issue > from_first_coupon > 0
+    # Excel accrues from the issue date whichever calc_method is given.
+    assert from_issue == pytest.approx(from_first_coupon) == pytest.approx(60.49723756906077)
 
 
 def test_actual_coupon_days_match_excel_for_month_end_schedule() -> None:

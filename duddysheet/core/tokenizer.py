@@ -48,6 +48,9 @@ class TokenKind(Enum):
     RIGHT_PAREN = auto()
     LEFT_BRACE = auto()
     RIGHT_BRACE = auto()
+    AT = auto()
+    HASH = auto()
+    STRUCTURED = auto()
     EOF = auto()
 
 
@@ -66,6 +69,12 @@ _NUMBER_RE = re.compile(
 _CELL_RE = re.compile(r"\$?[A-Za-z]{1,3}\$?[1-9][0-9]*")
 _IDENTIFIER_RE = re.compile(r"[A-Za-z_\\][A-Za-z0-9_.\\]*")
 _ERROR_LITERALS = (
+    "#GETTING_DATA",
+    "#BLOCKED!",
+    "#CONNECT!",
+    "#UNKNOWN!",
+    "#FIELD!",
+    "#CALC!",
     "#SPILL!",
     "#DIV/0!",
     "#VALUE!",
@@ -100,6 +109,7 @@ _ONE_CHARACTER_TOKENS = {
     ")": TokenKind.RIGHT_PAREN,
     "{": TokenKind.LEFT_BRACE,
     "}": TokenKind.RIGHT_BRACE,
+    "@": TokenKind.AT,
 }
 
 
@@ -146,9 +156,31 @@ def tokenize(formula: str) -> list[Token]:
                 None,
             )
             if literal is None:
+                if raw_tokens and raw_tokens[-1].kind in (
+                    TokenKind.CELL,
+                    TokenKind.IDENTIFIER,
+                    TokenKind.RIGHT_PAREN,
+                ):
+                    raw_tokens.append(Token(TokenKind.HASH, "#", absolute_position))
+                    position += 1
+                    continue
                 raise FormulaSyntaxError("Unknown error literal", absolute_position)
             raw_tokens.append(Token(TokenKind.ERROR, literal, absolute_position))
             position += len(literal)
+            continue
+
+        if character == "[":
+            # Structured reference: Table1[...] or a bare [...] inside a table.
+            inner, position = _read_brackets(source, position, offset=offset)
+            table = None
+            if (
+                raw_tokens
+                and raw_tokens[-1].kind is TokenKind.IDENTIFIER
+                and raw_tokens[-1].position + len(str(raw_tokens[-1].value)) == absolute_position
+            ):
+                table = str(raw_tokens.pop().value)
+                absolute_position -= len(table)
+            raw_tokens.append(Token(TokenKind.STRUCTURED, (table, inner), absolute_position))
             continue
 
         two_character = source[position : position + 2]
@@ -260,6 +292,25 @@ def _read_quoted_name(
     raise FormulaSyntaxError("Unterminated quoted name", start + offset)
 
 
+def _read_brackets(source: str, start: int, *, offset: int) -> tuple[str, int]:
+    """Read a balanced [...] group (with ' escapes); return (inside, end)."""
+    depth = 0
+    position = start
+    while position < len(source):
+        character = source[position]
+        if character == "'" and position + 1 < len(source):
+            position += 2
+            continue
+        if character == "[":
+            depth += 1
+        elif character == "]":
+            depth -= 1
+            if depth == 0:
+                return source[start + 1 : position], position + 1
+        position += 1
+    raise FormulaSyntaxError("Unterminated structured reference", start + offset)
+
+
 def _is_lexeme_boundary(source: str, position: int) -> bool:
     return position >= len(source) or not (
         source[position].isalnum() or source[position] in "_.\\"
@@ -295,6 +346,7 @@ def _neighbor(tokens: list[Token], index: int, *, direction: int) -> Token | Non
 
 def _can_end_reference(kind: TokenKind) -> bool:
     return kind in {
+        TokenKind.STRUCTURED,
         TokenKind.CELL,
         TokenKind.IDENTIFIER,
         TokenKind.NUMBER,
@@ -304,6 +356,7 @@ def _can_end_reference(kind: TokenKind) -> bool:
 
 def _can_start_reference(kind: TokenKind) -> bool:
     return kind in {
+        TokenKind.STRUCTURED,
         TokenKind.CELL,
         TokenKind.IDENTIFIER,
         TokenKind.QUOTED_NAME,

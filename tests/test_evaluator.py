@@ -197,7 +197,8 @@ def test_registered_function_can_flatten_ranges_arrays_and_unions() -> None:
 
     assert evaluator.evaluate("=TOTAL(A1:A3)") == 6
     assert evaluator.evaluate("=TOTAL({1,2;3,4})") == 10
-    assert evaluator.evaluate("=TOTAL((A1:A2,A2:A3))") == 6
+    # Excel counts a cell twice when union areas overlap.
+    assert evaluator.evaluate("=TOTAL((A1:A2,A2:A3))") == 8
 
 
 def test_registered_function_receives_scalar_reference_helper() -> None:
@@ -309,16 +310,31 @@ def test_text_coercion_handles_blank_boolean_and_integral_float() -> None:
     assert evaluator.evaluate('=C1&"x"') == "3x"
 
 
-def test_implicit_intersection_uses_formula_row_then_column_then_first_cell() -> None:
+def test_at_operator_intersects_with_the_formula_row_or_column() -> None:
     workbook = Workbook()
     workbook.active_sheet.set_cell(1, 0, 20)
     workbook.active_sheet.set_cell(0, 1, 30)
     workbook.active_sheet.set_cell(0, 0, 10)
+    workbook.active_sheet.set_cell(1, 1, 40)
     evaluator = FormulaEvaluator(workbook)
 
-    assert evaluator.evaluate("=A1:A3", origin=(1, 5)) == 20
-    assert evaluator.evaluate("=A1:C1", origin=(5, 1)) == 30
-    assert evaluator.evaluate("=A1:B2", origin=(5, 5)) == 10
+    assert evaluator.evaluate("=@A1:A3", origin=(1, 5)) == 20
+    assert evaluator.evaluate("=@A1:C1", origin=(5, 1)) == 30
+    assert evaluator.evaluate("=@A1:B2", origin=(1, 1)) == 40
+    # Excel returns #VALUE! when the formula cell shares no row or column.
+    assert evaluator.evaluate("=@A1:A3", origin=(5, 5)) == VALUE_ERROR
+    assert evaluator.evaluate("=@A1:B2", origin=(5, 5)) == VALUE_ERROR
+    assert evaluator.evaluate("=@{7,8;9,10}") == 7
+
+
+def test_bare_multi_cell_reference_spills_with_blanks_as_zero() -> None:
+    workbook = Workbook()
+    workbook.active_sheet.set_cell(0, 0, 10)
+    workbook.active_sheet.set_cell(2, 0, 30)
+    evaluator = FormulaEvaluator(workbook)
+
+    assert evaluator.evaluate("=A1:A3", origin=(1, 5)) == ((10,), (0,), (30,))
+    assert evaluator.evaluate("=A2") == 0
 
 
 def test_sheet_scoped_name_can_be_qualified_explicitly() -> None:

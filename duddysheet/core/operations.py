@@ -88,7 +88,61 @@ def edit_structure(
             delete=delete,
         )
 
+    _translate_tables(target, axis=axis, index=index, count=count, delete=delete)
+    _translate_pivot_sources(workbook, target.name, axis=axis, index=index, count=count, delete=delete)
+    if target.drawings:
+        from duddysheet.core.drawings import shift_drawings
+
+        target.drawings = shift_drawings(target.drawings, axis, index, count, delete)
+    if target.comments:
+        from duddysheet.core.comments import shift_comments
+
+        target.comments = shift_comments(target.comments, axis, index, count, delete)
+    _translate_defined_names(
+        workbook,
+        target_name=target.name,
+        axis=axis,
+        index=index,
+        count=count,
+        delete=delete,
+    )
     _move_cells(target, axis=axis, index=index, count=count, delete=delete)
+    _refresh_table_headers(target)
+    if axis == "row" and not delete:
+        _fill_inserted_table_rows(target, index, count)
+    _move_notes(target, axis=axis, index=index, count=count, delete=delete)
+    if axis == "row":
+        target.row_outline = _move_index_map(
+            target.row_outline,
+            index=index,
+            count=count,
+            delete=delete,
+            limit=MAX_ROWS,
+        )
+    else:
+        target.column_outline = _move_index_map(
+            target.column_outline,
+            index=index,
+            count=count,
+            delete=delete,
+            limit=MAX_COLUMNS,
+        )
+    if axis == "row":
+        target.row_formats = _move_index_map(
+            target.row_formats,
+            index=index,
+            count=count,
+            delete=delete,
+            limit=MAX_ROWS,
+        )
+    else:
+        target.column_formats = _move_index_map(
+            target.column_formats,
+            index=index,
+            count=count,
+            delete=delete,
+            limit=MAX_COLUMNS,
+        )
     if axis == "row":
         target.row_heights = _move_index_map(
             target.row_heights,
@@ -256,6 +310,25 @@ def _move_cells(
         sheet.put_cell(target_row, target_column, cell)
 
 
+def _move_notes(
+    sheet: object,
+    *,
+    axis: str,
+    index: int,
+    count: int,
+    delete: bool,
+) -> None:
+    limit = MAX_ROWS if axis == "row" else MAX_COLUMNS
+    moved_notes: dict[tuple[int, int], object] = {}
+    for (row, column), note in sheet.notes.items():
+        coordinate = row if axis == "row" else column
+        moved = _move_index(coordinate, index=index, count=count, delete=delete, limit=limit)
+        if moved is None:
+            continue
+        moved_notes[(moved, column) if axis == "row" else (row, moved)] = note
+    sheet.notes = moved_notes
+
+
 def _move_index(
     value: int,
     *,
@@ -364,3 +437,166 @@ def _translate_sparklines(
             replace(sparkline, row=row, column=column, data_range=data_range)
         )
     return translated
+
+
+def _translate_defined_names(
+    workbook: Workbook,
+    *,
+    target_name: str,
+    axis: str,
+    index: int,
+    count: int,
+    delete: bool,
+) -> None:
+    """Move defined names with the cells they refer to, as Excel does."""
+    for defined in workbook.defined_names:
+        if defined.reference is not None:
+            sheet = defined.reference.sheet
+            if sheet is None or sheet.casefold() != target_name.casefold():
+                continue
+            translated = translate_reference_structure(
+                defined.reference,
+                axis=axis,
+                index=index,
+                count=count,
+                delete=delete,
+            )
+            if translated is None:
+                workbook.put_name(replace(defined, reference=None, formula="=#REF!"))
+            elif translated != defined.reference:
+                workbook.put_name(replace(defined, reference=translated))
+            continue
+        if defined.formula is None:
+            continue
+        formula = translate_formula_structure(
+            defined.formula,
+            formula_sheet=defined.scope or "\0",
+            target_sheet=target_name,
+            axis=axis,
+            index=index,
+            count=count,
+            delete=delete,
+        )
+        if formula != defined.formula:
+            workbook.put_name(replace(defined, formula=formula))
+
+
+def _translate_tables(
+    sheet: object,
+    *,
+    axis: str,
+    index: int,
+    count: int,
+    delete: bool,
+) -> None:
+    """Grow, shrink, or move tables, pivots, and data tables with inserted cells."""
+    from duddysheet.core.tables import TableSpec
+
+    kept: list[TableSpec] = []
+    for table in sheet.tables:
+        reference = RangeReference(
+            CellReference(table.top, table.left),
+            CellReference(table.bottom, table.right),
+        )
+        moved = translate_reference_structure(reference, axis=axis, index=index, count=count, delete=delete)
+        if moved is None:
+            continue
+        if isinstance(moved, CellReference):
+            moved = RangeReference(moved, moved)
+        if axis == "row" and delete and table.top >= index and table.top < index + count:
+            continue
+        kept.append(
+            replace(
+                table,
+                top=moved.min_row,
+                left=moved.min_column,
+                bottom=moved.max_row,
+                right=moved.max_column,
+            )
+        )
+    sheet.tables = kept
+
+    def move_rect(rect: tuple[int, int, int, int]) -> tuple[int, int, int, int] | None:
+        reference = RangeReference(CellReference(rect[0], rect[1]), CellReference(rect[2], rect[3]))
+        moved = translate_reference_structure(reference, axis=axis, index=index, count=count, delete=delete)
+        if moved is None:
+            return None
+        if isinstance(moved, CellReference):
+            moved = RangeReference(moved, moved)
+        return (moved.min_row, moved.min_column, moved.max_row, moved.max_column)
+
+    def move_cell(sheet_name: str, row: int, column: int) -> tuple[str, int, int] | None:
+        moved = translate_reference_structure(
+            CellReference(row, column), axis=axis, index=index, count=count, delete=delete
+        )
+        if not isinstance(moved, CellReference):
+            return None
+        return (sheet_name, moved.row, moved.column)
+
+    pivots = []
+    for pivot in sheet.pivots:
+        anchor = move_cell(sheet.name, *pivot.anchor)
+        if anchor is None:
+            continue
+        extent = move_rect(pivot.extent) if pivot.extent is not None else None
+        pivots.append(replace(pivot, anchor=anchor[1:], extent=extent))
+    sheet.pivots = pivots
+    data_tables = []
+    for spec in sheet.data_tables:
+        rect = move_rect((spec.top, spec.left, spec.bottom, spec.right))
+        if rect is None or rect[2] <= rect[0] or rect[3] <= rect[1]:
+            continue
+        row_input = spec.row_input
+        column_input = spec.column_input
+        if row_input is not None and row_input[0].casefold() == sheet.name.casefold():
+            row_input = move_cell(*row_input)
+        if column_input is not None and column_input[0].casefold() == sheet.name.casefold():
+            column_input = move_cell(*column_input)
+        data_tables.append(replace(spec, top=rect[0], left=rect[1], bottom=rect[2], right=rect[3], row_input=row_input, column_input=column_input))
+    sheet.data_tables = data_tables
+
+
+def _translate_pivot_sources(workbook: object, sheet_name: str, *, axis: str, index: int, count: int, delete: bool) -> None:
+    """PivotTable sources follow structural edits on their source sheet."""
+    folded = sheet_name.casefold()
+    for host in workbook:
+        updated = []
+        for pivot in host.pivots:
+            if pivot.source_sheet.casefold() == folded and pivot.source_table is None:
+                top, left, bottom, right = pivot.source
+                reference = RangeReference(CellReference(top, left), CellReference(bottom, right))
+                moved = translate_reference_structure(reference, axis=axis, index=index, count=count, delete=delete)
+                if isinstance(moved, CellReference):
+                    moved = RangeReference(moved, moved)
+                if moved is not None:
+                    pivot = replace(pivot, source=(moved.min_row, moved.min_column, moved.max_row, moved.max_column))
+            updated.append(pivot)
+        host.pivots = updated
+
+
+def _refresh_table_headers(sheet: object) -> None:
+    """After cells move, name new table columns and write their headers."""
+    from duddysheet.core.tables import header_names
+
+    refreshed = []
+    for table in sheet.tables:
+        if len(table.columns) != table.right - table.left + 1:
+            columns = header_names(sheet, table.top, table.left, table.right)
+            for offset, name in enumerate(columns):
+                if sheet.get_cell(table.top, table.left + offset).display_value in (None, ""):
+                    sheet.set_cell(table.top, table.left + offset, name)
+            table = replace(table, columns=columns)
+        refreshed.append(table)
+    sheet.tables = refreshed
+
+
+def _fill_inserted_table_rows(sheet: object, index: int, count: int) -> None:
+    """Rows inserted inside a table pick up its calculated-column formulas."""
+    from duddysheet.core.tables import fill_calculated
+
+    for table in sheet.tables:
+        if not table.calculated:
+            continue
+        for row in range(index, index + count):
+            if table.first_data_row <= row <= table.last_data_row:
+                fill_calculated(sheet, table, row)

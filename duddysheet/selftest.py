@@ -182,11 +182,105 @@ def _check_licensing() -> str:
     raise AssertionError("a forged key was accepted")
 
 
+def _check_analysis_features() -> str:
+    """Tables, PivotTables, and data tables calculate and survive both file formats."""
+    from duddysheet.core.analysis_help import build_practice_workbook
+    from duddysheet.core.engine import FormulaEngine
+    from duddysheet.io.native import load_native, save_native
+    from duddysheet.io.xlsx_reader import read_xlsx
+    from duddysheet.io.xlsx_writer import write_xlsx
+
+    workbook = build_practice_workbook()
+    if workbook.get_sheet("Sales").get_cell(11, 5).display_value != 1635:
+        raise AssertionError("table total row did not calculate")
+    if workbook.get_sheet("Pivot").get_cell(7, 3).display_value != 1635:
+        raise AssertionError("PivotTable grand total is wrong")
+    payment = workbook.get_sheet("Loan").get_cell(8, 5).display_value
+    if not isinstance(payment, float) or round(payment, 2) != 1342.05:
+        raise AssertionError(f"data table returned {payment!r}")
+    with tempfile.TemporaryDirectory() as directory:
+        native = Path(directory) / "analysis.dsheet"
+        save_native(workbook, native)
+        reloaded = load_native(native)
+        FormulaEngine(reloaded).recalculate()
+        excel = Path(directory) / "analysis.xlsx"
+        write_xlsx(workbook, excel)
+        loaded = read_xlsx(excel)
+    for copy, label in ((reloaded, ".dsheet"), (loaded.workbook, ".xlsx")):
+        if not copy.get_sheet("Sales").tables or not copy.get_sheet("Pivot").pivots:
+            raise AssertionError(f"{label} lost a table or PivotTable")
+        if not copy.get_sheet("Loan").data_tables:
+            raise AssertionError(f"{label} lost a data table")
+    if loaded.warnings:
+        raise AssertionError(f"xlsx round trip warned: {loaded.warnings}")
+    return "tables, PivotTables, and data tables ok"
+
+
+def _check_excel_objects() -> str:
+    """Charts and sparklines are written as Excel objects and read back."""
+    from duddysheet.core.chart import ChartSpec
+    from duddysheet.core.engine import FormulaEngine
+    from duddysheet.core.refs import parse_a1
+    from duddysheet.core.sparkline import build_sparklines
+    from duddysheet.core.workbook import Workbook
+    from duddysheet.io.xlsx_reader import read_xlsx
+    from duddysheet.io.xlsx_writer import write_xlsx
+
+    workbook = Workbook()
+    engine = FormulaEngine(workbook)
+    sheet = workbook.active_sheet
+    for row, values in enumerate((("Month", "Sales"), ("Jan", 4), ("Feb", 7), ("Mar", 5))):
+        for column, value in enumerate(values):
+            engine.set_cell(sheet.name, row, column, value)
+    for chart_type in ("column", "pie", "histogram", "waterfall"):
+        sheet.charts.append(ChartSpec(chart_type, sheet.name, parse_a1("A1:B4"), chart_type, title=chart_type))
+    sheet.sparklines.extend(build_sparklines(parse_a1("B2:B4"), parse_a1("C1"), "line"))
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "objects.xlsx"
+        write_xlsx(workbook, path)
+        loaded = read_xlsx(path).workbook.active_sheet
+    kinds = [chart.chart_type for chart in loaded.charts]
+    if kinds != ["column", "pie", "histogram", "waterfall"] or len(loaded.sparklines) != 1:
+        raise AssertionError(f"xlsx objects came back as {kinds} and {len(loaded.sparklines)} sparklines")
+    return "Excel charts and sparklines ok"
+
+
+def _check_excel_parity() -> str:
+    """A sample of results verified in Microsoft Excel, and its entry rules."""
+    from duddysheet.core.entry_rules import validate_entry
+    from duddysheet.core.evaluator import FormulaEvaluator
+    from duddysheet.core.tokenizer import FormulaSyntaxError
+    from duddysheet.core.workbook import Workbook
+
+    samples = {
+        "=ACCRINT(DATE(2025,1,1),DATE(2025,7,1),DATE(2026,1,1),0.06,1000,2,1)": 60.49723756906077,
+        "=CEILING(-4.5,2)": -4,
+        "=NPER(0.01,1,1)": -1,
+        "=XLOOKUP(\"b\",{\"a\",\"b\",\"c\"},{10,20,30})": 20,
+        "=FORECAST.ETS.SEASONALITY({1,2,3,4,1,2,3,4,1,2,3,4},{1,2,3,4,5,6,7,8,9,10,11,12})": 4,
+    }
+    evaluator = FormulaEvaluator(Workbook())
+    for formula, expected in samples.items():
+        actual = evaluator.evaluate(formula)
+        if not isinstance(actual, (int, float)) or abs(actual - expected) > 1e-9 * max(1, abs(expected)):
+            raise AssertionError(f"{formula} gave {actual!r}, Excel gives {expected!r}")
+    try:
+        validate_entry('=COUNTIF({1,2,3},">1")')
+    except FormulaSyntaxError:
+        pass
+    else:
+        raise AssertionError("a formula Excel refuses was accepted")
+    return f"Excel parity ok ({len(samples)} samples)"
+
+
 CHECKS: tuple[tuple[str, Callable[[], str]], ...] = (
     ("Bundled resources", _check_bundled_resources),
     ("Formula engine", _check_formula_engine),
+    ("Excel parity", _check_excel_parity),
     ("Native file format", _check_native_round_trip),
     ("Excel interoperability", _check_xlsx_round_trip),
+    ("Excel charts and sparklines", _check_excel_objects),
+    ("Tables, PivotTables, data tables", _check_analysis_features),
     ("Financial models", _check_financial_models),
     ("Charts", _check_charts),
     ("PDF export", _check_pdf_export),

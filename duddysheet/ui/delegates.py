@@ -6,8 +6,8 @@ import math
 from typing import Any
 
 from PySide6.QtCore import QEvent, QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QKeyEvent, QPainter, QPen, QPolygonF
-from PySide6.QtWidgets import QLineEdit, QStyledItemDelegate, QStyleOptionViewItem, QWidget
+from PySide6.QtGui import QColor, QFont, QFontMetricsF, QKeyEvent, QPainter, QPen, QPolygonF
+from PySide6.QtWidgets import QApplication, QLineEdit, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QWidget
 
 from duddysheet.core.cell import BorderStyle, CellFormat
 from duddysheet.ui.completer import FunctionCompleter
@@ -28,6 +28,88 @@ _PEN_STYLES = {
     "double": (3, Qt.PenStyle.SolidLine),
     "hair": (1, Qt.PenStyle.DotLine),
 }
+
+
+_POINT_TRIGGERS = set("=(,+-*/^&<>:; ")
+
+
+def clear_point(editor: Any) -> None:
+    """Forget any in-progress point-mode reference."""
+    editor.setProperty("pointSpan", None)
+    editor.setProperty("pointCell", None)
+    editor.setProperty("pointAnchor", None)
+
+
+def can_point(editor: Any) -> bool:
+    """Return whether the formula is waiting for a reference at the cursor."""
+    text = editor.text()
+    if not text.startswith("="):
+        return False
+    if editor.property("pointSpan") is not None:
+        return True
+    position = editor.cursorPosition()
+    return position > 0 and text[position - 1] in _POINT_TRIGGERS
+
+
+def insert_point_reference(
+    editor: Any,
+    row: int,
+    column: int,
+    *,
+    anchor: tuple[int, int] | None = None,
+) -> None:
+    """Insert or replace the point-mode reference with a cell or range."""
+    from duddysheet.core.refs import CellReference, RangeReference
+
+    text = editor.text()
+    span = editor.property("pointSpan")
+    if span is None:
+        start = end = editor.cursorPosition()
+    else:
+        start, end = span
+    if anchor is not None and anchor != (row, column):
+        top, bottom = sorted((anchor[0], row))
+        left, right = sorted((anchor[1], column))
+        reference = RangeReference(CellReference(top, left), CellReference(bottom, right)).to_a1()
+    else:
+        reference = CellReference(row, column).to_a1(include_sheet=False)
+    editor.setText(text[:start] + reference + text[end:])
+    editor.setCursorPosition(start + len(reference))
+    editor.setProperty("pointSpan", (start, start + len(reference)))
+    editor.setProperty("pointCell", (row, column))
+
+
+def point_reference(
+    editor: Any,
+    view: Any,
+    d_row: int,
+    d_column: int,
+    *,
+    extend: bool,
+    to_edge: bool,
+) -> bool:
+    """Excel point mode: arrow keys while typing a formula insert a reference."""
+    if not can_point(editor):
+        return False
+    current = view.currentIndex()
+    base = editor.property("pointCell") or (current.row(), current.column())
+    anchor = editor.property("pointAnchor")
+    if extend and anchor is None:
+        anchor = tuple(base)
+        editor.setProperty("pointAnchor", anchor)
+    if not extend:
+        editor.setProperty("pointAnchor", None)
+        anchor = None
+    if to_edge:
+        from duddysheet.core.navigation import data_edge
+
+        row, column = data_edge(view.grid_model.sheet, base[0], base[1], d_row, d_column)
+    else:
+        row = max(0, base[0] + d_row)
+        column = max(0, base[1] + d_column)
+    insert_point_reference(editor, row, column, anchor=anchor)
+    view.scrollTo(view.grid_model.index(row, column))
+    return True
 
 
 def _completer_for(editor: Any) -> FunctionCompleter | None:
@@ -54,12 +136,58 @@ class CellDelegate(QStyledItemDelegate):
         return editor
 
     def eventFilter(self, editor: Any, event: QEvent) -> bool:
-        """Let an open suggestion list claim navigation keys before the view."""
+        """Excel editing keys: suggestions first, then point mode, then commit-and-move."""
         if event.type() == QEvent.Type.KeyPress and isinstance(event, QKeyEvent):
             completer = _completer_for(editor)
             if completer is not None and completer.handle_key(event):
                 return True
+            if isinstance(editor, QLineEdit) and self._handle_excel_key(editor, event):
+                return True
         return super().eventFilter(editor, event)
+
+    _MOVES = {
+        Qt.Key.Key_Up: (-1, 0),
+        Qt.Key.Key_Down: (1, 0),
+        Qt.Key.Key_Left: (0, -1),
+        Qt.Key.Key_Right: (0, 1),
+    }
+
+    def _view(self) -> Any:
+        view = self.parent()
+        return view if hasattr(view, "move_after_edit") else None
+
+    def _commit_and_move(self, editor: QLineEdit, d_row: int, d_column: int) -> None:
+        view = self._view()
+        self.commitData.emit(editor)
+        self.closeEditor.emit(editor, QStyledItemDelegate.EndEditHint.NoHint)
+        if view is not None:
+            view.move_after_edit(d_row, d_column)
+
+    def _handle_excel_key(self, editor: QLineEdit, event: QKeyEvent) -> bool:
+        key = event.key()
+        modifiers = event.modifiers()
+        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        control = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        alt = bool(modifiers & Qt.KeyboardModifier.AltModifier)
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not alt and not control:
+            self._commit_and_move(editor, -1 if shift else 1, 0)
+            return True
+        if key == Qt.Key.Key_Tab:
+            self._commit_and_move(editor, 0, 1)
+            return True
+        if key == Qt.Key.Key_Backtab:
+            self._commit_and_move(editor, 0, -1)
+            return True
+        view = self._view()
+        if key in self._MOVES and not alt and view is not None and view.edit_mode == "enter":
+            d_row, d_column = self._MOVES[key]
+            if point_reference(editor, view, d_row, d_column, extend=shift, to_edge=control):
+                return True
+            self._commit_and_move(editor, d_row, d_column)
+            return True
+        if event.text():
+            clear_point(editor)
+        return False
 
     def destroyEditor(self, editor: QWidget, index: Any) -> None:
         """Dismiss any open guidance before the editor is torn down."""
@@ -90,7 +218,10 @@ class CellDelegate(QStyledItemDelegate):
         painted_option = QStyleOptionViewItem(option)
         if icon:
             painted_option.rect.adjust(16, 0, 0, 0)
-        super().paint(painter, painted_option, index)
+        if isinstance(cell_format, CellFormat) and needs_custom_text(cell_format):
+            self._paint_formatted_text(painter, painted_option, index, cell_format)
+        else:
+            super().paint(painter, painted_option, index)
 
         if icon:
             self._paint_icon(painter, option.rect, str(icon))
@@ -99,6 +230,47 @@ class CellDelegate(QStyledItemDelegate):
             paint_sparkline(painter, QRectF(option.rect), *sparkline)
         if isinstance(cell_format, CellFormat):
             self._paint_borders(painter, option.rect, cell_format)
+
+    def _paint_formatted_text(
+        self,
+        painter: QPainter,
+        option: QStyleOptionViewItem,
+        index: Any,
+        cell_format: CellFormat,
+    ) -> None:
+        """Paint a cell whose text is indented, rotated, stacked, or shrunk to fit."""
+        styled = QStyleOptionViewItem(option)
+        self.initStyleOption(styled, index)
+        text = styled.text
+        styled.text = ""
+        widget = option.widget
+        style = widget.style() if widget is not None else QApplication.style()
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, styled, painter, widget)
+        if not text:
+            return
+        painter.save()
+        painter.setClipRect(option.rect)
+        foreground = index.data(Qt.ItemDataRole.ForegroundRole)
+        color = foreground.color() if hasattr(foreground, "color") else styled.palette.text().color()
+        if option.state & QStyle.StateFlag.State_Selected and not foreground:
+            color = styled.palette.highlightedText().color()
+        painter.setPen(color)
+        font = QFont(styled.font)
+        alignment = index.data(Qt.ItemDataRole.TextAlignmentRole)
+        alignment = Qt.AlignmentFlag(int(alignment)) if alignment is not None else Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom
+        rect = QRectF(option.rect).adjusted(2, 1, -2, -1)
+        layout = text_layout(cell_format, rect, font, text)
+        painter.setFont(layout.font)
+        if layout.stacked:
+            painter.drawText(layout.rect, int(Qt.AlignmentFlag.AlignHCenter | (alignment & Qt.AlignmentFlag.AlignVertical_Mask)), "\n".join(text))
+        elif layout.angle:
+            painter.translate(layout.rect.center())
+            painter.rotate(-layout.angle)
+            box = QRectF(-layout.extent / 2, -layout.thickness / 2, layout.extent, layout.thickness)
+            painter.drawText(box, int(Qt.AlignmentFlag.AlignCenter), text)
+        else:
+            painter.drawText(layout.rect, int(alignment | Qt.TextFlag.TextSingleLine), text)
+        painter.restore()
 
     @staticmethod
     def _paint_icon(painter: QPainter, rect: Any, icon: str) -> None:
@@ -162,6 +334,53 @@ class CellDelegate(QStyledItemDelegate):
                 else:
                     painter.drawLine(start.x() - offset, start.y(), end.x() - offset, end.y())
         painter.restore()
+
+
+INDENT_PIXELS = 9
+
+
+def needs_custom_text(cell_format: CellFormat) -> bool:
+    """Whether a cell's text needs indent, rotation, stacking, or shrink-to-fit painting."""
+    return bool(cell_format.indent or cell_format.text_rotation or cell_format.shrink_to_fit)
+
+
+class TextLayout:
+    """Where and how a cell's text is drawn."""
+
+    def __init__(self, rect: QRectF, font: QFont, angle: int = 0, stacked: bool = False, extent: float = 0.0, thickness: float = 0.0) -> None:
+        self.rect = rect
+        self.font = font
+        self.angle = angle
+        self.stacked = stacked
+        self.extent = extent
+        self.thickness = thickness
+
+
+def text_layout(cell_format: CellFormat, rect: QRectF, font: QFont, text: str) -> TextLayout:
+    """Lay out a cell's text for Excel's indent, rotation (-90..90, 255 stacked), and shrink-to-fit."""
+    area = QRectF(rect)
+    if cell_format.indent:
+        shift = cell_format.indent * INDENT_PIXELS
+        if cell_format.horizontal_alignment == "right":
+            area.adjust(0, 0, -shift, 0)
+        else:
+            area.adjust(shift, 0, 0, 0)
+    used = QFont(font)
+    rotation = cell_format.text_rotation
+    if rotation == 255:
+        return TextLayout(area, used, stacked=True)
+    angle = rotation if rotation <= 90 else 90 - rotation
+    if cell_format.shrink_to_fit and not cell_format.wrap_text and not angle:
+        metrics = QFontMetricsF(used)
+        width = metrics.horizontalAdvance(text)
+        if width > area.width() > 0:
+            ratio = area.width() / width
+            if used.pointSizeF() > 0:
+                used.setPointSizeF(max(1.0, used.pointSizeF() * ratio))
+            else:
+                used.setPixelSize(max(1, int(used.pixelSize() * ratio)))
+    metrics = QFontMetricsF(used)
+    return TextLayout(area, used, angle=angle, extent=metrics.horizontalAdvance(text) + 2, thickness=metrics.height())
 
 
 def paint_sparkline(

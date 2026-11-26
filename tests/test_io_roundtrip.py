@@ -147,19 +147,26 @@ def test_xlsx_translates_future_function_prefixes_without_changing_text(tmp_path
     assert loaded.get_cell(1, 0).display_value > 0
 
 
-def test_xlsx_reader_returns_warnings_for_dropped_chart_content(tmp_path) -> None:
+def test_xlsx_reader_imports_charts_including_ones_plotting_other_sheets(tmp_path) -> None:
     path = tmp_path / "chart.xlsx"
     write_xlsx(xlsx_workbook(), path)
     package = load_workbook(path)
-    chart = BarChart()
-    chart.add_data(Reference(package["Sheet1"], min_col=1, min_row=1, max_row=1))
-    package["Sheet1"].add_chart(chart, "F2")
+    own = BarChart()
+    own.add_data(Reference(package["Sheet1"], min_col=1, min_row=1, max_row=2))
+    package["Sheet1"].add_chart(own, "F2")
+    other = package.create_sheet("Elsewhere")
+    foreign = BarChart()
+    foreign.add_data(Reference(package["Sheet1"], min_col=1, min_row=1, max_row=2))
+    other.add_chart(foreign, "B2")
     package.save(path)
     package.close()
 
     result = read_xlsx(path)
 
-    assert any("chart" in warning.lower() for warning in result.warnings)
+    assert [chart.chart_type for chart in result.workbook.get_sheet("Sheet1").charts] == ["column"]
+    (borrowed,) = result.workbook.get_sheet("Elsewhere").charts
+    assert borrowed.sheet_name == "Sheet1" and borrowed.source_range.to_a1() == "Sheet1!A1:A2"
+    assert result.warnings == ()
 
 
 def test_xlsx_reader_accepts_missing_individual_border_sides(tmp_path) -> None:

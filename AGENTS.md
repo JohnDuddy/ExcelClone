@@ -42,7 +42,31 @@ implementation details or mock internal collaborators.
 
 ## Current Milestone
 
-M13 is complete. Charting matches Excel's gallery apart from Map charts: 62
+M15 is complete. `.xlsx` carries charts (`duddysheet.io.xlsx_charts`),
+sparklines and post-save package edits (`duddysheet.io.xlsx_extras`,
+`duddysheet.io.xlsx_package`), PivotTables (`duddysheet.io.xlsx_pivots`),
+pictures and shapes (`duddysheet.io.xlsx_drawings`), and threaded comments
+(`duddysheet.io.xlsx_comments`). Function results are cross-checked against
+Microsoft Excel through `tests/fixtures/excel_function_results.json`; Excel's
+formula-entry rules live in `duddysheet.core.entry_rules` and apply to typed
+formulas only. Solver is `duddysheet.core.solver`; drawings
+`duddysheet.core.drawings` with `duddysheet.ui.drawing_layer`; the outline
+bar `duddysheet.ui.outline_bar`; Quick Analysis, Forecast Sheet, and comments
+`duddysheet.ui.extras_ui`. The native schema is 6.
+
+M14 is also complete. Excel functional parity covers Excel 365 calculation
+semantics (spills, `@`, `#`, LET, LAMBDA, 3-D references), 524 functions,
+Excel's editing and keyboard model, auditing, styles, protection, outlines,
+and calculation options. Excel Tables live in `duddysheet.core.tables`
+(structured references resolve there), PivotTables in
+`duddysheet.core.pivot`, and What-If data tables in
+`duddysheet.core.data_table` (TABLE evaluates through `WhatIfEvaluator`
+without touching real inputs). Their commands are in
+`duddysheet.commands.analysis`, their window wiring in
+`duddysheet.ui.analysis_ui`, and their tutorial (now 21 lessons) and
+practice workbook in `duddysheet.core.analysis_help`.
+
+M13 is also complete. Charting matches Excel's gallery apart from Map charts: 62
 chart types across Excel's families (including 100% stacked, 3-D, stock,
 surface, treemap, sunburst, Pareto, funnel, and custom combos), every Add
 Chart Element item, Excel's axis and series format options, Line, Column, and
@@ -50,7 +74,6 @@ Win/Loss sparklines, an Insert menu and ribbon galleries, and a 25-lesson
 Charts and Graphing Tutorial under Help. The chart catalog in
 `duddysheet.core.chart` is the single source for type names, gallery order,
 and tutorial reference tables; rendering lives in `duddysheet.ui.chart_renderer`.
-The native schema is 4.
 
 The prior M12 commercial readiness, M11 financial modeling with the Financial
 Calculations Lab, and comprehensive F1 help remain covered by the release
@@ -58,8 +81,12 @@ regression contract.
 
 ## Known Issues
 
-No shipped behavior is known to be broken. VBA, pivots, Power Query, live
-market feeds, multi-variable optimization, collaboration, and embedded Office
-objects remain intentionally outside scope. Map charts are out of scope
-because they need an online geography service. Charts and sparklines persist
-only in `.dsheet`; `.xlsx` import and export carry data without them.
+No shipped behavior is known to be broken. VBA, Power Query, live market
+feeds, collaboration, and embedded Office objects remain intentionally outside
+scope. Map charts are out of scope because they need an online geography
+service. Slicers persist only in `.dsheet` (the filter they set is kept on the
+PivotTable in `.xlsx`). Excel has no heatmap or step chart, so a heatmap is
+left out of `.xlsx` and a step chart is saved as a line chart. Known result
+differences from Excel are listed in `tests/test_excel_cross_check.py`:
+FORECAST.ETS parameter fitting and ACCRINT with month-end actual/actual
+coupons.

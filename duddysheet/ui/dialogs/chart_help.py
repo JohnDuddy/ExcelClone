@@ -921,10 +921,14 @@ Feb     135       84     0.38</pre>
         undo history, with the rest of your edits.</p>
         <h2>Saving</h2>
         <p>Charts and sparklines are saved in <code>.dsheet</code> workbooks,
-        with every setting, and reopen exactly as they were. Excel
-        <code>.xlsx</code> and CSV files cannot carry these charts: saving to
-        them keeps the data but not the charts, and charts inside an Excel
-        file you open are not imported (you are told when this happens).</p>
+        with every setting, and reopen exactly as they were. Saved as Excel
+        <code>.xlsx</code>, they become real Excel charts and sparklines, and
+        the charts and sparklines in Excel files you open are imported. Excel
+        has no Heatmap chart, so a heatmap is left out of an <code>.xlsx</code>
+        file, and a Step Line chart is saved as a Line chart; the status bar
+        says so when you save. Settings Excel has no place for, such as the
+        color theme, are kept only in <code>.dsheet</code>. CSV files hold
+        values only.</p>
         <h2>Charts on several sheets</h2>
         <p>Each sheet has its own charts. Switching sheets shows that sheet's
         charts, and a chart may plot data from a different sheet by naming
@@ -1017,8 +1021,9 @@ Feb     135       84     0.38</pre>
         <td>Closing its window deletes it: press Ctrl+Z. Or it belongs to a
         different sheet: switch sheets.</td></tr>
         <tr><td>Charts disappeared after saving</td>
-        <td>The workbook was saved as .xlsx or .csv. Save as
-        <code>.dsheet</code> to keep charts.</td></tr>
+        <td>The workbook was saved as .csv, which holds values only, or the
+        chart is a Heatmap saved as .xlsx (Excel has no heatmap). Save as
+        <code>.dsheet</code> to keep every chart exactly.</td></tr>
         </table>
         """,
     ),
@@ -1056,8 +1061,6 @@ Feb     135       84     0.38</pre>
           the rest of its series.</li>
           <li>Dragging chart elements (titles, legend) to custom positions, and
           saving chart templates.</li>
-          <li>Carrying charts in <code>.xlsx</code> files: use
-          <code>.dsheet</code> to keep them.</li>
           <li>Logarithmic scales on 3-D charts.</li>
         </ul>
         """,

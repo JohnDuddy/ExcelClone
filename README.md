@@ -18,9 +18,10 @@ prohibited outright and desktop Excel is licensed per seat through a process
 you do not control. Duddy Spreadsheet is built for that gap: a purchased,
 perpetual, single-file install that works with the network cable unplugged.
 
-**It is deliberately not a general-purpose Excel replacement.** It has no
-macros, no pivot tables, no Power Query, and no live market feeds. What it
-has is a fast, correct, auditable modeling environment.
+**It is deliberately not a cloud or macro platform.** It has no macros, no
+Power Query, and no live market feeds. What it has is a fast, correct,
+auditable modeling environment that opens and saves Excel files with their
+charts, PivotTables, and comments intact.
 
 ## What it does
 
@@ -41,7 +42,8 @@ has is a fast, correct, auditable modeling environment.
 
 ### Spreadsheet engine
 
-- **196 functions** with searchable in-application help.
+- **524 functions** with searchable in-application help, including
+  Excel 365 dynamic arrays, LET, and LAMBDA.
 - Excel-sized virtual grid, dynamic-array spilling with `#SPILL!` reporting,
   and an incremental dependency graph that recalculates only what changed.
 - 200-level undo across every mutation, including structural edits.
@@ -50,20 +52,45 @@ has is a fast, correct, auditable modeling environment.
 - **Verified against Microsoft Excel**: 200 formulas are cross-checked
   against values Excel itself computed, and the suite fails if they diverge.
 
+### Tables, PivotTables, and What-If Analysis
+
+- **Excel Tables** (Ctrl+T): named, self-formatting lists that grow as you
+  type, fill formulas down automatically, add a total row, and can be used in
+  formulas by name, such as `=SUM(Sales[Amount])` or `=[@Qty]*[@Price]`.
+- **PivotTables** (Insert > PivotTable): drag fields into Rows, Columns,
+  Values, and Filters to total, average, or count a list by category, group
+  dates by year, quarter, or month, and show values as percentages. Refresh
+  with Alt+F5 and pull numbers into formulas with `GETPIVOTDATA`.
+- **Data tables** (Data > What-If Analysis > Data Table): see a formula's
+  result for a column of input values, or for every combination of two
+  inputs, without changing your model.
+- **PivotTable Fields pane, calculated fields, slicers, and PivotCharts**:
+  drag fields between areas while you watch the report change, add fields
+  such as `=Amount/Units`, filter with slicer buttons, and chart the report.
+- **Solver** (Data > Solver): maximize, minimize, or hit a target by changing
+  several cells under constraints, with Simplex LP, GRG Nonlinear, and
+  Evolutionary methods and integer or binary variables.
+- **Forecast Sheet** (Data > Forecast Sheet) and **Quick Analysis** (Ctrl+Q).
+- **Directions**: Help > PivotTables, Tables, and What-If Tutorial has 21
+  step-by-step lessons and opens a practice workbook to try them on.
+
 ### Presenting the work
 
 - **Printing and PDF export** with page setup, print preview, print areas,
   repeating header rows and columns, fit-to-page scaling, and header/footer
   tokens. Page setup is saved with the workbook.
-- **17 chart types** that stay bound to their ranges through edits, row and
+- **62 chart types** that stay bound to their ranges through edits, row and
   column changes, and sheet renames, exportable to PNG, SVG, and PDF.
+- **Pictures, shapes, and text boxes** that float over the sheet.
+- **Threaded comments** (Ctrl+Alt+M) with replies and resolve, alongside
+  notes.
 
 ### Files
 
 | Format | Support |
 |---|---|
 | `.dsheet` | Native format. Lossless, versioned, migration-safe. |
-| `.xlsx` / `.xlsm` | Formulas, values, styles, merges, names, validation, frozen panes, and hyperlinks. Unsupported content is reported before it is dropped, never silently lost. |
+| `.xlsx` / `.xlsm` | Formulas, values, styles, merges, names, validation, frozen panes, hyperlinks, tables, charts, sparklines, PivotTables, data tables, pictures, shapes, comments, and Solver models. Unsupported content is reported before it is dropped, never silently lost. |
 | `.csv` / `.tsv` | Import and export of the active sheet. |
 | `.ogrid` | Legacy files from earlier versions still open. |
 
@@ -107,6 +134,11 @@ Enter a licence key under **Help > Licence and Activation**.
 | `Ctrl+C`, `Ctrl+V` | Copy, paste |
 | `Ctrl+Enter` | Fill the selection with the current cell |
 | `Ctrl+D`, `Ctrl+R` | Fill down, fill right |
+| `Ctrl+T` | Create a table |
+| `Ctrl+Shift+T` | Toggle a table's total row |
+| `Alt+F5`, `Ctrl+Alt+F5` | Refresh the PivotTable, refresh all |
+| `Ctrl+Q` | Quick Analysis |
+| `Ctrl+Alt+M` | New comment |
 | `F1` | Financial functions guide |
 | `F2` | Edit the active cell |
 | `F4` | Cycle relative/absolute references while editing |
@@ -115,10 +147,9 @@ Enter a licence key under **Help > Licence and Activation**.
 
 ## Deliberately out of scope
 
-VBA and macros, pivot tables, Power Query, live market data, real-time
-collaboration, embedded Office objects, and a multi-variable optimisation
-solver. These are not silently approximated: the application says so when a
-file uses them.
+VBA and macros, Power Query, live market data, real-time collaboration, and
+embedded Office objects. These are not silently approximated: the application
+says so when a file uses them.
 
 ## Building from source
 

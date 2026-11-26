@@ -16,16 +16,38 @@ from duddysheet.core.refs import (
 from duddysheet.core.sheet import Sheet
 
 _INVALID_SHEET_CHARACTERS = frozenset(r"[]:*?/\\")
+WORKBOOK_OPTIONS = (
+    "calculation_mode",
+    "iterative_calculation",
+    "max_iterations",
+    "max_change",
+    "structure_protected",
+    "structure_password_hash",
+)
 _DEFINED_NAME_RE = re.compile(r"^[A-Za-z_\\][A-Za-z0-9_.\\]*$")
 
 
 @dataclass(frozen=True, slots=True)
 class DefinedName:
-    """A workbook- or sheet-scoped symbolic reference."""
+    """A workbook- or sheet-scoped name for a reference, constant, or formula.
+
+    ``reference`` is set for names that refer to cells. ``formula`` holds the
+    ``=``-prefixed text of any other definition, such as ``=0.07`` or a
+    ``LAMBDA``.
+    """
 
     name: str
-    reference: Reference
+    reference: Reference | None
     scope: str | None = None
+    formula: str | None = None
+    comment: str = ""
+
+    @property
+    def refers_to(self) -> str:
+        """Return the definition as Name Manager shows it, with a leading ``=``."""
+        if self.formula is not None:
+            return self.formula
+        return "=" + self.reference.to_a1() if self.reference is not None else "="
 
 
 class Workbook:
@@ -33,6 +55,17 @@ class Workbook:
 
     def __init__(self, *, create_default: bool = True) -> None:
         self._sheets: list[Sheet] = []
+        #: Name lookups keyed by the exact identifier; cleared on any change.
+        self._name_cache: dict[str, Sheet] = {}
+        #: Excel calculation options: "automatic", "automatic_except_tables",
+        #: or "manual"; iterative calculation resolves intentional cycles.
+        self.calculation_mode = "automatic"
+        self.iterative_calculation = False
+        self.max_iterations = 100
+        self.max_change = 0.001
+        #: Workbook structure protection (sheet add/delete/rename/move).
+        self.structure_protected = False
+        self.structure_password_hash = ""
         self._active_sheet: Sheet | None = None
         self._defined_names: dict[tuple[str | None, str], DefinedName] = {}
         if create_default:
@@ -90,9 +123,13 @@ class Workbook:
                 return self._sheets[identifier]
             except IndexError:
                 raise IndexError(f"Sheet index out of range: {identifier}") from None
+        cached = self._name_cache.get(identifier)
+        if cached is not None:
+            return cached
         folded = identifier.casefold()
         for sheet in self._sheets:
             if sheet.name.casefold() == folded:
+                self._name_cache[identifier] = sheet
                 return sheet
         raise KeyError(f"Unknown sheet: {identifier!r}")
 
@@ -105,6 +142,7 @@ class Workbook:
         selected_name = self._next_sheet_name() if name is None else name
         self._validate_new_sheet_name(selected_name)
         sheet = Sheet(selected_name)
+        self._name_cache.clear()
         if index is None:
             self._sheets.append(sheet)
         else:
@@ -122,6 +160,7 @@ class Workbook:
         sheet = self.get_sheet(identifier)
         index = self._sheets.index(sheet)
         self._sheets.remove(sheet)
+        self._name_cache.clear()
         if self._active_sheet is sheet:
             self._active_sheet = self._sheets[min(index, len(self._sheets) - 1)]
         self._defined_names = {
@@ -138,6 +177,7 @@ class Workbook:
         if not 0 <= destination <= len(self._sheets):
             raise IndexError(f"Sheet insertion index out of range: {destination}")
         self._sheets.insert(destination, sheet)
+        self._name_cache.clear()
         if self._active_sheet is None:
             self._active_sheet = sheet
 
@@ -148,6 +188,7 @@ class Workbook:
             self._validate_new_sheet_name(new_name)
         old_name = sheet.name
         sheet.name = new_name
+        self._name_cache.clear()
 
         updated_names: dict[tuple[str | None, str], DefinedName] = {}
         for defined_name in self._defined_names.values():
@@ -157,12 +198,26 @@ class Workbook:
                 and defined_name.scope.casefold() == old_name.casefold()
                 else defined_name.scope
             )
-            reference = _rename_reference_sheet(
-                defined_name.reference,
-                old_name=old_name,
-                new_name=new_name,
+            reference = (
+                None
+                if defined_name.reference is None
+                else _rename_reference_sheet(
+                    defined_name.reference,
+                    old_name=old_name,
+                    new_name=new_name,
+                )
             )
-            updated = replace(defined_name, reference=reference, scope=scope)
+            formula = defined_name.formula
+            if formula is not None:
+                from duddysheet.core.translation import rename_formula_sheet
+
+                formula = rename_formula_sheet(formula, old_name, new_name)
+            updated = replace(
+                defined_name,
+                reference=reference,
+                scope=scope,
+                formula=formula,
+            )
             updated_names[_name_key(updated.name, updated.scope)] = updated
         self._defined_names = updated_names
         return sheet
@@ -188,6 +243,7 @@ class Workbook:
         duplicate = source.copy(name=selected_name)
         source_index = self._sheets.index(source)
         self._sheets.insert(source_index + 1, duplicate)
+        self._name_cache.clear()
         return duplicate
 
     def define_name(
@@ -196,21 +252,62 @@ class Workbook:
         reference: Reference | str,
         *,
         scope: str | None = None,
+        comment: str = "",
     ) -> DefinedName:
-        """Create a workbook- or sheet-scoped defined name."""
+        """Create a workbook- or sheet-scoped defined name.
+
+        A string definition that parses as a reference (with or without a
+        leading ``=``) becomes a reference name; any other ``=`` text, such as
+        ``=0.07`` or ``=LAMBDA(x, x*2)``, is stored as a named formula.
+        """
         self._validate_defined_name(name)
         normalized_scope = self.get_sheet(scope).name if scope is not None else None
-        resolved_reference = (
-            parse_a1(reference, default_sheet=normalized_scope or self.active_sheet.name)
-            if isinstance(reference, str)
-            else reference
+        resolved_reference, formula = self._resolve_definition(
+            reference,
+            default_sheet=normalized_scope or self.active_sheet.name,
         )
         key = _name_key(name, normalized_scope)
         if key in self._defined_names:
             raise ValueError(f"Defined name already exists in scope: {name!r}")
-        defined_name = DefinedName(name, resolved_reference, normalized_scope)
+        defined_name = DefinedName(
+            name,
+            resolved_reference,
+            normalized_scope,
+            formula=formula,
+            comment=comment,
+        )
         self._defined_names[key] = defined_name
         return defined_name
+
+    def put_name(self, defined_name: DefinedName) -> DefinedName | None:
+        """Store a defined name, replacing one with the same scope and name."""
+        key = _name_key(defined_name.name, defined_name.scope)
+        previous = self._defined_names.get(key)
+        self._defined_names[key] = defined_name
+        return previous
+
+    @staticmethod
+    def _resolve_definition(
+        definition: Reference | str,
+        *,
+        default_sheet: str,
+    ) -> tuple[Reference | None, str | None]:
+        if not isinstance(definition, str):
+            return definition, None
+        text = definition.strip()
+        body = text[1:].strip() if text.startswith("=") else text
+        if not body:
+            raise ValueError("A defined name needs a definition")
+        try:
+            return parse_a1(body, default_sheet=default_sheet), None
+        except ValueError:
+            pass
+        if not text.startswith("="):
+            raise ValueError(f"Invalid name reference: {definition!r}")
+        from duddysheet.core.parser import parse_formula
+
+        parse_formula("=" + body)
+        return None, "=" + body
 
     def get_name(self, name: str, *, scope: str | None = None) -> DefinedName:
         """Resolve a local defined name first, then its workbook fallback."""
@@ -238,14 +335,19 @@ class Workbook:
         duplicate._sheets = [sheet.copy() for sheet in self._sheets]
         duplicate._active_sheet = duplicate._sheets[self.active_sheet_index]
         duplicate._defined_names = self._defined_names.copy()
+        for option in WORKBOOK_OPTIONS:
+            setattr(duplicate, option, getattr(self, option))
         return duplicate
 
     def restore_from(self, snapshot: Workbook) -> None:
         """Replace workbook state from an independent snapshot."""
         restored = snapshot.copy()
         self._sheets = restored._sheets
+        self._name_cache.clear()
         self._active_sheet = restored._active_sheet
         self._defined_names = restored._defined_names
+        for option in WORKBOOK_OPTIONS:
+            setattr(self, option, getattr(restored, option))
 
     def _next_sheet_name(self) -> str:
         number = 1

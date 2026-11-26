@@ -163,7 +163,7 @@ class WorksheetRenderer:
     def _effective_format(self, row: int, column: int) -> CellFormat:
         """Return a cell's format including any conditional overrides."""
         if self._conditional is None:
-            return self.sheet.get_cell(row, column).format
+            return self.sheet.effective_format(row, column)
         return self._conditional.evaluate(self.sheet, row, column).format
 
     def _tracks(self, page: Page) -> tuple[list[_Track], list[_Track]]:

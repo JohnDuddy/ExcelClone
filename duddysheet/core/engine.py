@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -46,12 +47,18 @@ class FormulaEngine:
         self.workbook = workbook
         self.graph = DependencyGraph()
         self.evaluator = FormulaEvaluator(workbook)
+        # Data tables (TABLE) evaluate what-if variants through the engine.
+        self.evaluator.engine = self
+        self.calc_generation = 0
         self._asts: dict[CellAddress, Node] = {}
         self._range_precedents: dict[CellAddress, tuple[RangeReference, ...]] = {}
+        self._range_version = 0
         self._volatile: set[CellAddress] = set()
         self._spill_cells: dict[CellAddress, set[CellAddress]] = {}
         self._spill_owners: dict[CellAddress, CellAddress] = {}
         self._spill_blockers: dict[CellAddress, set[CellAddress]] = {}
+        #: Formulas awaiting calculation while the workbook is in manual mode.
+        self.pending: set[CellAddress] = set()
         self._index_existing_formulas()
 
     def set_cell(
@@ -80,7 +87,9 @@ class FormulaEngine:
         changed = {address}
         changed.update(self._clear_spill(address))
         previous = sheet.get_cell(row, column)
-        selected_format = previous.format if cell_format is None else cell_format
+        selected_format = (
+            sheet.effective_format(row, column) if cell_format is None else cell_format
+        )
         sheet.set_cell(
             row,
             column,
@@ -91,6 +100,7 @@ class FormulaEngine:
         if ast is None:
             self._asts.pop(address, None)
             self._range_precedents.pop(address, None)
+            self._range_version += 1
             self._volatile.discard(address)
             self.graph.set_precedents(address, set())
         else:
@@ -98,12 +108,23 @@ class FormulaEngine:
             self._install_dependencies(address, ast)
 
         affected = self._affected_formulas(changed | self._volatile)
+        if self.workbook.calculation_mode == "automatic_except_tables":
+            deferred = {item for item in affected if self._is_table_formula(item) and item != address}
+            self.pending.update(deferred)
+            affected -= deferred
+        if self.workbook.calculation_mode == "manual":
+            # Excel calculates only the entered formula; dependents wait for F9.
+            self.pending.update(affected)
+            entered = {address} & self._asts.keys()
+            self.pending.difference_update(entered)
+            return self._calculate_nodes(entered)
         return self._calculate_nodes(affected)
 
     def recalculate(self, *, sheet_name: str | None = None) -> RecalculationResult:
         """Recalculate every formula, or formulas on one selected sheet."""
         if sheet_name is None:
             selected = set(self._asts)
+            self.pending.clear()
         else:
             canonical = self.workbook.get_sheet(sheet_name).name.casefold()
             selected = {
@@ -126,6 +147,7 @@ class FormulaEngine:
         self.graph = DependencyGraph()
         self._asts.clear()
         self._range_precedents.clear()
+        self._range_version += 1
         self._volatile.clear()
         self._spill_cells.clear()
         self._spill_owners.clear()
@@ -146,10 +168,7 @@ class FormulaEngine:
     def _install_dependencies(self, address: CellAddress, ast: Node) -> None:
         precedents: set[CellAddress] = set()
         ranges: list[RangeReference] = []
-        for reference in collect_references(ast):
-            resolved = self._resolve_reference(reference, scope=address.sheet)
-            if resolved is None:
-                continue
+        for resolved in self._formula_references(ast, address.sheet, origin=(address.row, address.column)):
             if isinstance(resolved, CellReference):
                 precedents.add(self._address_from_reference(resolved, address.sheet))
                 continue
@@ -181,25 +200,97 @@ class FormulaEngine:
             self._volatile.discard(address)
         if ranges:
             self._range_precedents[address] = tuple(ranges)
+            self._range_version += 1
         else:
             self._range_precedents.pop(address, None)
+            self._range_version += 1
 
-    def _resolve_reference(
+    def _is_table_formula(self, address: CellAddress) -> bool:
+        from duddysheet.core.parser import FunctionNode
+
+        ast = self._asts.get(address)
+        return isinstance(ast, FunctionNode) and ast.name == "TABLE"
+
+    def _structured_references(
         self,
-        reference: Reference | str,
-        *,
+        ast: Node,
         scope: str,
-    ) -> Reference | None:
-        if not isinstance(reference, str):
-            return reference
-        name_scope = scope
-        name = reference
-        if "!" in reference:
-            name_scope, _, name = reference.partition("!")
-        try:
-            return self.workbook.get_name(name, scope=name_scope).reference
-        except (KeyError, ValueError):
-            return None
+        origin: tuple[int, int],
+    ) -> list[Reference]:
+        from duddysheet.core.parser import StructuredReferenceNode, node_children
+        from duddysheet.core.tables import resolve_structured
+
+        found: list[Reference] = []
+
+        from duddysheet.core.parser import NameNode
+        from duddysheet.core.tables import StructuredSpec, find_table
+
+        def visit(node: Node) -> None:
+            if isinstance(node, StructuredReferenceNode):
+                reference = resolve_structured(self.workbook, node.table, node.spec, scope, origin)
+                if reference is not None:
+                    found.append(reference)
+                return
+            if isinstance(node, NameNode) and node.sheet is None and find_table(self.workbook, node.name):
+                reference = resolve_structured(self.workbook, node.name, StructuredSpec(), scope, origin)
+                if reference is not None:
+                    found.append(reference)
+                return
+            for child in node_children(node):
+                visit(child)
+
+        if any(sheet.tables for sheet in self.workbook):
+            visit(ast)
+        from duddysheet.core.parser import FunctionNode
+
+        if isinstance(ast, FunctionNode) and ast.name == "TABLE":
+            from duddysheet.core.data_table import data_table_at, dependency_ranges
+
+            try:
+                sheet = self.workbook.get_sheet(scope)
+            except KeyError:
+                return found
+            spec = data_table_at(sheet, *origin)
+            if spec is not None:
+                found.extend(dependency_ranges(spec, sheet.name))
+        return found
+
+    def _formula_references(
+        self,
+        ast: Node,
+        scope: str,
+        seen: frozenset[tuple[str | None, str]] = frozenset(),
+        *,
+        origin: tuple[int, int] = (0, 0),
+    ) -> list[Reference]:
+        """Return cell and range precedents, following named formulas and tables."""
+        resolved: list[Reference] = self._structured_references(ast, scope, origin)
+        for reference in collect_references(ast, sheet_names=self.workbook.sheet_names):
+            if not isinstance(reference, str):
+                resolved.append(reference)
+                continue
+            name_scope = scope
+            name = reference
+            if "!" in reference:
+                name_scope, _, name = reference.partition("!")
+            try:
+                defined = self.workbook.get_name(name, scope=name_scope)
+            except (KeyError, ValueError):
+                continue
+            if defined.reference is not None:
+                resolved.append(defined.reference)
+                continue
+            key = (defined.scope, defined.name.casefold())
+            if defined.formula is None or key in seen:
+                continue
+            try:
+                name_ast = parse_formula(defined.formula)
+            except ValueError:
+                continue
+            resolved.extend(
+                self._formula_references(name_ast, scope, seen | {key})
+            )
+        return resolved
 
     def _address_from_reference(
         self,
@@ -232,51 +323,67 @@ class FormulaEngine:
 
     def _affected_formulas(self, changed: set[CellAddress]) -> set[CellAddress]:
         affected = set(changed)
-        queue = list(sorted(changed))
+        queue = deque(changed)
+        dependents = self.graph._dependents
+        has_ranges = bool(self._range_precedents)
+        has_blockers = bool(self._spill_blockers)
         while queue:
-            current = queue.pop(0)
-            candidates = set(self.graph.dependents_of(current))
-            candidates.update(self._range_dependents(current))
-            candidates.update(
-                parent
-                for parent, blockers in self._spill_blockers.items()
-                if current in blockers
-            )
-            for dependent in sorted(candidates):
-                if dependent not in affected:
-                    affected.add(dependent)
-                    queue.append(dependent)
+            current = queue.popleft()
+            direct = dependents.get(current)
+            if direct:
+                for dependent in direct:
+                    if dependent not in affected:
+                        affected.add(dependent)
+                        queue.append(dependent)
+            if has_ranges:
+                for dependent in self._range_dependents(current):
+                    if dependent not in affected:
+                        affected.add(dependent)
+                        queue.append(dependent)
+            if has_blockers:
+                for parent, blockers in self._spill_blockers.items():
+                    if current in blockers and parent not in affected:
+                        affected.add(parent)
+                        queue.append(parent)
         return affected & self._asts.keys()
 
     def _range_dependents(self, address: CellAddress) -> set[CellAddress]:
+        index = self._range_index()
         dependents: set[CellAddress] = set()
+        row, column = address.row, address.column
+        for min_row, max_row, min_column, max_column, formula in index.get(address.sheet.casefold(), ()):
+            if min_row <= row <= max_row and min_column <= column <= max_column:
+                dependents.add(formula)
+        return dependents
+
+    def _range_index(self) -> dict[str, list[tuple[int, int, int, int, CellAddress]]]:
+        """Range precedents as plain bounds grouped by sheet, rebuilt when they change."""
+        signature = (id(self._range_precedents), len(self._range_precedents), self._range_version)
+        cached = getattr(self, "_range_index_cache", None)
+        if cached is not None and cached[0] == signature:
+            return cached[1]
+        index: dict[str, list[tuple[int, int, int, int, CellAddress]]] = {}
         for formula, ranges in self._range_precedents.items():
             for reference in ranges:
-                sheet_name = reference.sheet or formula.sheet
-                if (
-                    sheet_name.casefold() == address.sheet.casefold()
-                    and reference.contains(address.row, address.column)
-                ):
-                    dependents.add(formula)
-                    break
-        return dependents
+                sheet_name = (reference.sheet or formula.sheet).casefold()
+                index.setdefault(sheet_name, []).append(
+                    (reference.min_row, reference.max_row, reference.min_column, reference.max_column, formula)
+                )
+        self._range_index_cache = (signature, index)
+        return index
 
     def _calculate_nodes(
         self,
         selected: set[CellAddress],
     ) -> RecalculationResult:
+        self.calc_generation += 1
         remaining = set(selected) & self._asts.keys()
-        circular: list[CellAddress] = []
-        while True:
-            cycle = self.graph.find_cycle(remaining)
-            if not cycle:
-                break
-            for address in sorted(cycle):
-                self._cache_result(address, CIRC_ERROR)
-                circular.append(address)
-            remaining.difference_update(cycle)
-
-        order = self.graph.topological_order(remaining)
+        order, circular_cells = self.graph.recalculation_plan(remaining)
+        circular: list[CellAddress] = list(circular_cells)
+        if circular and self.workbook.iterative_calculation:
+            return self._calculate_iteratively(order, circular)
+        for address in circular:
+            self._cache_result(address, CIRC_ERROR)
         recalculated: list[CellAddress] = []
         for address in order:
             result = self.evaluator.evaluate(
@@ -290,6 +397,47 @@ class FormulaEngine:
             tuple(recalculated),
             tuple(sorted(set(circular))),
         )
+
+    def _calculate_iteratively(
+        self,
+        order: tuple[CellAddress, ...],
+        circular: list[CellAddress],
+    ) -> RecalculationResult:
+        """Resolve circular references by iteration, as Excel's option does."""
+        for address in order:
+            self._evaluate_into(address)
+        limit = max(1, int(self.workbook.max_iterations))
+        tolerance = float(self.workbook.max_change)
+        for _ in range(limit):
+            largest = 0.0
+            for address in circular:
+                before = self._numeric_cache(address)
+                self._evaluate_into(address)
+                after = self._numeric_cache(address)
+                if before is None or after is None:
+                    largest = max(largest, 0.0 if before == after else float("inf"))
+                else:
+                    largest = max(largest, abs(after - before))
+            if largest <= tolerance:
+                break
+        for address in order:
+            self._evaluate_into(address)
+        return RecalculationResult(tuple(order) + tuple(circular), ())
+
+    def _evaluate_into(self, address: CellAddress) -> None:
+        result = self.evaluator.evaluate(
+            self._asts[address],
+            sheet_name=address.sheet,
+            origin=(address.row, address.column),
+        )
+        self._cache_result(address, result)
+
+    def _numeric_cache(self, address: CellAddress) -> float | None:
+        cell = self.workbook.get_sheet(address.sheet).get_cell(address.row, address.column)
+        value = cell.cached_value
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+        return None
 
     def _cache_result(self, address: CellAddress, value: Any) -> None:
         sheet = self.workbook.get_sheet(address.sheet)

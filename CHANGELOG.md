@@ -6,6 +6,86 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Added
 
+- `.xlsx` files keep charts, sparklines, and PivotTables. Charts become
+  native Excel charts, including histogram, Pareto, box and whisker,
+  waterfall, funnel, treemap, and sunburst; PivotTables become real Excel
+  PivotTables that refresh when the file opens. Charts, sparklines, and
+  PivotTables in files saved by Excel are imported. Excel has no heatmap or
+  step chart: a heatmap is left out of `.xlsx` and a step chart saved as a
+  line chart, and the status bar says so.
+- Formula results checked against Microsoft Excel itself: about 1,000
+  formulas were entered in Excel and its answers recorded as a test fixture.
+- Formulas Excel refuses when typed are refused with Excel's message: the
+  wrong number of arguments, anything but constants inside `{...}`, and a
+  value where a function needs a range, such as `=COUNTIF({1,2,3},">1")`.
+  Formulas already in a workbook keep working.
+- Cells draw rotated, stacked, indented, and shrink-to-fit text. Grouped rows
+  and columns get Excel's outline bar with level buttons and +/- boxes. The
+  Home ribbon has Font and Font Size boxes.
+- The PivotTable Fields pane docks beside the sheet while a PivotTable is
+  selected, with drag and drop between areas and Defer Layout Update.
+  PivotTables gain calculated fields, slicers, and PivotCharts.
+- Data > Solver with Simplex LP, GRG Nonlinear, and Evolutionary methods,
+  integer and binary constraints, and Keep Solver Solution. The model is
+  saved with the sheet and in `.xlsx` the way Excel's Solver stores it.
+- Insert > Pictures, Shapes, and Text Box: floating objects that can be
+  moved, resized, edited, and deleted, saved in `.dsheet` and `.xlsx`.
+- Quick Analysis (Ctrl+Q): formatting, charts, totals, tables, and
+  sparklines for the selection. Data > Forecast Sheet builds a forecast with
+  confidence bounds and a chart. Review > New Comment (Ctrl+Alt+M) starts a
+  threaded comment with replies and resolve, saved to `.xlsx` as an Excel
+  threaded comment.
+- The packaged-build self-test checks Excel parity, Excel objects, Tables,
+  PivotTables, and data tables.
+
+- Excel Tables. Ctrl+T (or Insert > Table) turns a list into a named table
+  with a styled header and banded rows. Formulas can refer to it by name:
+  `Table1[Qty]`, `[@Qty]` for the same row, `Table1[#Headers]`,
+  `Table1[#Totals]`, `Table1[#All]`, column ranges such as
+  `Table1[[Qty]:[Price]]`, and a bare `Table1` for its data. A formula typed
+  into an empty column fills the whole column, and rows typed below or
+  inserted inside receive it too. Typing beside or below a table grows it.
+  Data > Table offers a total row (Ctrl+Shift+T) with a per-column Sum,
+  Average, Count, Max, Min, StdDev, or Var, plus 35 styles, banding and
+  first/last column options, rename (formulas follow), resize, and Convert to
+  Range, which rewrites structured references as A1 references.
+- PivotTables. Insert > PivotTable summarizes a range or table on a new or
+  existing sheet. The PivotTable Fields dialog places fields in Filters,
+  Columns, Rows, and Values. Eleven summary functions are offered, with Show
+  Values As (% of grand, column, or row total, and running total), item
+  filters, year/quarter/month/day date grouping, compact, outline, or
+  tabular layout, and switchable subtotals and grand totals. Refresh (Alt+F5),
+  Refresh All (Ctrl+Alt+F5), Change Data Source, Show Details, and
+  `GETPIVOTDATA` all work as in Excel. A PivotTable built from a table
+  follows the table as it grows.
+- What-If data tables. Data > What-If Analysis > Data Table creates one- and
+  two-variable `{=TABLE()}` tables that show a formula's result for many
+  input values without changing the real inputs, recalculate as the model
+  changes, and honor Automatic Except for Data Tables. Goal Seek and Scenario
+  Manager share the same submenu.
+- Help > PivotTables, Tables, and What-If Tutorial: 16 searchable lessons
+  with steps, worked examples, and tips, plus a practice workbook holding a
+  sales table, a PivotTable built from it, and a loan data table.
+- Excel 365 formula semantics: arrays broadcast through operators and
+  functions, ranges spill, `@` forces implicit intersection, `A1#` refers to
+  a spill, and LET, LAMBDA, named formulas, 3-D references, and `:` between
+  reference expressions all work. The function library grows to 524,
+  including SORTBY, VSTACK, GROUPBY, PIVOTBY, XMATCH, TEXTSPLIT, and the
+  engineering, database, and remaining statistical and financial functions.
+- Excel's editing model: Enter and Tab move after an edit, arrow keys
+  point at references while typing a formula, Ctrl+arrows jump between data
+  edges, Ctrl+A selects the current region, cut-and-paste moves cells, and
+  Insert/Delete Cells shift neighbours. Every Paste Special mode, Flash Fill,
+  AutoSum, and Excel's formatting shortcuts are included.
+- Go To Special, Trace Precedents and Dependents with arrows, Evaluate
+  Formula, error checking with cell markers, and a Watch Window.
+- Cell styles, the number-format gallery, notes, sheet and workbook
+  protection compatible with Excel passwords, row and column grouping,
+  Subtotal, Consolidate, Advanced Filter, manual and iterative calculation.
+- `.xlsx` files keep tables (with totals and calculated columns), data
+  tables, dynamic-array formulas, notes, protection, outlines, conditional
+  formats, and calculation options.
+
 - A workbook named on the command line now opens at startup. `--open PATH`,
   `--open=PATH`, or a single bare path all work, so Duddy Spreadsheet can be
   launched from a script or a shortcut, or registered as the handler for a
@@ -70,6 +150,16 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Changed
 
+- Native schema 6 stores slicers, Solver models, pictures and shapes, and
+  comment threads. Schema 5 files migrate on open.
+- PivotTables over 100,000 rows compute in under a second (from about nine),
+  and large data tables recalculate in under a second (from minutes).
+  Editing a cell that ranges depend on is faster in every workbook.
+- The PivotTable tutorial grows to 21 lessons, covering calculated fields,
+  slicers, PivotCharts, Solver, and Forecast Sheet.
+- Native schema 5 stores notes, outlines, protection, row and column formats,
+  workbook calculation options, tables, PivotTables, and data tables. Schema 4
+  files migrate on open.
 - Native schema raised to 4 to carry sparklines and the new chart options,
   with a migration from 3. Older charts open with their original appearance.
 - Pie and doughnut slices now run clockwise from 12 o'clock, as in Excel.
@@ -80,6 +170,19 @@ All notable changes follow Keep a Changelog conventions.
 
 ### Fixed
 
+- Results now match Excel for `CEILING` and `FLOOR` with negative numbers,
+  `LOG` with base 1, `FORECAST` with one point, `TREND` with mismatched
+  sizes, `TEXTBEFORE`/`TEXTAFTER` when the delimiter is missing, `VLOOKUP`
+  and `HLOOKUP` with a missing value, `XLOOKUP` with mismatched arrays,
+  `LOOKUP` with a shorter result vector, `MATCH` with any positive or
+  negative match type, `FILTER` with a single include value, `PMT` with zero
+  periods, `NPV` at -100%, `NPER` with all-positive cash flows, `MIRR`
+  without both signs, `PRICEDISC` with large discounts, `AGGREGATE` reference
+  functions given arrays, `NETWORKDAYS` with a text holiday, `SHEET` of a
+  value, `FORECAST.ETS.SEASONALITY` when no season repeats three times, and
+  `ACCRINT`, which now sums coupon periods the way Excel does.
+- Complex-number text uses 15 significant digits, as in Excel.
+- The Data menu no longer appears twice in the menu bar.
 - Editing a chart no longer silently switches it to the top recommended chart
   type.
 - Turning gridlines off on a radar chart now hides them.

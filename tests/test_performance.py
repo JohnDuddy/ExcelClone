@@ -128,3 +128,58 @@ def test_undo_10_000_cell_paste_is_under_500ms() -> None:
 
     assert engine.workbook.active_sheet.populated_count == 0
     assert elapsed < 0.500
+
+
+@pytest.mark.performance
+def test_pivot_table_over_100_000_rows_is_under_two_seconds() -> None:
+    from duddysheet.core.cell import Cell
+    from duddysheet.core.pivot import PivotSpec, PivotValueField, compute_pivot
+
+    workbook = Workbook()
+    sheet = workbook.active_sheet
+    for column, header in enumerate(("Region", "Product", "Amount")):
+        sheet.put_cell(0, column, Cell(header, header))
+    regions = ("East", "West", "North", "South")
+    for row in range(1, 100_001):
+        for column, value in enumerate((regions[row % 4], f"P{row % 25}", float(row % 97))):
+            sheet.put_cell(row, column, Cell(value, value))
+    spec = PivotSpec("P", sheet.name, (0, 0, 100_000, 2), (0, 5), rows=("Region",), columns=("Product",), values=(PivotValueField("Amount"),))
+
+    started = perf_counter()
+    result = compute_pivot(workbook, spec)
+    elapsed = perf_counter() - started
+
+    grand_total = max(row for row, _column in result.cells)
+    assert result.cells[(grand_total, 0)].value == "Grand Total"
+    assert elapsed < 2.0
+
+
+@pytest.mark.performance
+def test_400_cell_data_table_recalculates_under_two_seconds() -> None:
+    from duddysheet.commands.analysis import create_data_table
+    from duddysheet.core.data_table import DataTableSpec
+
+    workbook = Workbook()
+    engine = FormulaEngine(workbook)
+    name = workbook.active_sheet.name
+    for row, value in enumerate((0.05, 360, 200000, "=PMT(A1/12,A2,-A3)")):
+        engine.set_cell(name, row, 0, value)
+    for step in range(4, 54):
+        engine.set_cell(name, step, 0, f"=A{step}*1.0001")
+    engine.set_cell(name, 0, 3, "=A54")
+    for index in range(20):
+        engine.set_cell(name, 0, 4 + index, 0.03 + index * 0.002)
+        engine.set_cell(name, 1 + index, 3, 120 + index * 12)
+    create_data_table(workbook, name, DataTableSpec(0, 3, 20, 23, (name, 0, 0), (name, 1, 0)))
+    engine.rebuild_index()
+
+    started = perf_counter()
+    engine.recalculate()
+    full = perf_counter() - started
+    started = perf_counter()
+    engine.set_cell(name, 2, 0, 250000)
+    edit = perf_counter() - started
+
+    assert isinstance(workbook.active_sheet.get_cell(20, 23).display_value, float)
+    assert full < 2.0
+    assert edit < 1.0
